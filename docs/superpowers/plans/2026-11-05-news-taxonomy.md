@@ -18,7 +18,7 @@
   → **本计划里没有 commit 步骤**，每个任务的检查点是「跑测试 + 在 README 记录」。不要执行 `git add` / `git commit`。
 - **临时脚本用完必须清理**：文件名用 `tmp-*` 前缀（`tmp-xxx.mjs` / `tmp-xxx.py` / `tmp-xxx.log`），
   任务结束前用
-  `mavis-trash.cmd -- "PROJECT_ROOT/tmp-xxx.mjs"` 删掉。
+  `recycle-delete.cmd -- "PROJECT_ROOT/tmp-xxx.mjs"` 删掉。
   **不要**用 `Remove-Item`（会被权限策略拒绝）。
 - **测试脚本内部的临时工程目录**用 `tools/.tmp-<名字>`（点开头），跑完由脚本自己 `fs.rmSync` 删掉 ——
   照抄 `tools/test-keep-manifest.mjs` 的现成模式，别另发明一套。
@@ -1358,7 +1358,7 @@ Expected: `═══ N 通过 / 0 失败 ═══`
 - [ ] **Step 7: 清理临时脚本**
 
 ```powershell
-mavis-trash.cmd -- "PROJECT_ROOT/tmp-verify-taxonomy-online.mjs"
+recycle-delete.cmd -- "PROJECT_ROOT/tmp-verify-taxonomy-online.mjs"
 ```
 
 - [ ] **Step 8: 在 README 记录**

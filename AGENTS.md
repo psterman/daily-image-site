@@ -881,7 +881,7 @@ assets/     shortcut.ico（桌面快捷方式图标）
 - **R2 条件写键名是 `etagMatches`**（不是 `etagMatch`）；冲突时 `put()` 返回 `null` 而不抛异常，必须看返回值
 - **任何会写生产数据的验证脚本必须自带收尾** —— 早先的线上冒烟脚本在 `likes/<日期>.json` 里留了一票，收不回来
 - **Pages Functions 路由 = 文件路径**；路由写错会回退首页返回 200 + HTML，图片全坏
-- **临时文件用完必须清理**（`tmp-*` / `tools/.tmp-*`）；**删除文件一律用** `mavis-trash.cmd -- "<正斜杠字面量路径>"`，别用 `Remove-Item`
+- **临时文件用完必须清理**（`tmp-*` / `tools/.tmp-*`）；**删除文件一律用** `recycle-delete.cmd -- "<正斜杠字面量路径>"`，别用 `Remove-Item`
 
 ---
 

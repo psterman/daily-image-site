@@ -329,7 +329,7 @@ schtasks /query /tn "DailyImageSite-NightPublish-0010" /fo LIST /v
 ## 八、别踩的坑（速查，详见 AGENTS.md）
 
 1. **站点代码不在 git 里** → 无 commit 可回滚，靠「跑测试 + 更新 AGENTS.md + 更新 SDD 账本」留痕。**SDD 账本同样不在 git 里**。
-2. **删文件只能走回收站删除脚本**（`mavis-trash.cmd -- "<正斜杠字面量路径>"`）；`Remove-Item` 被安全策略硬拦。**递归拷贝（`Copy-Item -Recurse`）同样被拦** → 往期 manifest 的备份用**线上快照**取回（`https://example.com/<日期>/manifest.<hash>.js`）。
+2. **删文件只能走回收站**（不要用 `Remove-Item`，它会被安全策略硬拦）；**递归拷贝（`Copy-Item -Recurse`）同样被拦** → 往期 manifest 的备份用**线上快照**取回（`https://example.com/<日期>/manifest.<hash>.js`）。
 3. **改文件用 edit/write + 绝对路径**；bash 里 `cd` 之后写文件/重定向会被硬拦。**bash 里 `cd` 对 .NET API（如 `ReadAllBytes`）无效 —— 相对路径按进程工作目录解析，要用绝对路径**。
 4. **比对线上文件必须下原始字节算哈希** —— `.js` 的 Content-Type 常不带 charset。**Pages 对不存在的路径返回 index.html + 200**（验「某期上线了没」不能只看 HTTP 码，要比对字节）。
 5. **分类有两套口径**：chip 筛选走 `tags`（一条可属多类，和 > 总数**正常**）；主标签 `tag` 每条唯一（和 = 总数）。**同一个 AI：chip 89 条 / 主标签 39 条**。以 `verify-news.mjs` 数出来的为准。
