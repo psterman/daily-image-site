@@ -14,6 +14,11 @@
  *   - 每个套件独立进程、独立退出码，**一个红不影响后面的**（要拿到完整清单）
  *   - 单个套件超时算红（挂死比红更糟：它会假装还在跑）
  *   - 结尾非零退出 = 有红
+ *
+ * 超时默认 30 分钟：test-webp.mjs 要把 R2 母本里上万个 WebP 逐个跟 ffprobe
+ * 对照（实测 12695 个文件 ≈ 16 分钟）。嫌慢可以调小，但别调到它跑不完 ——
+ * 那会得到一个「因为超时而红」的假象。
+ *   SUITE_TIMEOUT_MS=600000 node tools/run-all-tests.mjs
  */
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -27,7 +32,7 @@ const argv = process.argv.slice(2);
 const includeMutate = argv.includes('--mutate');
 const onlyArg = argv.find((a) => a.startsWith('--only='));
 const only = onlyArg ? onlyArg.slice('--only='.length) : '';
-const PER_SUITE_TIMEOUT_MS = 600_000;   // 10 分钟
+const PER_SUITE_TIMEOUT_MS = Number(process.env.SUITE_TIMEOUT_MS || 1800_000);   // 30 分钟
 
 const files = fs.readdirSync(__dirname)
   .filter((n) => /^test-.*\.mjs$/.test(n))
