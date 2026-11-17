@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0b0b0f">
+<meta name="format-detection" content="telephone=no">
+<meta name="referrer" content="no-referrer">
+<title>留言板 · 每日图片站</title>
+<meta name="description" content="留言板 · 求图 · 留言。">
+<meta name="robots" content="noindex, nofollow">
+<!-- 这个标记给 functions/board/index.js 用：Pages 的 ASSETS 绑定对不存在的路径
+     会回退到首页并返回 200 + text/html，光看状态码和 Content-Type 分不出来。
+     靠这个标记确认拿到的确实是留言板页面，不是首页。 -->
+<meta name="board-page" content="1">
+<link rel="icon" href="/assets/logo.jpg" type="image/jpeg">
+<style>
+  :root {
+    --bg: #0b0b0f;
+    --bg-elev: #16161d;
+    --bg-elev-2: #1e1e28;
+    --line: #26262f;
+    --text: #e8e8ee;
+    --text-dim: #8b8b99;
+    --accent: #4a8cff;
+    --danger: #ff5c5c;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: rgba(0,0,0,0); }
+  html, body {
+    margin: 0; padding: 0; background: var(--bg); color: var(--text);
+    -webkit-text-size-adjust: 100%; text-size-adjust: 100%;
+  }
+  body {
+    font: 15px/1.6 -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    padding-bottom: calc(32px + var(--safe-bottom));
+  }
+  a { color: var(--accent); text-decoration: none; }
+
+  .wrap { max-width: 560px; margin: 0 auto; padding: 0 16px; }
+
+  /* ── 顶栏 ── */
+  .topbar {
+    position: -webkit-sticky; position: sticky; top: 0; z-index: 20;
+    background: rgba(11,11,15,.92);
+    -webkit-backdrop-filter: saturate(160%) blur(12px);
+    backdrop-filter: saturate(160%) blur(12px);
+    border-bottom: 1px solid var(--line);
+    padding-top: var(--safe-top);
+  }
+  .topbar-row {
+    display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center;
+    padding: 12px 16px 12px;
+  }
+  .brand { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; }
+  .brand-mark { width: 28px; height: 28px; border-radius: 8px; margin-right: 10px; background: #fff; }
+  .brand-text h1 { margin: 0; font-size: 16px; font-weight: 600; letter-spacing: .3px; }
+  .brand-text p { margin: 2px 0 0; font-size: 12px; color: var(--text-dim); }
+  .topbar-actions { margin-left: auto; }
+  .home-link { font-size: 13px; color: var(--text-dim); }
+  .home-link .chev { margin-left: 4px; font-size: 15px; }
+
+  /* ── 通用块 ── */
+  .card {
+    background: var(--bg-elev); border: 1px solid var(--line);
+    border-radius: 14px; padding: 16px; margin-top: 18px;
+  }
+  .card h2 { margin: 0 0 4px; font-size: 15px; font-weight: 600; }
+  .card .hint { margin: 0 0 14px; font-size: 12px; color: var(--text-dim); }
+
+  input[type=text], input[type=password], textarea, select {
+    width: 100%; background: var(--bg-elev-2); border: 1px solid var(--line);
+    color: var(--text); border-radius: 10px; padding: 10px 12px; font-size: 15px;
+    font-family: inherit; outline: none; -webkit-appearance: none; appearance: none;
+  }
+  input:focus, textarea:focus, select:focus { border-color: var(--accent); }
+  textarea { resize: vertical; min-height: 96px; line-height: 1.6; }
+  select {
+    background-image: linear-gradient(45deg, transparent 50%, var(--text-dim) 50%),
+                      linear-gradient(135deg, var(--text-dim) 50%, transparent 50%);
+    background-position: calc(100% - 16px) 50%, calc(100% - 11px) 50%;
+    background-size: 5px 5px, 5px 5px;
+    background-repeat: no-repeat;
+    padding-right: 34px;
+  }
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 6px; }
+  .row2 { display: -webkit-flex; display: flex; }
+  .row2 .field { -webkit-flex: 1; flex: 1; min-width: 0; }
+  .row2 .field.gap { margin-left: 10px; }
+
+  button {
+    font-family: inherit; font-size: 15px; border: 0; border-radius: 10px;
+    padding: 11px 18px; color: #fff; background: var(--accent);
+    -webkit-appearance: none; appearance: none; cursor: pointer;
+  }
+  button:disabled { opacity: .5; }
+  button.ghost { background: transparent; border: 1px solid var(--line); color: var(--text-dim); }
+  button.danger { background: transparent; border: 1px solid rgba(255,92,92,.4); color: var(--danger); padding: 6px 12px; font-size: 13px; }
+
+  .row-actions { margin-top: 14px; display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; }
+  .row-actions .msg { margin-left: 12px; font-size: 13px; color: var(--text-dim); }
+  .row-actions .msg.ok { color: #4ade80; }
+  .row-actions .msg.err { color: var(--danger); }
+
+  /* ── 留言列表 ── */
+  .msg-list { margin: 0; padding: 0; list-style: none; }
+  .msg-item {
+    background: var(--bg-elev); border: 1px solid var(--line);
+    border-radius: 12px; padding: 13px 14px; margin-top: 10px;
+  }
+  .msg-head { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; margin-bottom: 6px; }
+  .msg-name { font-size: 14px; font-weight: 600; }
+  .msg-name.is-anon { color: var(--text-dim); font-weight: 400; }
+  .msg-time { margin-left: 8px; font-size: 12px; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+  .msg-cat {
+    margin-left: 8px; font-size: 11px; color: var(--accent);
+    background: rgba(74,140,255,.12); padding: 2px 7px; border-radius: 999px;
+  }
+  .msg-body { margin: 0; font-size: 15px; line-height: 1.62; white-space: pre-wrap; word-break: break-word; }
+  .msg-link { display: inline-block; margin-top: 8px; font-size: 13px; word-break: break-all; }
+  .msg-del { margin-left: auto; }
+  .empty { padding: 28px 0; text-align: center; color: var(--text-dim); font-size: 14px; }
+  .count { font-size: 12px; color: var(--text-dim); margin: 22px 0 0; }
+
+  /* ── 跟图评论的图上下文 ── */
+  .img-ctx {
+    display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center;
+    padding: 12px 14px; margin: 0 0 12px;
+    border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.04);
+  }
+  /* 必须有这一句：作者样式表里的 display:flex 优先级高于 UA 样式表的
+     [hidden]{display:none}，不写的话 <div hidden> 照样显示得出来，
+     「不带参数时不显示图上下文」那条断言就永远失败。
+     （同款规则在 site/app.css 的 .like-badge[hidden]{display:none} 里已经有了。） */
+  .img-ctx[hidden] { display: none; }
+  .img-ctx img { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; background: #000; }
+  /* 不用 flex gap —— iOS 13 的 WKWebView 不支持（board.html 里现有的样式一个 gap 都没用，
+     site/app.css 顶部也写死了这条约束），相邻元素之间用 margin 撑开。 */
+  .img-ctx-img { margin-right: 12px; }
+  .img-ctx-txt {
+    -webkit-flex: 1; flex: 1; min-width: 0;
+    display: -webkit-flex; display: flex; -webkit-flex-direction: column; flex-direction: column;
+  }
+  .img-ctx-txt strong { font-size: 14px; }
+  /* --text-dim 是本文件定义的变量名（board.html 里用了 12 次）；
+     写成 var(--dim) 的话变量不存在，这行 color 直接失效，文字会继承父级颜色。 */
+  .img-ctx-txt span { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
+  /* 用本文件定义的 --accent，别另开一个色值 —— 现有链接走的都是 var(--accent)。 */
+  .img-ctx a { margin-left: 12px; font-size: 13px; color: var(--accent); white-space: nowrap; }
+  .msg-thumb-link {
+    display: -webkit-inline-block; display: inline-block;
+    vertical-align: middle; line-height: 0;
+    margin-right: 8px;
+  }
+  .msg-thumb { display: block; width: 48px; height: 48px; object-fit: cover; border-radius: 6px; }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-row">
+    <div class="brand">
+      <img class="brand-mark" src="/assets/logo.webp" alt="" width="28" height="28">
+      <div class="brand-text">
+        <h1>留言板</h1>
+        <p>求图 · 留言 · 投稿</p>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <a class="home-link" href="/">回首页<span class="chev">›</span></a>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <!-- 口令门 -->
+  <div class="card" id="gateCard">
+    <h2>需要投稿口令</h2>
+    <p class="hint">向发链接的人索取投稿口令，验证一次后 30 天内不用再输。</p>
+    <div class="field">
+      <input type="password" id="tokenInput" placeholder="投稿口令" autocomplete="off" autocorrect="off" autocapitalize="off">
+    </div>
+    <div class="row-actions">
+      <button id="gateBtn" type="button">进入</button>
+      <span class="msg" id="gateMsg"></span>
+    </div>
+  </div>
+
+  <!-- 提交表单 -->
+  <div class="card" id="formCard" hidden>
+    <h2>留个言</h2>
+    <p class="hint">想求什么图、想说什么，写在这里。带上链接的话我会照着抓。</p>
+    <div class="row2">
+      <div class="field">
+        <label for="nameInput">昵称（可选）</label>
+        <input type="text" id="nameInput" placeholder="随便写" maxlength="40">
+      </div>
+      <div class="field gap">
+        <label for="catSelect">栏目（可选）</label>
+        <select id="catSelect">
+          <option value="">不指定</option>
+          <option value="求图">求图</option>
+          <option value="见闻">见闻</option>
+          <option value="见她">见她</option>
+          <option value="见笑">见笑</option>
+          <option value="其他">其他</option>
+        </select>
+      </div>
+    </div>
+    <div class="field">
+      <label for="bodyInput">留言内容</label>
+      <textarea id="bodyInput" placeholder="说点什么…" maxlength="2000"></textarea>
+    </div>
+    <div class="field">
+      <label for="linkInput">链接（可选）</label>
+      <input type="text" id="linkInput" placeholder="https://… 只支持 http/https" maxlength="500">
+    </div>
+    <div class="row-actions">
+      <button id="submitBtn" type="button">提交</button>
+      <span class="msg" id="submitMsg"></span>
+    </div>
+  </div>
+
+  <!-- 留言列表 -->
+  <div class="card" id="listCard" hidden>
+    <h2>留言</h2>
+    <div id="imgCtx" class="img-ctx" hidden>
+      <img id="imgCtxImg" class="img-ctx-img" alt="">
+      <div class="img-ctx-txt">
+        <strong id="imgCtxTitle"></strong>
+        <span id="imgCtxSub"></span>
+      </div>
+      <a id="showAll" href="/board/">看全部留言</a>
+    </div>
+    <ul class="msg-list" id="msgList"></ul>
+    <div class="empty" id="emptyTip" hidden>还没有留言，来抢第一条。</div>
+  </div>
+
+  <p class="count" id="countTip"></p>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var AUTHOR_KEY = 'board-author-token';
+  var api = '/board/api';
+
+  /* ── 跟图评论：?img=&id=&thumb= ─────────────────────────── */
+  var IMG_THUMB_RE = /^\/img\/\d{4}-\d{2}-\d{2}\/[a-z]+\/[0-9a-f]{10}_\d{3}_t\.webp$/;
+  var IMG_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+  var IMG_ID_RE = /^[a-z]{3,10}_\d{3}$/;
+
+  /* thumb 要再过一次白名单 —— 后端已经校验过，
+     但前端渲染前再挡一次，防止以后有人改后端时漏了 */
+  function readImgContext() {
+    var q = new URLSearchParams(location.search);
+    var date = q.get('img') || '';
+    var id = q.get('id') || '';
+    var thumb = q.get('thumb') || '';
+    if (!IMG_DATE_RE.test(date) || !IMG_ID_RE.test(id) || !IMG_THUMB_RE.test(thumb)) return null;
+    return { date: date, id: id, thumb: thumb };
+  }
+
+  var imgCtx = readImgContext();
+
+  /* 栏目 key -> 中文名。给用户看的是「见笑」，不是内部 id「jianxiao_012」。
+     music / movie 是榜单 tab（听乐 / 看片）—— 它们没有图片产物，
+     但留言板照样要能用中文名说话，所以一并登记。
+     tools/test-contract.mjs 会从 build.mjs 抠出全部栏目逐个核对这里，
+     漏一个就会红。 */
+  var TAB_LABELS = {
+    jianwen: '见闻', jianshe: '见她', jianxiao: '见笑', news: '见报',
+    music: '听乐', movie: '看片'
+  };
+
+  /** 图 id 是 <栏目>_<序号>，展示成「见笑 · 012」 */
+  function imgCtxLabel() {
+    if (!imgCtx) return '';
+    var p = imgCtx.id.split('_');
+    var label = TAB_LABELS[p[0]] || p[0];
+    return p[1] ? label + ' · ' + p[1] : label;
+  }
+
+  function showImgContext() {
+    if (!imgCtx) return;
+    document.getElementById('imgCtxImg').setAttribute('src', imgCtx.thumb);
+    document.getElementById('imgCtxTitle').textContent = imgCtx.date + ' 这张图的评论';
+    document.getElementById('imgCtxSub').textContent = imgCtxLabel();
+    document.getElementById('imgCtx').hidden = false;
+  }
+
+  var gateCard = document.getElementById('gateCard');
+  var gateBtn = document.getElementById('gateBtn');
+  var gateMsg = document.getElementById('gateMsg');
+  var tokenInput = document.getElementById('tokenInput');
+
+  var formCard = document.getElementById('formCard');
+  var submitBtn = document.getElementById('submitBtn');
+  var submitMsg = document.getElementById('submitMsg');
+  var nameInput = document.getElementById('nameInput');
+  var catSelect = document.getElementById('catSelect');
+  var bodyInput = document.getElementById('bodyInput');
+  var linkInput = document.getElementById('linkInput');
+
+  var listCard = document.getElementById('listCard');
+  var msgList = document.getElementById('msgList');
+  var emptyTip = document.getElementById('emptyTip');
+  var countTip = document.getElementById('countTip');
+
+  var authorToken = null;
+  try { authorToken = localStorage.getItem(AUTHOR_KEY); } catch (e) {}
+
+  function setMsg(el, text, kind) {
+    el.textContent = text || '';
+    el.className = 'msg' + (kind ? ' ' + kind : '');
+  }
+
+  function fmtTime(ts) {
+    var d = new Date(ts);
+    var p = function (n) { return (n < 10 ? '0' : '') + n; };
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) +
+           ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+
+  function headers(extra) {
+    var h = extra || {};
+    if (authorToken) h['x-author-token'] = authorToken;
+    return h;
+  }
+
+  /* ── 拉留言 ── */
+  function load() {
+    fetch(api, { headers: headers(), credentials: 'same-origin', cache: 'no-store' })
+      .then(function (r) {
+        if (r.status === 401 || r.status === 503) return { ok: false, gated: true, status: r.status };
+        return r.json();
+      })
+      .then(function (data) {
+        if (!data || !data.ok) {
+          if (data && data.gated) { showGate(data.status === 503 ? '留言板未启用' : '需要投稿口令'); return; }
+          showGate('读取失败');
+          return;
+        }
+        showBoard();
+        render(data.items || []);
+      })
+      .catch(function () { showGate('网络错误'); });
+  }
+
+  function showGate(msg) {
+    gateCard.hidden = false;
+    formCard.hidden = true;
+    listCard.hidden = true;
+    countTip.textContent = '';
+    if (msg) setMsg(gateMsg, msg, 'err');
+  }
+
+  function showBoard() {
+    gateCard.hidden = true;
+    formCard.hidden = false;
+    listCard.hidden = false;
+  }
+
+  function render(items) {
+    msgList.innerHTML = '';
+    // 带了图上下文就只显示这张图的评论
+    var list = imgCtx
+      ? items.filter(function (it) {
+          return it && it.imgDate === imgCtx.date && it.imgId === imgCtx.id;
+        })
+      : items;
+    list.forEach(function (it) {
+      var li = document.createElement('li');
+      li.className = 'msg-item';
+
+      var head = document.createElement('div');
+      head.className = 'msg-head';
+
+      var name = document.createElement('span');
+      name.className = 'msg-name' + (it.name ? '' : ' is-anon');
+      name.textContent = it.name || '匿名';
+      head.appendChild(name);
+
+      var time = document.createElement('span');
+      time.className = 'msg-time';
+      time.textContent = fmtTime(it.ts);
+      head.appendChild(time);
+
+      if (it.cat) {
+        var cat = document.createElement('span');
+        cat.className = 'msg-cat';
+        cat.textContent = it.cat;
+        head.appendChild(cat);
+      }
+
+      if (it.mine) {
+        var del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'danger msg-del';
+        del.textContent = '删除';
+        del.addEventListener('click', function () { remove(it.id, del); });
+        head.appendChild(del);
+      }
+
+      li.appendChild(head);
+
+      // 正文用 textContent，绝不拼 HTML
+      var p = document.createElement('p');
+      p.className = 'msg-body';
+      p.textContent = it.body;
+
+      // 带图的留言：正文前面放一张缩略图，点它跳回那张图。
+      // 放进 p 里而不是挂在 li 上 —— p 是块级元素，缩略图如果挂在 li 上会自己独占一行，
+      // CSS 里的 vertical-align / margin-right 就全成了摆设（实测：正文被挤到缩略图下面）。
+      //
+      // 缩略图包在 <a> 里，而不是给 <img> 挂 click 处理：
+      // 原生链接自带键盘可聚焦 / 回车可点 / 右键新标签打开 / 手机长按可保存，
+      // 而 <img> 加点击处理这四样一个都没有。
+      //
+      // 外层元素**两种情况都用同一个 <a>**：
+      // 日期合法 -> 给 href，是个链接；
+      // 日期不合法 -> 不给 href（<a> 没有 href 时就是个普通行内元素，不可聚焦、不可点），
+      //   但外框的 display:inline-block 一样在，缩略图照样跟正文同一行。
+      // 早先只有合法分支包 <a>，非法分支把 <img> 直接塞进 p ——
+      // 而 .msg-thumb 是 display:block（为了让 <a> 里的图不撑出基线间隙），
+      // 那条分支上缩略图就自己独占一行、正文被挤到下面（真实 Chrome 实测间距 -48、不同行）。
+      if (it.imgThumb && IMG_THUMB_RE.test(it.imgThumb)) {
+        var ti = document.createElement('img');
+        ti.className = 'msg-thumb';
+        ti.setAttribute('src', it.imgThumb);
+
+        // 日期也要过白名单 —— it.imgDate 是服务端给的，后端写入时已经校验过，
+        // 但拼进 URL 前再挡一次：万一以后后端改了校验，这里拼出 //evil.com/ 就把用户带走了。
+        var ta = document.createElement('a');
+        ta.className = 'msg-thumb-link';
+        if (IMG_DATE_RE.test(it.imgDate)) {
+          ti.alt = '跳到这张图';
+          ta.href = '/' + it.imgDate + '/';
+        } else {
+          ti.alt = '这张图';
+        }
+        ta.appendChild(ti);
+        p.insertBefore(ta, p.firstChild);
+      }
+
+      li.appendChild(p);
+
+      if (it.link) {
+        var a = document.createElement('a');
+        a.className = 'msg-link';
+        a.href = it.link;
+        a.textContent = it.link;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer nofollow';
+        li.appendChild(a);
+      }
+
+      msgList.appendChild(li);
+    });
+
+    emptyTip.hidden = list.length > 0;
+    // 带图参数进来却一条评论都没有时，别让页面说「还没有留言，来抢第一条」——
+    // 留言板上明明有别的留言，只是这张图还没有。
+    // 计数同理：过滤后要说明数的是「这张图的评论」，不是整个留言板。
+    emptyTip.textContent = imgCtx
+      ? '这张图还没有评论，来说第一句。'
+      : '还没有留言，来抢第一条。';
+    countTip.textContent = list.length
+      ? (imgCtx ? ('这张图 ' + list.length + ' 条评论') : ('共 ' + list.length + ' 条留言'))
+      : '';
+  }
+
+  /* ── 删除 ── */
+  function remove(id, btn) {
+    if (!window.confirm('删掉这条留言？')) return;
+    btn.disabled = true;
+    fetch(api, {
+      method: 'POST',
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers: headers({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ action: 'delete', id: id, authorToken: authorToken }),
+    })
+      .then(function (r) { return r.json().then(function (d) { return { s: r.status, d: d }; }); })
+      .then(function (res) {
+        if (res.d && res.d.ok) { load(); return; }
+        btn.disabled = false;
+        window.alert((res.d && res.d.error) || '删除失败');
+      })
+      .catch(function () { btn.disabled = false; window.alert('网络错误'); });
+  }
+
+  /* ── 提交 ── */
+  function submit() {
+    var body = bodyInput.value.trim();
+    if (!body) { setMsg(submitMsg, '内容不能为空', 'err'); return; }
+
+    submitBtn.disabled = true;
+    setMsg(submitMsg, '提交中…');
+    var payload = {
+      name: nameInput.value.trim(),
+      cat: catSelect.value,
+      body: body,
+      link: linkInput.value.trim(),
+    };
+    // 只在有图上下文时才加这三个键 —— 后端约定「要么都不给，要么都给」
+    if (imgCtx) {
+      payload.imgDate = imgCtx.date;
+      payload.imgId = imgCtx.id;
+      payload.imgThumb = imgCtx.thumb;
+    }
+
+    fetch(api, {
+      method: 'POST',
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers: headers({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload),
+    })
+      .then(function (r) { return r.json().then(function (d) { return { s: r.status, d: d }; }); })
+      .then(function (res) {
+        submitBtn.disabled = false;
+        var d = res.d || {};
+        if (d.ok) {
+          if (d.authorToken) {
+            authorToken = d.authorToken;
+            try { localStorage.setItem(AUTHOR_KEY, authorToken); } catch (e) {}
+          }
+          bodyInput.value = '';
+          linkInput.value = '';
+          setMsg(submitMsg, '已提交', 'ok');
+          load();
+          return;
+        }
+        if (res.s === 401) { showGate('需要投稿口令'); return; }
+        setMsg(submitMsg, d.error || '提交失败', 'err');
+      })
+      .catch(function () {
+        submitBtn.disabled = false;
+        setMsg(submitMsg, '网络错误', 'err');
+      });
+  }
+
+  /* ── 口令 ── */
+  function enter() {
+    var t = tokenInput.value.trim();
+    if (!t) { setMsg(gateMsg, '口令不能为空', 'err'); return; }
+    gateBtn.disabled = true;
+    setMsg(gateMsg, '验证中…');
+    fetch(api, { headers: { 'x-board-token': t }, credentials: 'same-origin', cache: 'no-store' })
+      .then(function (r) {
+        gateBtn.disabled = false;
+        if (r.status === 401) { setMsg(gateMsg, '口令不对', 'err'); return; }
+        if (r.status === 503) { setMsg(gateMsg, '留言板未启用', 'err'); return; }
+        return r.json().then(function (d) {
+          if (d && d.ok) { setMsg(gateMsg, ''); load(); return; }
+          setMsg(gateMsg, '口令不对', 'err');
+        });
+      })
+      .catch(function () {
+        gateBtn.disabled = false;
+        setMsg(gateMsg, '网络错误', 'err');
+      });
+  }
+
+  submitBtn.addEventListener('click', submit);
+  gateBtn.addEventListener('click', enter);
+  tokenInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') enter(); });
+
+  showImgContext();
+  load();
+})();
+</script>
+</body>
+</html>

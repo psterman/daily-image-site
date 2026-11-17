@@ -1,0 +1,106 @@
+{
+  "_doc": "见报分类的唯一真相源。改这里 = 改分类，不用动任何代码。categories 的顺序 = 前端 chip 显示顺序（固定，不随条数变）。sourceCategory：源名 -> 主分类 key，每个源都必须有。keywordTags：标题/摘要命中关键词后追加的分类。",
+  "_doc2": "2026-11-11 新开两个分类：时政要闻(current) / 财经商业(biz)。起因是发现两个结构性缺口 —— ① 原来的 6 个分类里 5 个是科技味的，中文时政只能塞进「热议」，热榜和时政混在一起；② 一个正经财经类都没有，「雪球」被挂在「深度阅读」里完全不对味。改完之后「热议」回归纯热榜聚合（微博热搜/知乎热榜/虎扑步行街/抽屉热榜），时事媒体整体挪到「时政要闻」。",
+  "_doc3": "2026-11-12 充实 AI 分类。① **专注 AI 的源，主分类直接归 ai**：机器之心 / 新智元 / 硅星人Pro / AI前线 / Datawhale / 晚点LatePost / 集智俱乐部 / PaperWeekly（这 8 个是公众号镜像 —— 它们的官网 RSS 都已经死了，公众号是唯一长期通道）。加上原来的 AIHOT精选 / 量子位 / APPSO / 即刻·AI编程，AI 分类现在有 12 个专属源。② **非 AI 源里的 AI 文章靠关键词追加进 ai**：关键词表从 10 个词扩到 33 个，覆盖实测标题里出现过的模型名（DeepSeek/Gemini/Kimi/Llama/Qwen/Mistral/Copilot/Cursor/Agent/Anthropic/OpenAI）和技术词（具身智能/多模态/大语言模型/推理模型/扩散模型/LLM/AGI/RAG/MCP/GPU/算力）。③ **故意不加「英伟达」** —— 实测把它加上后，2026-11-12 那天 14 条「黄仁勋婚外情/董事会罢免 CEO」的**公司治理八卦**全被拖进 AI 分类。英伟达真正的技术新闻本来就带 GPU / 算力 / 芯片，由这几个词兜住；治理新闻只提公司名，不该进 AI。同理**故意不加**：机器人（工业自动化也用这个词）、芯片（驱动之家整站都是芯片新闻，加了等于把整个源拖进 AI）、模型（太泛）、Token（财经文里也常见）、论文（任何学科都发论文）、推理（逻辑/刑侦语境）。④ 分类顺序没动（AI 仍在第 5 位），chip 顺序不随条数变。",
+
+  "categories": [
+    { "key": "hot",     "label": "热议" },
+    { "key": "current", "label": "时政要闻" },
+    { "key": "biz",     "label": "财经商业" },
+    { "key": "tech",    "label": "科技数码" },
+    { "key": "ai",      "label": "AI" },
+    { "key": "tools",   "label": "效率工具" },
+    { "key": "dev",     "label": "技术社区" },
+    { "key": "deep",    "label": "深度阅读" }
+  ],
+
+  "sourceCategory": {
+    "微博热搜": "hot",
+    "知乎热榜": "hot",
+    "虎扑步行街": "hot",
+    "抽屉热榜": "hot",
+
+    "联合早报": "current",
+    "联合早报·国际": "current",
+    "路透中文": "current",
+    "纽约时报中文": "current",
+    "参考消息": "current",
+    "每日环球视野": "current",
+    "新华网·新华社新闻": "current",
+    "求是网": "current",
+    "澎湃新闻": "current",
+    "侠客岛": "current",
+    "长安街知事": "current",
+    "卫星社中文": "current",
+    "德国之声中文": "current",
+    "法广中文": "current",
+
+    "雪球": "biz",
+    "虎嗅": "biz",
+    "钛媒体": "biz",
+    "FT中文网": "biz",
+    "财富中文网": "biz",
+    "华尔街见闻": "biz",
+    "新财富": "biz",
+
+    "驱动之家": "tech",
+    "爱范儿": "tech",
+    "36氪": "tech",
+    "差评X.PIN": "tech",
+    "Readhub早报": "tech",
+    "蓝点网": "tech",
+    "数字尾巴": "tech",
+    "cnBeta": "tech",
+    "雷锋网": "tech",
+    "FreeBuf网络安全": "tech",
+    "安全客": "tech",
+
+    "AIHOT精选": "ai",
+    "即刻·AI编程": "ai",
+    "APPSO": "ai",
+    "量子位": "ai",
+    "机器之心": "ai",
+    "新智元": "ai",
+    "硅星人Pro": "ai",
+    "AI前线": "ai",
+    "Datawhale": "ai",
+    "晚点LatePost": "ai",
+    "集智俱乐部": "ai",
+    "PaperWeekly": "ai",
+
+    "少数派": "tools",
+    "少数派发现": "tools",
+    "异次元": "tools",
+    "小众软件": "tools",
+
+    "V2EX 热榜": "dev",
+    "V2EX创意": "dev",
+    "V2EX·技术": "dev",
+    "即刻·行业内幕": "dev",
+    "w2solo独立开发": "dev",
+    "LINUX DO": "dev",
+    "掘金技术社区": "dev",
+    "掘金本周最热": "dev",
+    "NodeSeek": "dev",
+    "infoQ中文": "dev",
+    "潮流周刊": "dev",
+
+    "阮一峰": "deep",
+    "博海拾贝": "deep",
+    "知乎日报": "deep",
+    "人人都是产品经理": "deep",
+    "字节跳动技术团队": "deep",
+    "美团技术团队": "deep",
+    "理想生活实验室": "deep",
+    "果壳网·科学人": "deep"
+  },
+
+  "keywordTags": [
+    {
+      "tag": "ai",
+      "words": ["AI", "人工智能", "大模型", "大语言模型", "多模态", "具身智能", "智能体", "机器学习", "深度学习", "神经网络", "算力", "推理模型", "扩散模型", "GPT", "ChatGPT", "Claude", "DeepSeek", "Gemini", "Kimi", "Llama", "Qwen", "Mistral", "Copilot", "Cursor", "Agent", "Anthropic", "OpenAI", "Transformer", "LLM", "AGI", "RAG", "MCP", "GPU"]
+    }
+  ],
+
+  "maxExtraTags": 2
+}

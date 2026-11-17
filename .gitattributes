@@ -1,0 +1,14 @@
+# 仓库内容统一 LF（Windows 上检出也是 LF）。
+#
+# 为什么不用 git 默认的 core.autocrlf=true：
+#   那个设置会让 Windows 的工作区变成 CRLF ——
+#   而 .sh / .ps1 / .cmd 遇到 CRLF，在 Unix 上会**直接坏掉**
+#   （bash 报 `#!/bin/bash^M: bad interpreter`）。
+#   这个工程本来就全用 LF（见 AGENTS.md 的编码约定），别让 git 改回去。
+* text=auto eol=lf
+
+# 二进制，明确不许做行尾转换
+*.webp binary
+*.jpg binary
+*.ico binary
+*.onnx binary

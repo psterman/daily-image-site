@@ -1,0 +1,301 @@
+{
+  "_comment": "RSS 订阅源配置。改完直接跑 node tools/build.mjs 生效，不用动任何代码。",
+  "_doc": {
+    "feeds": "每个源：name=显示的来源名，url=订阅地址。分类不在这里配 —— 见 tools/news-taxonomy.json（唯一真相源）",
+    "perFeed": "每个源最多取几条",
+    "maxItems": "当天总共保留多少条",
+    "fairCap": "单个源最多能占几个名额（防止话痨源霸屏），默认按 maxItems/源数 自动算",
+    "timeoutMs": "单个源的超时毫秒数（超了算失败，不影响其他源）",
+    "maxAgeDays": "条目最多存活几天。超过就丢掉 —— 源停更时整源消失（看得见的故障），而不是把上个月的文章当今天的新闻显示。单个源可以用 maxAgeDays 单独放宽",
+    "enabled": "false 可以整体关掉见报功能，构建照常进行",
+    "probe": "想加新源先测一下：node tools/fetch-rss.mjs --probe <url>",
+    "maxItems 怎么算": "59 个源 × 每源 4 条 = 232。**不是死公式** —— fairCap = max(2, ceil(maxItems/源数))，且补齐是「保底 1 条 + 之后按时间倒序填」，所以条目比热门源旧的源会被挤到 1~2 条。实测 177（×3）时求是网/侠客岛/新财富等只拿到 1 条，232（×4）后几乎每个源都 4 条 → **按「安静源能不能露脸」调**。改大 maxItems 见报总长会跟着涨（177→347 条 / 232→396 条）",
+    "2026-11-11 加的 30 个源": "全部实测过（2026-11-11）：HTTP 200 + 合法 RSS + 最新条目 0~2 天前。**没加**：人民日报（公众号镜像推的是「梁家辉最佳男主角」「国民平价鱼」这种娱乐/生活向，跟时政要闻对不上）、BBC中文（繁体，简体站）、财新网/第一财经周刊（标题大半是「推广|特别呈现|活动招募」的商业活动稿）、InfoQ推荐（与 infoQ中文 同一批文章，重复）、V2EX首页（全站流水含灌水帖）、知乎日报/澎湃的 feedx.net 旧镜像（停更 325~416 天，过期闸门会全丢）、IT之家/极客公园/Solidot/开源中国（用户之前移除过，不许借镜像混回来）",
+    "2026-11-12 加的 8 个 AI 源": "机器之心 / 新智元 / 硅星人Pro / AI前线 / Datawhale / 晚点LatePost / 集智俱乐部 / PaperWeekly。**全走 `wechat2rss.bestblogs.dev`**（站里已在用：APPSO、掘金技术社区）—— 因为这几家的**官网 RSS 都已经死了**（机器之心 /rss、/rss.xml、/atom.xml 三个地址全返回 HTML；PaperWeekly 域名不通；硅星人官网域名被抢跳 /lander 广告页），公众号镜像反而是唯一长期可用的通道。实测（2026-11-12）：8 个源 HTTP 200 + 合法 RSS + 近 7 天都有更新。**没加**：雷峰网公众号（官网源已在，文章重复）；智谱/通义/阶跃/DeepSeek 公众号（停更 8~115 天，过期闸门会全丢）；宝玉（停更 23 天）；TechNode（2000 条但全英文标题，违反只收中文）",
+    "换过的地址": "**APPSO（2026-11-12）**：配置里的地址被截断成 38 位（…4ae111e5b509609a5ee96c9894f1868fba）→ 一直 HTTP 500，之前记成「镜像上也没了」是错的；用户给的完整地址是 42 位 …4ae111e5b509609a5ee96c9894f1868fbafd793e.xml → 改完后 200 + 10 条 + 9 条带图 + 最新 11-11。 || 纽约时报中文：用户给的是 feedburner（http://feeds.feedburner.com/nytcn），实测 3 次里有 1 次要靠重试才过（24 秒），直连 cn.nytimes.com/rss 每次 1.2 秒 —— 内容一模一样，改用直连",
+    "重名的源": "「V2EX 热榜」有两个渠道（头条 Python 抓的 + RSS屋 镜像），共用同一个显示名。构建期有跨源去重，同一条链接只留一条"
+  },
+  "enabled": true,
+  "perFeed": 10,
+  "maxItems": 232,
+  "timeoutMs": 15000,
+  "maxAgeDays": 10,
+  "feeds": [
+    {
+      "name": "少数派",
+      "url": "https://sspai.com/feed"
+    },
+    {
+      "name": "少数派发现",
+      "url": "https://meta.appinn.net/c/faxian.rss"
+    },
+    {
+      "name": "AIHOT精选",
+      "url": "https://aihot.news/feed.xml"
+    },
+    {
+      "name": "爱范儿",
+      "url": "https://www.ifanr.com/feed"
+    },
+    {
+      "name": "知乎日报",
+      "url": "https://rsshub.bestblogs.dev/zhihu/daily"
+    },
+    {
+      "name": "抽屉热榜",
+      "url": "https://dig.ichouti.cn/feed.xml"
+    },
+    {
+      "name": "V2EX创意",
+      "url": "https://www.v2ex.com/feed/tab/creative.xml"
+    },
+    {
+      "name": "即刻·行业内幕",
+      "url": "https://rss.injahow.cn/jike/topic/5699f451d3e8351200bffdc8"
+    },
+    {
+      "name": "即刻·AI编程",
+      "url": "https://rss.injahow.cn/jike/topic/56d2fabe7cb3331100467e2b"
+    },
+    {
+      "name": "阮一峰",
+      "url": "https://www.ruanyifeng.com/blog/atom.xml",
+      "maxAgeDays": 14
+    },
+    {
+      "name": "博海拾贝",
+      "url": "https://feed.luobo8.com/"
+    },
+    {
+      "name": "人人都是产品经理",
+      "url": "https://www.woshipm.com/feed"
+    },
+    {
+      "name": "Readhub早报",
+      "url": "https://www.readhub.cn/rss"
+    },
+    {
+      "name": "w2solo独立开发",
+      "url": "https://w2solo.com/topics/feed"
+    },
+    {
+      "name": "36氪",
+      "url": "https://www.36kr.com/feed"
+    },
+    {
+      "name": "每日环球视野",
+      "url": "https://plink.anyfeeder.com/idaily/today"
+    },
+    {
+      "name": "联合早报",
+      "url": "https://plink.anyfeeder.com/zaobao/realtime/china"
+    },
+    {
+      "name": "路透中文",
+      "url": "https://reuters.buzzing.cc/feed.xml"
+    },
+    {
+      "name": "纽约时报中文",
+      "url": "https://cn.nytimes.com/rss/"
+    },
+    {
+      "name": "参考消息",
+      "url": "https://plink.anyfeeder.com/weixin/ckxxwx"
+    },
+    {
+      "name": "差评X.PIN",
+      "url": "https://wechat2rss.xlab.app/feed/8d839de8dd3290a1f1be7a94423cccb30c1b087d.xml"
+    },
+    {
+      "name": "APPSO",
+      "url": "https://wechat2rss.bestblogs.dev/feed/4ae111e5b509609a5ee96c9894f1868fbafd793e.xml"
+    },
+    {
+      "name": "异次元",
+      "url": "https://feedex.net/feed/feed.iplaysoft.com/"
+    },
+    {
+      "name": "小众软件",
+      "url": "http://feeds-origin.appinn.com/appinns"
+    },
+    {
+      "name": "LINUX DO",
+      "url": "https://linuxdorss.longpink.com/top.xml"
+    },
+    {
+      "name": "V2EX 热榜",
+      "url": "https://rss.mifaw.com/articles/5c8bb11a3c41f61efd36683e/5c923e953882afa09dff573a"
+    },
+    {
+      "name": "掘金技术社区",
+      "url": "https://wechat2rss.bestblogs.dev/feed/33ecd2122ae788ea02dfcf1df857a54b9ae1338d.xml"
+    },
+    {
+      "name": "NodeSeek",
+      "url": "https://rss.nodeseek.com/"
+    },
+    {
+      "name": "雪球",
+      "url": "https://plink.anyfeeder.com/weixin/xueqiujinghua"
+    },
+
+    {
+      "name": "新华网·新华社新闻",
+      "url": "https://plink.anyfeeder.com/newscn/whxw"
+    },
+    {
+      "name": "求是网",
+      "url": "https://plink.anyfeeder.com/qstheory"
+    },
+    {
+      "name": "澎湃新闻",
+      "url": "https://plink.anyfeeder.com/weixin/thepapernews"
+    },
+    {
+      "name": "侠客岛",
+      "url": "https://plink.anyfeeder.com/weixin/xiake_island"
+    },
+    {
+      "name": "长安街知事",
+      "url": "https://plink.anyfeeder.com/weixin/capitalnews"
+    },
+    {
+      "name": "联合早报·国际",
+      "url": "https://plink.anyfeeder.com/zaobao/realtime/world"
+    },
+    {
+      "name": "卫星社中文",
+      "url": "https://sputniknews.cn/export/rss2/archive/index.xml"
+    },
+    {
+      "name": "德国之声中文",
+      "url": "https://rss.dw.com/rdf/rss-chi-all"
+    },
+    {
+      "name": "法广中文",
+      "url": "https://www.rfi.fr/cn/rss"
+    },
+
+    {
+      "name": "虎嗅",
+      "url": "https://rss.huxiu.com/"
+    },
+    {
+      "name": "钛媒体",
+      "url": "https://www.tmtpost.com/feed"
+    },
+    {
+      "name": "FT中文网",
+      "url": "https://www.ftchinese.com/rss/feed"
+    },
+    {
+      "name": "财富中文网",
+      "url": "https://plink.anyfeeder.com/fortunechina"
+    },
+    {
+      "name": "华尔街见闻",
+      "url": "https://plink.anyfeeder.com/weixin/wallstreetcn"
+    },
+    {
+      "name": "新财富",
+      "url": "https://plink.anyfeeder.com/weixin/newfortune"
+    },
+
+    {
+      "name": "蓝点网",
+      "url": "https://www.landiannews.com/feed"
+    },
+    {
+      "name": "数字尾巴",
+      "url": "https://plink.anyfeeder.com/dgtle"
+    },
+    {
+      "name": "cnBeta",
+      "url": "https://plink.anyfeeder.com/cnbeta"
+    },
+    {
+      "name": "雷锋网",
+      "url": "https://www.leiphone.com/feed"
+    },
+    {
+      "name": "FreeBuf网络安全",
+      "url": "https://www.freebuf.com/feed"
+    },
+    {
+      "name": "安全客",
+      "url": "https://api.anquanke.com/data/v1/rss"
+    },
+
+    {
+      "name": "量子位",
+      "url": "https://www.qbitai.com/feed"
+    },
+
+    {
+      "name": "V2EX·技术",
+      "url": "https://www.v2ex.com/feed/tab/tech.xml"
+    },
+    {
+      "name": "掘金本周最热",
+      "url": "https://rsshub.bestblogs.dev/juejin/trending/all/weekly"
+    },
+    {
+      "name": "infoQ中文",
+      "url": "https://www.infoq.cn/feed"
+    },
+    {
+      "name": "潮流周刊",
+      "url": "https://weekly.tw93.fun/rss.xml"
+    },
+
+    {
+      "name": "字节跳动技术团队",
+      "url": "https://juejin.cn/rss"
+    },
+    {
+      "name": "美团技术团队",
+      "url": "https://tech.meituan.com/feed/"
+    },
+    {
+      "name": "理想生活实验室",
+      "url": "https://plink.anyfeeder.com/toodaylab"
+    },
+    {
+      "name": "果壳网·科学人",
+      "url": "https://plink.anyfeeder.com/guokr/scientific"
+    },
+
+    {
+      "name": "机器之心",
+      "url": "https://wechat2rss.bestblogs.dev/feed/8d97af31b0de9e48da74558af128a4673d78c9a3.xml"
+    },
+    {
+      "name": "新智元",
+      "url": "https://wechat2rss.bestblogs.dev/feed/e531a18b21c34cf787b83ab444eef659d7a980de.xml"
+    },
+    {
+      "name": "硅星人Pro",
+      "url": "https://wechat2rss.bestblogs.dev/feed/c62ceda9eed269d851802bdbc5f33c4fabbf7462.xml"
+    },
+    {
+      "name": "AI前线",
+      "url": "https://wechat2rss.bestblogs.dev/feed/25185b01482da0f485418ecb92e208b4416712fb.xml"
+    },
+    {
+      "name": "Datawhale",
+      "url": "https://wechat2rss.bestblogs.dev/feed/ea0dd8bddfe4fbfb32eaa81a1e1b628d45e97a80.xml"
+    },
+    {
+      "name": "晚点LatePost",
+      "url": "https://wechat2rss.bestblogs.dev/feed/c442206ec9957f3c52f2f40300ca532079538b31.xml"
+    },
+    {
+      "name": "集智俱乐部",
+      "url": "https://wechat2rss.bestblogs.dev/feed/bb50f406adb7c85720fcbf0882dc84887f81b67a.xml"
+    },
+    {
+      "name": "PaperWeekly",
+      "url": "https://wechat2rss.bestblogs.dev/feed/0120e999fc95e098c74bd5482a2a4c8407c42c38.xml"
+    }
+  ]
+}

@@ -1,0 +1,62 @@
+name	group	url	ok	count	latest	oldest	bytes	ms	tries	title
+每日环球视野(RSSHub)	资讯	https://rsshub.app/idaily/today	N	0			0	0	3	HTTP 403
+卫星社中文A	资讯	https://sputniknews.cn/export/rss2/archive/index.xml	Y	100	2026-11-05	2026-11-04	72266	333	1	俄外交部：美国大选结果是其内政但会影响国际事务
+卫星社中文B	资讯	https://zh.sputniknews.cn/export/rss2/archive/index.xml	N	0			0	0	3	fetch failed
+卫星社中文C	资讯	https://sputniknews.cn/rss	N	0			0	0	3	返回的不是 RSS/Atom（多半是反爬页面）
+卫星社中文D	资讯	https://sputniknews.cn/export/rss2/news/index.xml	N	0			0	0	3	返回的不是 RSS/Atom（多半是反爬页面）
+BBC中文	资讯	https://feeds.bbci.co.uk/zhongwen/simp/rss.xml	Y	42	2026-11-05	2026-09-22	28076	8003	1	黃之鋒勾結罪國安案：重判10年，料出獄已屆40歲
+联合早报中国	资讯	https://www.zaobao.com/realtime/china/rss.xml	N	0			0	0	3	HTTP 404
+法广中文	资讯	https://www.rfi.fr/cn/rss	Y	30	2026-11-05	2026-11-04	39145	2201	1	黄之锋亲撰求情信认错判法律 强调政治参与非出于仇恨 盼出狱照顾年迈双亲
+纽约时报中文	资讯	https://cn.nytimes.com/rss/	Y	20	2026-11-05	2026-11-01	23441	2444	1	“一夜爆红”能否拯救她妈妈的中餐馆？
+参考消息	资讯	https://rss.cankaoxiaoxi.com/	N	0			0	0	3	fetch failed
+澎湃新闻	资讯	https://feedx.net/rss/thepaper.xml	Y	20	2025-12-16	2025-12-15	44946	4821	1	澳枪击事件嫌疑人为父子：曾宣誓效忠“伊斯兰国”，行凶枪支为合法持有
+环球时报	资讯	https://feedx.net/rss/huanqiu.xml	N	0			0	0	3	HTTP 404
+德国之声中文	资讯	https://rss.dw.com/rdf/rss-chi-all	Y	61	2026-11-05	2019-09-14	40752	4613	1	德国总理：国家应尽可能减少对经济事务的干预
+纽约时报中文网	资讯	https://cn.nyt.com/rss/	N	0			0	0	3	fetch failed
+FT中文网	资讯	https://www.ftchinese.com/rss/feed	Y	20	2026-11-04	2026-11-03	8166	2036	1	微创医疗创办人卸任 13亿元租金争议未息
+路透中文	资讯	https://cn.reuters.com/rssFeed/CNTopGenNews	N	0			0	0	3	HTTP 401
+香港01	资讯	https://www.hk01.com/rss	N	0			0	0	3	HTTP 404
+linux.do	社区	https://linux.do/latest.rss	N	0			0	0	3	HTTP 403
+V2EX首页	社区	https://www.v2ex.com/index.xml	Y	50	2026-11-05	2026-11-05	49295	24553	1	[投资] 狗日的$sndk，我 CNM
+V2EX热榜	社区	https://rsshub.app/v2ex/topics/hot	N	0			0	0	3	HTTP 403
+NodeSeek	社区	https://nodeseek.com/rss	N	0			0	0	3	HTTP 403
+知乎每日精选	社区	https://rsshub.app/zhihu/daily	N	0			0	0	3	HTTP 403
+什么值得买好文	社区	https://rsshub.app/smzdm/haowen/7	N	0			0	0	3	HTTP 403
+雪球热帖	社区	https://rsshub.app/xueqiu/hots	N	0			0	0	3	HTTP 403
+虎扑话题	社区	https://rsshub.app/hupu/bbs	N	0			0	0	3	HTTP 403
+掘金热门	社区	https://rsshub.app/juejin/category/frontend	N	0			0	0	3	HTTP 403
+Chiphell	社区	https://www.chiphell.com/forum.php?mod=rss	N	0			0	0	3	返回的不是 RSS/Atom（多半是反爬页面）
+博客园	社区	https://www.cnblogs.com/feed/	N	0			0	0	3	返回的不是 RSS/Atom（多半是反爬页面）
+Reddit中文	社区	https://rsshub.app/reddit/subreddit/chinese	N	0			0	0	3	HTTP 403
+36氪	科技	https://www.36kr.com/feed	Y	30	2026-11-05	2026-11-04	74105	466	1	Personal Agent的竞争，开始于用户想清楚之前
+虎嗅	科技	https://rss.huxiu.com/	Y	141	2026-11-05	2026-11-04	1284595	414	1	品牌叙事，如何让功能型商品变得有意思？
+机器之心	科技	https://www.jiqizhixin.com/rss	N	0			0	0	3	返回的不是 RSS/Atom（多半是反爬页面）
+量子位	科技	https://www.qbitai.com/feed	Y	9	2026-11-05	2026-11-04	5513	81	1	百度开源文心5.5 Flash Base，多基准测试刷新同尺寸模型 SOTA
+品玩	科技	https://www.pingwest.com/feed	N	0			0	0	3	返回的不是 RSS/Atom（多半是反爬页面）
+钛媒体	科技	https://www.tmtpost.com/feed	Y	15	2026-11-05	2026-11-05	90350	561	1	1亿卖“闲置”预增利5500万，康惠股份用存量资产换转型时间
+雷锋网	科技	https://www.leiphone.com/feed	Y	20	2026-11-05	2026-11-04	426946	538	1	李彦宏百度世界2026演讲海报曝光，或分享智能组织进化新思考
+差评	科技	https://www.chaping.cn/feed	N	0			0	0	3	HTTP 502
+蓝点网	科技	https://www.landiannews.com/feed	Y	20	2026-11-05	2026-11-04	20225	10160	1	苹果将检查iCloud公开链接中的有害内容 若用户分享有害内容也可能会被封号
+爱范儿(现用)	科技	https://www.ifanr.com/feed	Y	20	2026-11-05	2026-11-04	291186	179	1	MacBook Pro 能触屏了，但这只是它最小的升级｜附选购指南
+驱动之家	科技	https://www.mydrivers.com/rss.xml	N	0			0	0	3	HTTP 404
+少数派(现用)	科技	https://sspai.com/feed	Y	10	2026-11-05	2026-11-03	4157	119	1	开启 Mac 的下一世代：MacBook Pro (PROLED XDR) 首发体验
+知乎日报(现用)	科技	https://rsshub.bestblogs.dev/zhihu/daily	Y	4	2026-11-04	2026-11-04	27607	3168	1	小时候流行的「屁股针」消失了吗？为何现在不流行了？
+知乎日报(旧镜像·已停更)	科技	https://feedx.net/rss/zhihudaily.xml	Y	20	2025-09-16	2025-09-12	110895	4182	1	瞎扯 · 如何正确地吐槽
+AIHOT(现用)	科技	https://aihot.news/feed.xml	Y	50	2026-11-05	2026-10-30	40342	113	1	腾讯混元感谢 Artificial Analysis 对 Hy4 的评测，模型获 Intelligence Index v5 35 分
+美团技术团队	博客	https://tech.meituan.com/feed/	Y	10			208538	946	1	美团正式发布 LongCat-2.5：面向智能体任务的原生多模态模型
+阿里技术	博客	https://developer.aliyun.com/feed	N	0			0	0	3	HTTP 404
+字节跳动技术团队	博客	https://juejin.cn/rss	Y	20	2026-11-05	2026-11-05	11917	93	1	手机和电脑传文件，除了微信还有 LocalSend
+酷壳	博客	https://www.qq.com/feed	N	0			0	0	3	返回的不是 RSS/Atom（多半是反爬页面）
+SegmentFault	博客	https://segmentfault.com/feed	N	0			0	0	3	HTTP 404
+infoQ中文	博客	https://www.infoq.cn/feed	Y	20	2026-11-05	2026-11-04	12259	162	1	模型之外，腾讯还在补什么？
+FreeBuf 网络安全行业门户[news]	news	https://www.freebuf.com/feed	Y	20	2026-11-05	2026-11-03	12715	264	1	离职电脑没清干净，公司用恢复软件把和新公司的聊天、项目资料全挖了出来，然后拿着这些证据索赔。
+安全客[news]	news	https://api.anquanke.com/data/v1/rss	Y	20	2026-11-05	2026-10-09	4720	1200	1	有人把欧洲超市的冷柜调到了50℃，这是第二个月了
+大橘和朋友们的周刊[news]	news	https://rrorangeandfriends.de/feed.xml	Y	5	2026-07-12	2025-12-20	373912	1629	1	第041期 - 晴云化狐
+潮流周刊[news]	news	https://weekly.tw93.fun/rss.xml	Y	12	2026-11-02	2026-08-10	117516	1441	1	第288期 - 偶遇小猫
+InfoQ 推荐[news]	news	https://plink.anyfeeder.com/infoq/recommend	Y	30	2026-11-05	2026-11-03	240691	2456	1	模型之外，腾讯还在补什么？
+MIT 科技评论 - 本周热榜[news]	news	https://rsshub.bestblogs.dev/mittrchina/hot	Y	10	2026-11-04	2026-11-01	101211	1456	1	用Astra改写Qwen神经网络，MIT爆火研究被高估了吗？
+掘金本周最热[news]	news	https://rsshub.bestblogs.dev/juejin/trending/all/weekly	Y	20	2026-11-05	2026-10-30	416718	2677	1	ArkTS 做应用内"快捷胶囊" —— 续航日记踩过的两个鸿蒙声明式 UI workaround
+站长之家[news]	news	https://app.chinaz.com/?app=rss	Y	10	2026-11-03	2026-10-28	4766	109	1	AI日报：腾讯混元发布Hyra 2.0；商汤发布日日新SenseNova 6.8 Flash；AI 虚拟恋人正式被苹果关进成人区
+LINUX DO · 文档共建[communities]	communities	https://linuxdorss.longpink.com/wiki.xml	Y	1	2026-11-04	2026-11-04	7692	1627	1	AI与AI安全：火线解读下Astra手调Qwen之谜
+V2EX · 创意[communities]	communities	https://www.v2ex.com/feed/tab/creative.xml	Y	50	2026-11-05	2026-08-06	101351	2317	1	做了一个 iOS 本地音乐播放器： Wi-Fi 拖歌、FLAC/DSD、10 段参数 EQ ，发帖送一波永久 pro 送码
+V2EX · 技术[communities]	communities	https://www.v2ex.com/feed/tab/tech.xml	Y	50	2026-11-05	2026-10-13	47176	11878	1	等 agent 跑的期间能做什么？

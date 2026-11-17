@@ -1,0 +1,934 @@
+/* 每日图片站 —— 微信内置浏览器优先
+   兼容性约束：
+   - 不用 flex/grid 的 gap，用 margin / column-gap
+   - 不用 aspect-ratio，用 padding-top 百分比占位
+   - 不依赖 srcset，图片统一走 <img src>
+   - 关键属性全部带 -webkit- 前缀兜底
+*/
+
+:root {
+  --bg: #0b0b0f;
+  --bg-elev: #16161d;
+  --bg-elev-2: #1e1e28;
+  --line: #26262f;
+  --text: #e8e8ee;
+  --text-dim: #8b8b99;
+  --accent: #4a8cff;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+}
+
+body {
+  font: 15px/1.5 -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB",
+        "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+  overflow-x: hidden;
+}
+
+img { border: 0; display: block; }
+button { font-family: inherit; }
+
+/* ───────────────────────── 顶栏 ───────────────────────── */
+
+.topbar {
+  position: -webkit-sticky;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: rgba(11, 11, 15, 0.92);
+  -webkit-backdrop-filter: saturate(160%) blur(12px);
+  backdrop-filter: saturate(160%) blur(12px);
+  border-bottom: 1px solid var(--line);
+  padding-top: var(--safe-top);
+}
+
+.topbar-row {
+  display: -webkit-flex;
+  display: flex;
+  -webkit-align-items: center;
+  align-items: center;
+  -webkit-box-sizing: border-box;
+  box-sizing: border-box;
+  padding: 12px 14px 10px;
+}
+
+.brand {
+  display: -webkit-flex;
+  display: flex;
+  -webkit-align-items: center;
+  align-items: center;
+  -webkit-box-flex: 1;
+  -webkit-flex: 1;
+  min-width: 0;
+}
+
+.brand-mark {
+  display: block;
+  width: 28px;
+  height: 28px;
+  margin-right: 10px;
+  border-radius: 7px;
+  /* logo 是白底线稿，用白底圆角块承载，深色页面上不突兀 */
+  background: #ffffff;
+  -webkit-object-fit: contain;
+  object-fit: contain;
+  -webkit-flex-shrink: 0;
+  flex-shrink: 0;
+}
+
+/* 顶栏右边多了「留言板」入口，窄屏（微信里 375~390px）空间更紧。
+   min-width:0 + 省略号，保证标题被挤没而不是把右侧按钮顶出屏幕。 */
+.brand-text { min-width: 0; overflow: hidden; }
+
+.brand-text h1 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: .2px;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.brand-date {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.count-pill {
+  -webkit-flex-shrink: 0;
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--text-dim);
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 顶栏右侧动作区：照片数 + 「全部日期」入口。
+   不用 flex gap —— iOS 13 的 WKWebView 不支持，改用 margin。 */
+.topbar-actions {
+  display: -webkit-flex;
+  display: flex;
+  -webkit-align-items: center;
+  align-items: center;
+  -webkit-flex-shrink: 0;
+  flex-shrink: 0;
+}
+
+.home-link {
+  -webkit-flex-shrink: 0;
+  flex-shrink: 0;
+  display: -webkit-inline-flex;
+  display: inline-flex;
+  -webkit-align-items: center;
+  align-items: center;
+  margin-left: 8px;
+  font-size: 12px;
+  color: var(--accent);
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 10px;
+  text-decoration: none;
+  -webkit-tap-highlight-color: rgba(74, 140, 255, .18);
+}
+
+.home-link:active { background: var(--bg-elev-2); }
+
+.home-link .chev {
+  margin-left: 4px;
+  font-size: 14px;
+  line-height: 1;
+}
+
+/* ───────────────────────── Tab ───────────────────────── */
+
+.tabs {
+  position: relative;
+  display: -webkit-flex;
+  display: flex;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.tabs::-webkit-scrollbar { display: none; }
+
+.tab {
+  -webkit-flex-shrink: 0;
+  flex-shrink: 0;
+  position: relative;
+  appearance: none;
+  -webkit-appearance: none;
+  background: none;
+  border: 0;
+  color: var(--text-dim);
+  font-size: 15px;
+  padding: 9px 16px 12px;
+  cursor: pointer;
+  -webkit-transition: color .18s ease;
+  transition: color .18s ease;
+  line-height: 1.3;
+}
+
+.tab.is-active { color: var(--text); font-weight: 600; }
+
+.tab-badge {
+  display: inline-block;
+  margin-left: 5px;
+  font-size: 11px;
+  color: var(--text-dim);
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 1px 6px;
+  vertical-align: 1px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tab.is-active .tab-badge {
+  color: #0b0b0f;
+  background: var(--tab-accent, var(--accent));
+  border-color: transparent;
+}
+
+.tab-ink {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  width: 0;
+  background: var(--tab-accent, var(--accent));
+  border-radius: 2px 2px 0 0;
+  -webkit-transition: transform .26s cubic-bezier(.4, 0, .2, 1), width .26s cubic-bezier(.4, 0, .2, 1);
+  transition: transform .26s cubic-bezier(.4, 0, .2, 1), width .26s cubic-bezier(.4, 0, .2, 1);
+  pointer-events: none;
+}
+
+/* ───────────────────────── 网格 ───────────────────────── */
+
+.grids { padding: 10px 0 24px; }
+
+.grid {
+  display: none;
+  -webkit-column-count: 2;
+  column-count: 2;
+  -webkit-column-gap: 8px;
+  column-gap: 8px;
+  padding: 0 6px;
+}
+
+.grid.is-active { display: block; }
+
+.cell {
+  position: relative;
+  display: block;
+  width: 100%;
+  margin: 0 0 8px;
+  padding-top: 60%; /* JS 按真实比例覆写 */
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--bg-elev);
+  cursor: -webkit-zoom-in;
+  cursor: zoom-in;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+}
+
+/* 模糊占位（blur-up）。
+   LQIP 是一张 24px 宽的小图，以 base64 data URI 内联在 manifest 里 ——
+   浏览器**零额外请求**就能立刻画出来，大图到位后再盖上去，
+   首屏不再是一格格空的深色方块（以前要等 3~4 秒缩略图才淡入）。
+
+   为什么**不加** filter: blur()：182 个格子各建一个模糊图层，手机上会明显掉帧。
+   24px 的小图放大到 400px 时，浏览器自己的双线性插值就已经是模糊的了。 */
+.cell::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: var(--lqip, none);
+  background-size: cover;
+  background-position: center;
+  opacity: .9;
+  pointer-events: none;
+  -webkit-transition: opacity .35s ease;
+  transition: opacity .35s ease;
+}
+
+.cell.is-loaded::before { opacity: 0; }
+
+.cell::after {
+  /* 加载中的微光 */
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: -webkit-linear-gradient(100deg, transparent 20%, rgba(255,255,255,.05) 50%, transparent 80%);
+  background: linear-gradient(100deg, transparent 20%, rgba(255,255,255,.05) 50%, transparent 80%);
+  background-size: 200% 100%;
+  -webkit-animation: shimmer 1.4s linear infinite;
+  animation: shimmer 1.4s linear infinite;
+  opacity: 1;
+  pointer-events: none;
+  -webkit-transition: opacity .35s ease;
+  transition: opacity .35s ease;
+}
+
+.cell.is-loaded::after { opacity: 0; }
+
+.cell img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  -webkit-transition: opacity .32s ease;
+  transition: opacity .32s ease;
+}
+
+.cell.is-loaded img { opacity: 1; }
+
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
+}
+
+/* ───────────────────────── 加载态 ───────────────────────── */
+
+.loading {
+  padding: 60px 0;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.loading[hidden] { display: none; }
+
+.spinner {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  margin-bottom: 10px;
+  border: 2px solid var(--line);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  -webkit-animation: spin .7s linear infinite;
+  animation: spin .7s linear infinite;
+}
+
+@keyframes spin { to { -webkit-transform: rotate(360deg); transform: rotate(360deg); } }
+
+/* ───────────────────────── 大图查看器 ───────────────────────── */
+
+.viewer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 100;
+  background: #000;
+  -webkit-display: -webkit-flex;
+  display: flex;
+  -webkit-flex-direction: column;
+  flex-direction: column;
+  -webkit-touch-callout: none;
+}
+
+.viewer[hidden] { display: none; }
+
+.viewer-bar {
+  display: -webkit-flex;
+  display: flex;
+  -webkit-align-items: center;
+  align-items: center;
+  -webkit-box-sizing: border-box;
+  box-sizing: border-box;
+  padding: calc(var(--safe-top) + 8px) 14px 8px;
+  background: linear-gradient(180deg, rgba(0,0,0,.72), rgba(0,0,0,0));
+}
+
+.viewer-count {
+  -webkit-flex: 1;
+  flex: 1;
+  font-size: 13px;
+  color: rgba(255,255,255,.82);
+  font-variant-numeric: tabular-nums;
+}
+
+.viewer-close {
+  appearance: none;
+  -webkit-appearance: none;
+  background: rgba(255,255,255,.12);
+  border: 0;
+  color: #fff;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  font-size: 15px;
+  line-height: 30px;
+  text-align: center;
+  cursor: pointer;
+  padding: 0;
+}
+
+.viewer-stage {
+  -webkit-flex: 1;
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  display: -webkit-flex;
+  display: flex;
+  -webkit-align-items: center;
+  align-items: center;
+  -webkit-justify-content: center;
+  justify-content: center;
+}
+
+.viewer-stage img {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.viewer-hint {
+  text-align: center;
+  font-size: 12px;
+  color: rgba(255,255,255,.42);
+  /* 底部安全区交给下面新加的操作栏管，这里不再重复留一份 ——
+     两处都留的话，iPhone 上会在提示和按钮中间多出 34px 死空间。 */
+  padding: 12px 0 10px;
+  background: linear-gradient(0deg, rgba(0,0,0,.72), rgba(0,0,0,0));
+  -webkit-transition: opacity .3s ease;
+  transition: opacity .3s ease;
+}
+
+.viewer-hint.is-hidden { opacity: 0; }
+
+/* ── 点赞 / 评论操作栏（查看器底部） ── */
+.viewer-actions {
+  display: -webkit-flex;
+  display: flex;
+  -webkit-flex: 0 0 auto;
+  flex: 0 0 auto;
+  padding: 10px 14px calc(12px + var(--safe-bottom));
+  background: linear-gradient(180deg, rgba(11,11,15,0), rgba(11,11,15,.92) 42%);
+  /* 必须是 flex 流里的一个普通项，不能用 position:absolute 压到底部。
+     真实 Chrome（390x844）实测过：absolute 的话操作栏正好盖住 .viewer-hint
+     整条（重叠 46px），「左右滑动切换 · 长按可保存」这个提示就永远看不见；
+     极端长宽比的图还会被操作栏切掉一截。改成流里的项之后，
+     .viewer-stage 自动让出高度，图和提示都盖不住。 */
+}
+/* 不用 flex gap —— iOS 13 的 WKWebView 不支持（app.css 顶部的兼容性约束），
+   改用 margin 撑开两个按钮之间的距离。 */
+.viewer-actions .vbtn + .vbtn { margin-left: 10px; }
+
+.vbtn {
+  display: -webkit-inline-flex;
+  display: inline-flex;
+  -webkit-align-items: center;
+  align-items: center;
+  min-height: 44px;           /* 微信里的可点区域不能太小 */
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(28,28,36,.82);
+  color: var(--text, #e8e8ee);
+  font-size: 14px;
+  text-decoration: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: rgba(255,255,255,.08);
+}
+.vbtn:active { -webkit-transform: scale(.97); transform: scale(.97); }
+.vbtn.is-on { border-color: #4a8cff; color: #8ab4f8; }
+.vbtn-ico { font-size: 16px; line-height: 1; }
+/* 图标和后面的文字之间 —— 还是 margin，不是 gap。
+   .vbtn 里最多三个相邻元素（图标 / 数字 / 文案），**相邻的两个 span 之间都要留 6px**。
+   早先只写了 `.vbtn-ico + span`，结果「数字 → 文案」那一段没人管，
+   按钮渲染成「💬 0评论这张图」，数字和文案贴死（真实 Chrome 实测 0px）。 */
+.vbtn > span + span { margin-left: 6px; }
+.vbtn-like.is-on .vbtn-ico { -webkit-filter: saturate(1.4); filter: saturate(1.4); }
+
+/* ── 缩略图格子的赞数角标（只显示，不可点） ── */
+.like-badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 2;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(0,0,0,.55);
+  color: #fff;
+  font-size: 11px;
+  line-height: 16px;
+  pointer-events: none;      /* 点它等同点格子 → 打开查看器，不误赞 */
+  -webkit-user-select: none;
+  user-select: none;
+}
+.like-badge[hidden] { display: none; }
+
+/* ───────────────────────── 口令提示 ───────────────────────── */
+
+.gate-notice {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 60;
+  padding: 13px 16px calc(13px + var(--safe-bottom));
+  background: rgba(74, 140, 255, .13);
+  border-top: 1px solid rgba(74, 140, 255, .32);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  text-align: center;
+}
+
+.gate-notice[hidden] { display: none; }
+
+.gate-notice strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 3px;
+}
+
+.gate-notice p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+/* ───────────────────────── 文字标题（RSS 见报 tab） ───────────────────────── */
+
+/* 见报是单列文字列表，不是多列图片网格。
+   用 .grid.grid-headlines 提高优先级 —— 下面 @media 里的 .grid 多列规则会覆盖单列声明。 */
+.grid.grid-headlines {
+  -webkit-column-count: 1;
+  column-count: 1;
+  padding: 0 14px;
+}
+
+/* ───────────────────────── 榜单 tab（听乐 / 看片） ───────────────────────── */
+
+/* 榜单也是单列文字列表，理由跟见报一样：条目本身有标题、副标题、
+   榜单序号，多列排起来会把这个结构压扁。
+   同样用 .grid.grid-rank 提高优先级，压过 @media 里的多列规则。 */
+.grid.grid-rank {
+  -webkit-column-count: 1;
+  column-count: 1;
+  padding: 0 14px;
+}
+
+/* 榜单序号：左边的窄列，宽度固定、数字等宽，
+   这样 9 → 10 的宽度变化不会把后面的封面推来推去。 */
+.rank-no {
+  -webkit-flex: 0 0 auto;
+  flex: 0 0 auto;
+  width: 22px;
+  margin-right: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 56px;
+  text-align: right;
+  color: var(--tab-accent, #a78bfa);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 榜单封面：正方形 56px（复用 .news-thumb 的框，只改尺寸）。
+   热链的封面挂了会被加上 .is-failed 藏掉，不留灰块。 */
+.rank-cover {
+  width: 56px;
+  height: 56px;
+  margin-right: 10px;
+  border-radius: 6px;
+}
+
+/* 没有封面的条目：占位框，保证「序号 / 封面 / 文字」三列始终对齐。
+   （豆瓣图床全站防盗链，250 部电影条目在构建期就没有封面 URL） */
+.rank-cover-empty {
+  display: -webkit-flex;
+  display: flex;
+  -webkit-align-items: center;
+  align-items: center;
+  -webkit-justify-content: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-dim);
+  background: var(--bg-elev-2);
+}
+
+/* 全网搜结果与本地榜单之间的分隔条 */
+.rank-sep {
+  margin: 4px 0 10px;
+  padding: 6px 2px;
+  font-size: 11px;
+  color: var(--text-dim);
+  border-bottom: 1px solid var(--line);
+}
+
+/* 标签 chips：横向滚动 */
+.chips {
+  display: -webkit-flex;
+  display: flex;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding: 10px 0 12px;
+}
+.chips::-webkit-scrollbar { display: none; }
+
+.chip {
+  -webkit-flex-shrink: 0;
+  flex-shrink: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1px solid var(--line);
+  background: var(--bg-elev);
+  color: var(--text-dim);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1;
+  padding: 7px 13px;
+  border-radius: 999px;
+  margin-right: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.chip.is-active {
+  color: #0b0b0f;
+  background: var(--tab-accent, #3ddc97);
+  border-color: transparent;
+  font-weight: 600;
+}
+
+/* 第二层：真实 RSS 源名。字号比上层小一号，视觉上次一级。 */
+.chips-srcs .chip {
+  font-size: 12px;
+  padding: 6px 11px;
+}
+
+/* 「来源」两个字 —— 告诉用户下面这排是源名，不是又一个分类 */
+.chips-cap {
+  -webkit-flex-shrink: 0;
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-right: 8px;
+  -webkit-align-self: center;
+  align-self: center;
+}
+
+/* ─────────────── 榜单多层 chip（2026-11-16 追更/看片/听乐 v2） ───────────────
+ *
+ * 一层一行：左边小标题（板块/分类/细分/类型）固定不动，
+ * 右边一排横向滚动的 chip。
+ *
+ * 小标题为什么放滚动区外面：放里面的话，用户往右滑的时候
+ * 「这排是什么」也跟着滑没了，多层 chip 下会彻底分不清层级。
+ *
+ * 不用 flex 的 gap —— 微信 X5 / 老安卓 WebView 不支持 flex gap，
+ * 会整个塌掉（元素贴在一起）。这里一律用 margin。 */
+.chip-lines { display: block; }
+
+.chip-line {
+  display: -webkit-flex;
+  display: flex;
+  -webkit-align-items: center;
+  align-items: center;
+  padding: 3px 0;
+}
+
+.chip-line .chips {
+  -webkit-flex: 1 1 auto;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 4px 0;
+}
+
+/* 第三层（细分）、第四层（类型）比上层小一号 —— 视觉上层层递进，
+   免得四排同样大小的胶囊糊成一片。 */
+.chips-lv3 .chip,
+.chips-lv4 .chip {
+  font-size: 12px;
+  padding: 6px 11px;
+}
+
+/* 见报的来源行沿用旧结构（.chips-srcs 里自带标题），这里不受影响 */
+
+/* ─────────────── 见报搜索框（2026-11-09 加） ───────────────
+ *
+ * 不用 flex 的 gap —— 微信 X5 / 老安卓 WebView 不支持 flex gap，
+ * 会整个塌掉（元素贴在一起）。这里一律用 margin。 */
+.news-search {
+  padding: 12px 14px 0;
+}
+
+/* 输入框 + 清空按钮一行。计数另起一行（见下），
+ * 不跟输入框挤在同一行 —— 窄屏上「当前筛选 0 条 · 全局 N 条」会把输入框压得太窄。 */
+.news-search-row {
+  display: -webkit-flex;
+  display: flex;
+  -webkit-align-items: center;
+  align-items: center;
+}
+
+.news-search-input {
+  -webkit-flex: 1;
+  flex: 1;
+  min-width: 0;
+  appearance: none;
+  -webkit-appearance: none;   /* 去掉 Safari / 微信 X5 自带的输入框外观 */
+  border: 1px solid var(--line);
+  background: var(--bg-elev);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-size: 14px;
+  font-family: inherit;
+  line-height: 1.4;
+  margin-right: 8px;
+}
+.news-search-input::placeholder { color: var(--text-dim); }
+.news-search-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.news-search-clear {
+  appearance: none;
+  -webkit-appearance: none;
+  -webkit-flex-shrink: 0;
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--line);
+  background: var(--bg-elev);
+  color: var(--text-dim);
+  border-radius: 999px;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+.news-search-clear:active { color: var(--text); }
+
+/* 计数单独一行。没搜索词时是空的 —— 用 :empty 收起，别留一条空白边。 */
+.news-search-count {
+  display: block;
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 6px;
+  line-height: 1.5;
+}
+.news-search-count:empty { display: none; }
+
+.news-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.news-item { margin: 0 0 10px; }
+.news-item.is-hidden { display: none; }
+
+.news-link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 13px;
+}
+.news-link:active { background: var(--bg-elev-2); }
+
+/* 没有原文链接的条目：渲染成纯文本，不做成可点的样子。
+   （以前 href="#" 会让点击跳到页面顶部，用户以为页面坏了） */
+.news-link-plain { cursor: default; }
+.news-link-plain .news-title { color: var(--text-dim); }
+
+/* 外链角标：点进去能看全文的条目，meta 行末尾标一个 ↗ */
+.news-arrow {
+  margin-left: 6px;
+  font-size: 11px;
+  color: var(--tab-accent, #3ddc97);
+  opacity: .85;
+}
+
+/* 「需登录」小标：知乎 / 微博 / X 这几个源，真人点进去也是登录墙。
+   提前标出来，用户就知道不是链接坏了，而是要先登录。 */
+.news-auth {
+  margin-left: 5px;
+  padding: 0 5px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  font-size: 10px;
+  line-height: 1.55;
+  color: var(--text-dim);
+  opacity: .9;
+}
+
+.news-title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.news-desc {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  margin-top: 5px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-dim);
+}
+
+.news-meta {
+  display: block;
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+/* 源名：真实 RSS 来源，样式最重。
+   大类名（「科技」「社区」…）是配置里翻译过的，源名才是真的那个名字 ——
+   所以源名用实心胶囊，大类退成描边标签。 */
+.news-src {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  line-height: 1.5;
+  background: var(--tab-accent, #3ddc97);
+  color: #0b0b0f;
+  margin-right: 6px;
+  font-weight: 600;
+}
+
+/* 大类：辅助信息。汇总入口在上面的 chip 上，这里只做标注。 */
+.news-tag {
+  display: inline-block;
+  padding: 0 5px;
+  border-radius: 999px;
+  font-size: 10px;
+  line-height: 1.7;
+  border: 1px solid var(--line);
+  color: var(--text-dim);
+  margin-right: 6px;
+}
+
+.news-time {
+  color: var(--text-dim);
+  margin-right: 4px;
+}
+
+/* ── 见报卡片的可选配图 ──
+   配图是**可选**的：manifest 里没有 img 字段的老数据一条图都不渲染，
+   页面上跟加这个功能之前一模一样（纯文字卡片）。
+   只有带图的条目才多一个 .has-thumb，走「图在左、字在右」的两栏版式。 */
+
+/* 两栏版式：不用 flex 的 gap（X5 不支持，会整个塌掉），间距用 margin */
+.news-link.has-thumb {
+  display: -webkit-flex;
+  display: flex;
+  -webkit-align-items: flex-start;
+  align-items: flex-start;
+}
+
+/* 缩略图框：宽高写死 —— 图片到位之前位置就占好了，页面不会跳（CLS）。
+   object-fit: cover 让比例各异的原图都填满这个框、不会变形。 */
+.news-thumb {
+  display: block;
+  -webkit-flex: 0 0 auto;
+  flex: 0 0 auto;
+  width: 96px;
+  height: 72px;
+  margin-right: 10px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--line);
+}
+
+.news-thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  -webkit-transition: opacity .32s ease;
+  transition: opacity .32s ease;
+}
+
+/* 加载完才显影 —— 免得先闪半张图出来 */
+.news-thumb.is-loaded .news-thumb-img { opacity: 1; }
+
+/* 这张图加载失败：整个框藏掉，不给用户留一个空位 */
+.news-thumb.is-failed { display: none; }
+
+/* 文字栏：min-width: 0 是关键 ——
+   不加的话，长标题 / 长链接会把这一栏撑宽，整张卡片横向溢出。
+   word-break: break-word 让没有空格的长串（URL）也能断行。 */
+.news-body {
+  display: block;
+  -webkit-flex: 1 1 auto;
+  flex: 1 1 auto;
+  min-width: 0;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+/* 窄屏（375px 微信尺寸）下把配图缩一档，
+   给文字栏留够读得清的宽度 */
+@media (max-width: 380px) {
+  .news-thumb {
+    width: 80px;
+    height: 60px;
+    margin-right: 8px;
+  }
+}
+
+/* ───────────────────────── 底部安全区 ───────────────────────── */
+
+.grids { padding-bottom: calc(24px + var(--safe-bottom)); }
+
+/* 宽屏（平板/桌面）给三列 */
+@media (min-width: 700px) {
+  .grid { -webkit-column-count: 3; column-count: 3; }
+}
+@media (min-width: 1000px) {
+  .grid { -webkit-column-count: 4; column-count: 4; }
+}

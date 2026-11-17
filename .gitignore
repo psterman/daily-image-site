@@ -1,0 +1,48 @@
+# 凭据（绝不入库）
+.env.local
+.env
+*.pem
+
+# 图片 URL 的随机盐 —— 泄露它就等于泄露全部图片路径，不要入库
+.img-salt
+
+# 审稿放行凭证（每天一个，审完就过期）
+.review-passed-*
+
+# 审稿台实际占用的端口（端口占用时自动顺延，写下来给一键脚本用）
+.review-port
+
+# 本次要发布的日期（daily.ps1 写的，publish.ps1 读它）
+.publish-date
+
+# 转码产物与页面产物（每日重新生成）
+r2/
+published/
+
+# 验证截图
+.verify/
+
+# 运行期日志 / 状态文件（每天都在变，且含本机路径）
+*.log
+*.out
+*.err
+*.pid
+*.done
+.fetch-ledger.json
+.daily-review.lock
+.probe-night-invoke.log
+
+# 依赖
+node_modules/
+
+# 临时工程目录（测试脚本的沙盒，用完即删）
+.tmp-*
+.tmp-*/
+
+# Python 侧
+__pycache__/
+*.pyc
+
+# 抓取器自动下载的模型（22 万字节，第一次跑会自己下载）
+tools/grab/models/
+*.onnx

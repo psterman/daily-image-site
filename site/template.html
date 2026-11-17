@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0b0b0f">
+<meta name="format-detection" content="telephone=no,email=no,address=no">
+<meta name="referrer" content="no-referrer">
+
+<title>{{PAGE_TITLE}}</title>
+<meta name="description" content="{{PAGE_DESC}}">
+
+<!-- 分享到微信/朋友圈时的卡片信息。
+     微信聊天里粘贴链接的卡片标题取 <title>，缩略图由微信爬虫抓第一张够大的图片。
+     og:image 指向**当期那一期的分享图**（每期一张 1200x630 拼图，
+     由 tools/build-og.mjs 在构建期合成，写到 /<日期>/og.jpg）。
+
+     ⚠️ 必须是**绝对 URL** —— 相对路径的话微信/X/知乎的爬虫拉不到，
+        分享卡片就是一张白卡（这个站踩过）。
+     ⚠️ URL 里**必须带日期** —— 微信按分享的 URL 缓存卡片，
+        不换 URL 的话第一天那张卡会永远停着。
+        根页 og:title/og:description 刻意**不带日期**：根 URL 是固定链接，
+        标题带日期的话缓存下来的卡片会永远显示第一天。
+        想每期都拿到新卡，分享**当天页面链接** /<日期>/（URL 唯一，微信每次都会重抓）。 -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="{{TITLE}}">
+<meta property="og:title" content="{{PAGE_TITLE}}">
+<meta property="og:description" content="{{PAGE_DESC}}">
+<meta property="og:image" content="{{OG_IMAGE}}">
+<meta property="og:image:width" content="{{OG_IMAGE_W}}">
+<meta property="og:image:height" content="{{OG_IMAGE_H}}">
+<meta property="og:url" content="{{OG_URL}}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="{{OG_IMAGE}}">
+
+<!-- RSS：每期一条 item 的日报。阅读器靠 <link rel="alternate"> 自动发现。
+     用绝对路径 /feed.xml —— 日期页在 /<日期>/ 下、归档页在 /archive/ 下，
+     深度不同，相对路径会指到不同地方。 -->
+<link rel="alternate" type="application/rss+xml" title="{{TITLE}} · 每日更新" href="/feed.xml">
+
+<link rel="icon" href="{{ASSET_BASE}}/logo.jpg" type="image/jpeg">
+<link rel="apple-touch-icon" href="{{ASSET_BASE}}/logo.jpg">
+<style>
+  /* 关键样式内联：微信 X5 解析外部 CSS 前先上色，避免白闪 */
+  html,body{background:#0b0b0f;color:#e8e8ee}
+  html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+  *{-webkit-tap-highlight-color:rgba(0,0,0,0)}
+</style>
+<link rel="stylesheet" href="{{CSS}}">
+</head>
+<body>
+
+<header class="topbar" id="topbar">
+  <div class="topbar-row">
+    <div class="brand">
+      <img class="brand-mark" src="{{ASSET_BASE}}/logo.webp" alt="" width="28" height="28">
+      <div class="brand-text">
+        <h1>{{TITLE}}</h1>
+        <p class="brand-date">{{DATE}}</p>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <span class="count-pill" id="countPill"></span>
+      <!-- 「留言板」入口：求图 / 留言。用绝对路径（/board/）——
+           日期页在 /<日期>/ 下、archive 页在 /archive/ 下，深度不同，
+           相对路径会指到不同地方，绝对路径在任何层级都对。 -->
+      <a class="home-link" href="/board/">留言板<span class="chev">›</span></a>
+      <!-- 「回到往期列表」入口：分享当天链接后，群友看完想翻往期就点这里。
+           用相对地址 —— 同一套产物在 example.com 和 pages.dev 下都能正确回到 /archive/。
+           纯 <a> 标签、不依赖 JS：微信内置浏览器 / X5 / 爬虫点开都有效。 -->
+      <a class="home-link" href="{{HOME}}">全部日期<span class="chev">›</span></a>
+    </div>
+  </div>
+  <nav class="tabs" id="tabs" role="tablist"></nav>
+  <div class="tab-ink" id="tabInk"></div>
+</header>
+
+<main id="grids" class="grids"></main>
+
+<div class="loading" id="loading">
+  <span class="spinner" aria-hidden="true"></span>
+  <p>正在加载…</p>
+</div>
+
+<!-- 图片加载失败时的提示（多为未携带访问口令） -->
+<div class="gate-notice" id="gateNotice" hidden>
+  <strong>图片未能加载</strong>
+  <p>如果本页面设置了访问口令，请向发送者索取带口令的完整链接。</p>
+</div>
+
+<!-- 大图查看器 -->
+<div class="viewer" id="viewer" hidden>
+  <div class="viewer-bar">
+    <span class="viewer-count" id="viewerCount"></span>
+    <button class="viewer-close" id="viewerClose" type="button" aria-label="关闭">✕</button>
+  </div>
+  <div class="viewer-stage" id="viewerStage">
+    <img id="viewerImg" alt="">
+  </div>
+  <div class="viewer-hint" id="viewerHint">左右滑动切换 · 长按可保存</div>
+  <!-- 点赞 + 评论这张图。放在 stage 下面，不挡图。
+       缩略图格子上只显示赞数角标，真正能点的是这里。 -->
+  <div class="viewer-actions" id="viewerActions">
+    <button class="vbtn vbtn-like" id="viewerLike" type="button">
+      <span class="vbtn-ico" id="viewerLikeIco">🤍</span><span id="viewerLikeCount">0</span>
+    </button>
+    <a class="vbtn vbtn-cmt" id="viewerComment" href="/board/">
+      <span class="vbtn-ico">💬</span><span id="viewerCommentCount">0</span><span class="vbtn-txt">评论这张图</span>
+    </a>
+  </div>
+</div>
+
+<!-- manifest 故意拆成独立 JS 文件，不内联进 HTML。
+     微信生成分享卡片时用的是「只解析 HTML、不执行 JS」的爬虫。
+     如果 490 个图片 URL 内联在 HTML 里（哪怕塞在 application/json 类型的
+     script 块中），爬虫照样能把它们全部抓下来做图像审核 —— 写真类内容就会自动触发风控。
+     拆到外部 .js 后，爬虫在 HTML 里只能看到一个脚本引用，拿不到任何正文图片链接。
+     两个 script 都用 defer：defer 脚本按文档顺序执行，manifest 一定先于 app.js 就绪。 -->
+<script src="{{MANIFEST}}" defer></script>
+<script src="{{JS}}" defer></script>
+</body>
+</html>

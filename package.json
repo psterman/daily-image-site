@@ -1,0 +1,30 @@
+{
+  "name": "daily-image-site",
+  "version": "1.0.0",
+  "description": "把每天收集到的图片，自动做成一个能在微信里直接打开的公开网页：抓取 → 清洗 → 构建 → 审稿 → 发布，附 RSS 订阅、OG 分享卡片、模糊占位和 38 套自动化护栏。",
+  "license": "MIT",
+  "author": "psterman",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/psterman/daily-image-site.git"
+  },
+  "homepage": "https://github.com/psterman/daily-image-site#readme",
+  "keywords": [
+    "static-site",
+    "cloudflare-pages",
+    "r2",
+    "rss",
+    "og-image",
+    "image-gallery"
+  ],
+  "scripts": {
+    "test": "node tools/run-all-tests.mjs",
+    "test:mutate": "node tools/run-all-tests.mjs --mutate",
+    "build": "node tools/build.mjs",
+    "preview": "node tools/preview-server.mjs",
+    "review": "node tools/start-review.mjs"
+  },
+  "devDependencies": {
+    "playwright": "1.59.1"
+  }
+}

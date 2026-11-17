@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  夜间自动发布的 launchd 定时任务（macOS 版）。
+
+  __PROJECT_DIR__ 由 tools/macos/install-launchd.sh 在安装时替换成真实项目路径。
+
+  跟 Windows 那边的对应关系：
+    Windows 计划任务 DailyImageSite-NightPublish-0010（DAILY 00:10）
+      → 这里的 StartCalendarInterval 00:10
+    Windows 启动文件夹 your-project-night.cmd（登录时补跑）
+      → 这里的 RunAtLoad = true
+    Windows「机器开着才跑，账户不能注销」
+      → macOS：LaunchAgent 属于用户会话，**注销后就不跑了**（锁屏无妨）
+
+  跑不跑得起来由 night-publish.ps1 自己的时间闸门决定（00:00–05:59 才发，
+  天亮就跳过），幂等标记（.night-publish-<日期>.done）保证一天只发一次。
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.your-project.night-publish</string>
+
+    <!-- 每天 00:10（北京时间口径由脚本自己算，这里是本机时间） -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>0</integer>
+        <key>Minute</key>
+        <integer>10</integer>
+    </dict>
+
+    <!-- 登录时也跑一次（补当天错过的）。闸门 + 幂等标记会兜住，不会重复发布。 -->
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>__PROJECT_DIR__/tools/macos/run-night-publish.sh</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>__PROJECT_DIR__</string>
+
+    <!-- launchd 会把子进程的 stdout / stderr 收到这两个文件。
+         判「它到底跑没跑」看这两个文件 + .night-publish-<日期>.log 的结束标记。 -->
+    <key>StandardOutPath</key>
+    <string>__PROJECT_DIR__/.night-publish-console.log</string>
+    <key>StandardErrorPath</key>
+    <string>__PROJECT_DIR__/.night-publish-console.err.log</string>
+
+    <!-- launchd 的 PATH 是写死的，不像登录 shell 那样自动带 Homebrew。
+         注意：plist 里**不做 $HOME 展开**，所以这里全是绝对路径。
+         （.dotnet/tools/pwsh 由 run-night-publish.sh 自己在运行时找。） -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+
+    <key>ProcessType</key>
+    <string>Background</string>
+</dict>
+</plist>
