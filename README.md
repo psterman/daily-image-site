@@ -193,6 +193,17 @@ daily-image-site/
 **图片路径只有一个真源**：`tools/paths.mjs`。别在别的脚本里写死路径 ——
 挪盘就得改 6 个文件，漏一个会静默出 bug。
 
+### 站名在哪改
+
+站名不是配置项，是 `tools/build.mjs` 里的两个字面量：
+
+| 位置 | 字面量 | 影响 |
+|---|---|---|
+| `tools/build.mjs` 的 `SITE_TITLE` | `每日图片站` | 页面标题、`og:site_name`、RSS 的 channel 标题 |
+| `site/template.html` 的 `{{TITLE}}` | 模板变量 | 不用改 —— 由上面那个注入 |
+
+搜 `每日图片站` 能一次找全（README 和 AGENTS.md 里的说明文字不算）。
+
 ---
 
 ## 一天的工作流
