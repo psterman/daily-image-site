@@ -22,7 +22,7 @@
   **不要**用 `Remove-Item`（会被权限策略拒绝）。
 - **测试脚本内部的临时工程目录**用 `tools/.tmp-<名字>`（点开头），跑完由脚本自己 `fs.rmSync` 删掉 ——
   照抄 `tools/test-keep-manifest.mjs` 的现成模式，别另发明一套。
-- **删除文件一律走 mavis-trash**（同上），一次性一个顶层命令，路径用正斜杠字面量。
+- **删除文件一律走回收站删除器**（同上），一次性一个顶层命令，路径用正斜杠字面量。
 - **PowerShell 5.1 陷阱**：`&&` / `||` 不支持；`$home` / `$HOST` 只读；`node -e` 的内联引号会被 PS 吃掉（要内联就写临时 `.mjs` 文件）；读 UTF-8 无 BOM 文件会乱码（用 `Get-Content -Raw -Encoding UTF8`）。
 - **联网脚本必须自带重试**：本机到 `api.cloudflare.com` / `example.com` 会间歇性 `ECONNRESET`。
   区分「连接被重置」（重试即可） vs「HTTP 4xx/5xx」（真问题，不许重试掩盖）。

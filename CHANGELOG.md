@@ -309,7 +309,7 @@ schtasks /query /tn "DailyImageSite-NightPublish-0010" /fo LIST /v
 | 1 | ~~**发 11-15（今天）**~~ | ✅ **已完成**（2026-11-15 上午，`publish.ps1 -Date 2026-11-15 -NoConvert` exit 0） |
 | 2 | ~~**补发 11-14**~~ | ✅ **已完成**（同一轮，`-SkipBuild` 复用已建好的产物，exit 0）。⚠️ 根路径 = 最后构建的那一期 → 顺序不能反 |
 | 2b | **`build.mjs` 改成原子替换** | 现在还是先 `fs.rm` 再 `mkdir`（第 955 行）→ 以后发布再被打断，仍会留下「空目录 + 悬空引用」。改成「写临时目录 → 原子替换」，或失败时保留上一版 |
-| 2c | **临时文件要手动删（清单已变）** | `PROJECT_ROOT\.exp\` 下：`publish-mutant.ps1` `publish-mutant2.ps1` `publish-mutant3.ps1` `publish-2026-11-14.log` `publish-2026-11-14b.log` `publish-2026-11-15.log` `repro-1115-build.log`；**外加工程根的 `.tmp-enc-test.txt`**（排查 `Set-Content -Encoding` 时留下的）；**本轮新增 `tools\.tmp-rank-build\`（整个目录，榜单试验构建产物）+ `%TEMP%\probe-*.mjs`（数据源探测脚本）**。**mavis-trash 启动器本轮仍不可调用 → 任何删除方式（含 `rm --`）都被安全策略硬拦，且明确禁止改用永久删除/脚本/文件系统 API** → 只能手动删（同目录的 `preview.*` / `start-preview.*` 是预览服务自己的文件，**别删**） |
+| 2c | **临时文件要手动删（清单已变）** | `PROJECT_ROOT\.exp\` 下：`publish-mutant.ps1` `publish-mutant2.ps1` `publish-mutant3.ps1` `publish-2026-11-14.log` `publish-2026-11-14b.log` `publish-2026-11-15.log` `repro-1115-build.log`；**外加工程根的 `.tmp-enc-test.txt`**（排查 `Set-Content -Encoding` 时留下的）；**本轮新增 `tools\.tmp-rank-build\`（整个目录，榜单试验构建产物）+ `%TEMP%\probe-*.mjs`（数据源探测脚本）**。**回收站删除器本轮仍不可调用 → 任何删除方式（含 `rm --`）都被安全策略硬拦，且明确禁止改用永久删除/脚本/文件系统 API** → 只能手动删（同目录的 `preview.*` / `start-preview.*` 是预览服务自己的文件，**别删**） |
 | 3 | **预览 8790 没跑** | 需要时 `node .exp\start-preview.mjs`（经 explorer.exe 脱 Job Object） |
 | 4 | **微博热搜 52 条无图** | 用户已决定**接受**，chip 顺序**不动**（11-06 定的） |
 | 5 | **投稿口令 `SUBMIT_TOKEN`** | 用户已决定**保留** |
