@@ -100,7 +100,15 @@ async function collectWebp(dir, out = []) {
 }
 
 async function main() {
-  const ffprobe = await findFfprobe();
+  let ffprobe;
+  try {
+    ffprobe = await findFfprobe();
+  } catch (err) {
+    // ffprobe 是**前置依赖**，不是代码坏了 → 跳过（退出码 2），别报红。
+    // 红表示「有东西不对」，跳过表示「条件不具备」—— 两回事，别混。
+    console.error('跳过：' + (err && err.message ? err.message : String(err)));
+    process.exit(2);
+  }
   console.log(`ffprobe : ${ffprobe}\n`);
 
   const files = [
@@ -108,8 +116,10 @@ async function main() {
     ...(await collectWebp(path.join(ROOT, 'published', 'img'))),
   ];
   if (!files.length) {
-    console.log('没有可测的 webp 文件（先跑一次构建）');
-    return;
+    // 0 个文件 = **什么都没测** → 报绿就是假绿。
+    // 显式跳过（退出码 2），跟「跑批器」里的「跳过」单列对上。
+    console.log('跳过：没有可测的 webp 文件（先跑一次构建，或把 IMAGE_ROOT 指到有母本的目录）');
+    process.exit(2);
   }
   console.log(`待测文件 : ${files.length} 个\n`);
 
