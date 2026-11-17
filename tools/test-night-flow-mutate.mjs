@@ -346,13 +346,18 @@ const MUTANTS = [
     to: '<key>Minute</key>\n        <integer>30</integer>',
   },
   {
-    label: 'paths.mjs：IMAGE_ROOT 默认值又不按平台分了（macOS 上审稿台一张图都不显示且不报错）',
+    // ⚠️ 这个变异点跟着 2026-11-17 的脱敏改造改过：
+    //   原来 paths.mjs 的默认值是「按平台分」（win32 → 盘符路径），
+    //   脱敏后统一成「落在家目录」，**代码里不再出现盘符字面量**。
+    //   护栏（test-portability.mjs）也同步改成盯「不许出现盘符字面量」——
+    //   所以这里要改的是**变异体**（把盘符塞回去），不是护栏。
+    label: 'paths.mjs：IMAGE_ROOT 默认值又写死盘符了（macOS 上没这个盘 → 静默拿到空目录）',
     guard: 'test-portability.mjs',
     env: 'PATHS_MJS',
     file: 'paths.mjs',
     src: PATHS,
-    from: "    : (process.platform === 'win32'",
-    to: '    : (true',
+    from: ": path.join(os.homedir(), 'image-root')",
+    to: ": 'D:\\some-root'",
   },
   {
     label: 'paths.mjs：旧路径候选 LEGACY_SRC 不限 Windows 了（macOS 上留个不存在的候选）',
