@@ -39,6 +39,9 @@ node_modules/
 .tmp-*
 .tmp-*/
 
+# 格式目录探针缓存（可重建）
+tools/.cache/
+
 # Python 侧
 __pycache__/
 *.pyc

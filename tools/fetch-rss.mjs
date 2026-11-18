@@ -520,6 +520,20 @@ export function loadConfig() {
  * 抓所有源，合并去重排序。
  * @returns {{items:object[], tags:string[], sources:string[], failures:{name:string,error:string}[], stale:{name:string,dropped:number,total:number,ageDays:number|null}[]}}
  */
+/** 有限并发跑任务，避免 几百源 Promise.all 把 undici 打崩。 */
+async function mapPool(items, concurrency, fn) {
+  const out = new Array(items.length);
+  let next = 0;
+  const workers = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+    while (next < items.length) {
+      const i = next++;
+      out[i] = await fn(items[i], i);
+    }
+  });
+  await Promise.all(workers);
+  return out;
+}
+
 export async function fetchHeadlines(cfg) {
   const feeds = Array.isArray(cfg.feeds) ? cfg.feeds : [];
   if (!feeds.length) return { items: [], tags: [], sources: [], failures: [], stale: [] };
@@ -529,18 +543,18 @@ export async function fetchHeadlines(cfg) {
   const timeoutMs = Number(cfg.timeoutMs) > 0 ? Number(cfg.timeoutMs) : 15000;
   // 过期条目闸门：0 = 不限。默认不启用，配置里显式写死数值。
   const maxAgeDays = Number(cfg.maxAgeDays) > 0 ? Number(cfg.maxAgeDays) : 0;
+  // 890 源全开并发会触发 undici Parser.finish 断言；16~24 稳
+  const concurrency = Math.max(1, Number(cfg.concurrency) || 20);
 
-  const results = await Promise.all(
-    feeds.map(async (feed) => {
-      try {
-        const r = await fetchOne(feed, timeoutMs, maxAgeDays);
-        return { feed, ...r, ok: true };
-      } catch (e) {
-        const msg = e.name === 'AbortError' ? `超时 ${timeoutMs}ms` : e.message;
-        return { feed, items: [], ok: false, error: msg };
-      }
-    }),
-  );
+  const results = await mapPool(feeds, concurrency, async (feed) => {
+    try {
+      const r = await fetchOne(feed, timeoutMs, maxAgeDays);
+      return { feed, ...r, ok: true };
+    } catch (e) {
+      const msg = e.name === 'AbortError' ? `超时 ${timeoutMs}ms` : e.message;
+      return { feed, items: [], ok: false, error: msg };
+    }
+  });
 
   const failures = [];
   const stale = [];
@@ -579,6 +593,8 @@ export async function fetchHeadlines(cfg) {
         // 候选配图地址 —— 跟上面那些字段一样是逐字段搬过来的，
         // 漏了这一行图片候选到不了构建那一步。
         imgs: it.imgs || [],
+        // 格式第二轴：rss.config 可写 contentType（article|podcast|video|note|link）
+        contentType: r.feed.contentType || r.feed.content_type || undefined,
       });
     }
   }

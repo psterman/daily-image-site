@@ -1,0 +1,670 @@
+{
+  "_doc": "目录 + 标签选项的唯一真相源（与 lib/tag-options.mjs 对齐）。选内容包 / Discover 分组读这里的 directories + tags。见报 chip = newsChips。",
+  "directories": [
+    {
+      "key": "综合",
+      "label": "综合",
+      "order": 1,
+      "desc": "社交与社区热榜"
+    },
+    {
+      "key": "科技",
+      "label": "科技",
+      "order": 2,
+      "desc": "AI、数码、新品"
+    },
+    {
+      "key": "娱乐",
+      "label": "娱乐",
+      "order": 3,
+      "desc": "轻松一刻配图"
+    },
+    {
+      "key": "社区",
+      "label": "社区",
+      "order": 4,
+      "desc": "开源与开发者"
+    },
+    {
+      "key": "财经",
+      "label": "财经",
+      "order": 5,
+      "desc": "商业财经速览"
+    },
+    {
+      "key": "视觉",
+      "label": "视觉",
+      "order": 6,
+      "desc": "人像与设计灵感"
+    },
+    {
+      "key": "文化",
+      "label": "文化",
+      "order": 7,
+      "desc": "电影音乐"
+    }
+  ],
+  "tags": [
+    {
+      "key": "hot",
+      "label": "热议",
+      "directory": "综合",
+      "risk": "medium",
+      "desc": "微博 / 抖音 / 小红书 / 知乎等社交与社区热榜合集",
+      "channels": [
+        "综合",
+        "社区"
+      ],
+      "sources": [
+        {
+          "name": "微博热搜",
+          "domain": "weibo.com"
+        },
+        {
+          "name": "抖音热榜",
+          "domain": "douyin.com"
+        },
+        {
+          "name": "小红书热榜",
+          "domain": "xiaohongshu.com"
+        },
+        {
+          "name": "知乎热榜",
+          "domain": "zhihu.com"
+        },
+        {
+          "name": "百度热搜",
+          "domain": "baidu.com"
+        },
+        {
+          "name": "今日头条热榜",
+          "domain": "toutiao.com"
+        },
+        {
+          "name": "B站热搜",
+          "domain": "bilibili.com"
+        },
+        {
+          "name": "虎扑步行街",
+          "domain": "hupu.com"
+        },
+        {
+          "name": "百度贴吧热议",
+          "domain": "tieba.baidu.com"
+        },
+        {
+          "name": "抽屉热榜",
+          "domain": "dig.ichouti.cn"
+        }
+      ]
+    },
+    {
+      "key": "ai",
+      "label": "AI 资讯",
+      "directory": "科技",
+      "risk": "low",
+      "desc": "大模型、Agent 与行业动态",
+      "channels": [
+        "科技"
+      ],
+      "sources": [
+        {
+          "name": "AIHOT精选",
+          "domain": "aihot.news"
+        },
+        {
+          "name": "AI前线",
+          "domain": "infoq.cn"
+        },
+        {
+          "name": "机器之心",
+          "domain": "jiqizhixin.com"
+        },
+        {
+          "name": "量子位",
+          "domain": "qbitai.com"
+        },
+        {
+          "name": "新智元",
+          "domain": "aiera.cn"
+        },
+        {
+          "name": "晚点LatePost",
+          "domain": "latepost.com"
+        },
+        {
+          "name": "APPSO",
+          "domain": "appso.com"
+        },
+        {
+          "name": "Twitter·宝玉",
+          "domain": "xgo.ing"
+        },
+        {
+          "name": "Twitter·小互",
+          "domain": "xgo.ing"
+        },
+        {
+          "name": "Twitter·向阳乔木",
+          "domain": "xgo.ing"
+        },
+        {
+          "name": "Twitter·orange.ai",
+          "domain": "xgo.ing"
+        },
+        {
+          "name": "Twitter·OpenAI",
+          "domain": "xgo.ing"
+        },
+        {
+          "name": "Twitter·Anthropic",
+          "domain": "xgo.ing"
+        },
+        {
+          "name": "Twitter·DeepSeek",
+          "domain": "xgo.ing"
+        },
+        {
+          "name": "Twitter·Cursor",
+          "domain": "xgo.ing"
+        },
+        {
+          "name": "Twitter·Karpathy",
+          "domain": "xgo.ing"
+        },
+        {
+          "name": "Twitter·Dify",
+          "domain": "xgo.ing"
+        },
+        {
+          "name": "听说了吗",
+          "domain": "anymesgs.com"
+        }
+      ]
+    },
+    {
+      "key": "tech",
+      "label": "科技新品",
+      "directory": "科技",
+      "risk": "low",
+      "desc": "数码与科技新品、效率工具",
+      "channels": [
+        "科技"
+      ],
+      "sources": [
+        {
+          "name": "Readhub早报",
+          "domain": "readhub.cn"
+        },
+        {
+          "name": "蓝点网",
+          "domain": "landian.news"
+        },
+        {
+          "name": "cnBeta",
+          "domain": "cnbeta.com"
+        },
+        {
+          "name": "小众软件",
+          "domain": "appinn.com"
+        },
+        {
+          "name": "爱范儿",
+          "domain": "ifanr.com"
+        },
+        {
+          "name": "36氪",
+          "domain": "36kr.com"
+        },
+        {
+          "name": "少数派",
+          "domain": "sspai.com"
+        },
+        {
+          "name": "数字尾巴",
+          "domain": "dgtle.com"
+        },
+        {
+          "name": "半导体行业观察",
+          "domain": "weixin.qq.com"
+        },
+        {
+          "name": "科技美学",
+          "domain": "weixin.qq.com"
+        },
+        {
+          "name": "津津乐道",
+          "domain": "daopub.com"
+        },
+        {
+          "name": "牛油果烤面包",
+          "domain": "typlog.io"
+        }
+      ]
+    },
+    {
+      "key": "funny",
+      "label": "轻松一刻",
+      "directory": "娱乐",
+      "risk": "low",
+      "desc": "轻松一刻：梗图与趣味配图（见笑 / TG 图墙），不含社交热榜或生活文化稿",
+      "channels": [
+        "娱乐",
+        "游戏",
+        "其他"
+      ],
+      "sources": [
+        {
+          "name": "TG每日沙雕墙",
+          "domain": "t.me/woshadiao"
+        },
+        {
+          "name": "TG平壤卫视",
+          "domain": "t.me/pingrangTV"
+        },
+        {
+          "name": "TG煎蛋无聊图",
+          "domain": "t.me/jandan_pic"
+        }
+      ]
+    },
+    {
+      "key": "opensource",
+      "label": "开源推荐",
+      "directory": "社区",
+      "risk": "low",
+      "desc": "开源项目与开发者工具",
+      "channels": [
+        "开发"
+      ],
+      "sources": [
+        {
+          "name": "NodeSeek",
+          "domain": "nodeseek.com"
+        },
+        {
+          "name": "V2EX",
+          "domain": "v2ex.com"
+        },
+        {
+          "name": "掘金",
+          "domain": "juejin.cn"
+        },
+        {
+          "name": "LINUX DO",
+          "domain": "linux.do"
+        },
+        {
+          "name": "GitHub趋势",
+          "domain": "github.com"
+        },
+        {
+          "name": "小众软件",
+          "domain": "appinn.com"
+        },
+        {
+          "name": "w2solo独立开发",
+          "domain": "w2solo.com"
+        }
+      ]
+    },
+    {
+      "key": "finance",
+      "label": "财经早报",
+      "directory": "财经",
+      "risk": "medium",
+      "desc": "商业与财经速览",
+      "channels": [
+        "财经"
+      ],
+      "sources": [
+        {
+          "name": "虎嗅",
+          "domain": "huxiu.com"
+        },
+        {
+          "name": "财联社",
+          "domain": "cls.cn"
+        },
+        {
+          "name": "钛媒体",
+          "domain": "tmtpost.com"
+        },
+        {
+          "name": "FT中文网",
+          "domain": "ftchinese.com"
+        },
+        {
+          "name": "参考消息",
+          "domain": "weixin.sogou.com"
+        },
+        {
+          "name": "华尔街见闻",
+          "domain": "wallstreetcn.com"
+        },
+        {
+          "name": "雪球",
+          "domain": "xueqiu.com"
+        },
+        {
+          "name": "财富中文网",
+          "domain": "fortunechina.com"
+        },
+        {
+          "name": "经济观察报",
+          "domain": "weixin.qq.com"
+        }
+      ]
+    },
+    {
+      "key": "portrait",
+      "label": "人像美学",
+      "directory": "视觉",
+      "risk": "medium",
+      "desc": "人像与摄影配图（见她），只热链不转存",
+      "channels": [],
+      "sources": [
+        {
+          "name": "煎蛋女装",
+          "domain": "jandan.net"
+        },
+        {
+          "name": "福利吧",
+          "domain": "fuliba2023.net"
+        }
+      ]
+    },
+    {
+      "key": "design",
+      "label": "设计灵感",
+      "directory": "视觉",
+      "risk": "low",
+      "desc": "产品设计与独立开发精选（池内实源）",
+      "channels": [
+        "阅读",
+        "开发"
+      ],
+      "sources": [
+        {
+          "name": "掘金",
+          "domain": "juejin.cn"
+        },
+        {
+          "name": "人人都是产品经理",
+          "domain": "woshipm.com"
+        },
+        {
+          "name": "博海拾贝",
+          "domain": "bohaishibei.com"
+        },
+        {
+          "name": "w2solo独立开发",
+          "domain": "w2solo.com"
+        },
+        {
+          "name": "小众软件",
+          "domain": "appinn.com"
+        },
+        {
+          "name": "V2EX",
+          "domain": "v2ex.com"
+        },
+        {
+          "name": "随机波动",
+          "domain": "fireside.fm"
+        },
+        {
+          "name": "Steve说",
+          "domain": "steveshuo.com"
+        },
+        {
+          "name": "Full of Mind",
+          "domain": "fom.fm"
+        },
+        {
+          "name": "UX Coffee 设计咖",
+          "domain": "uxcoffee.com"
+        },
+        {
+          "name": "但为君故",
+          "domain": "dreams.plus"
+        },
+        {
+          "name": "GeekPlux",
+          "domain": "geekplux.com"
+        },
+        {
+          "name": "Reorx",
+          "domain": "reorx.com"
+        },
+        {
+          "name": "不吐不快",
+          "domain": "mianao.info"
+        },
+        {
+          "name": "水八口",
+          "domain": "shuiba.co"
+        },
+        {
+          "name": "洞见",
+          "domain": "weixin.qq.com"
+        }
+      ]
+    },
+    {
+      "key": "movie",
+      "label": "电影音乐",
+      "directory": "文化",
+      "risk": "low",
+      "desc": "院线/乐榜封面与简介（听乐+看片）",
+      "channels": [
+        "视频",
+        "音乐",
+        "娱乐"
+      ],
+      "sources": [
+        {
+          "name": "网易云音乐",
+          "domain": "music.163.com"
+        },
+        {
+          "name": "猫眼",
+          "domain": "maoyan.com"
+        },
+        {
+          "name": "豆瓣",
+          "domain": "douban.com"
+        },
+        {
+          "name": "爱奇艺",
+          "domain": "iqiyi.com"
+        },
+        {
+          "name": "腾讯视频",
+          "domain": "v.qq.com"
+        },
+        {
+          "name": "QQ音乐",
+          "domain": "y.qq.com"
+        },
+        {
+          "name": "B站",
+          "domain": "bilibili.com"
+        },
+        {
+          "name": "B站每周必看",
+          "domain": "bilibili.com"
+        }
+      ]
+    }
+  ],
+  "newsChips": [
+    {
+      "key": "hot",
+      "label": "热议"
+    },
+    {
+      "key": "current",
+      "label": "时政要闻"
+    },
+    {
+      "key": "biz",
+      "label": "财经商业"
+    },
+    {
+      "key": "tech",
+      "label": "科技数码"
+    },
+    {
+      "key": "ai",
+      "label": "AI"
+    },
+    {
+      "key": "tools",
+      "label": "效率工具"
+    },
+    {
+      "key": "dev",
+      "label": "技术社区"
+    },
+    {
+      "key": "deep",
+      "label": "深度阅读"
+    },
+    {
+      "key": "ent",
+      "label": "影视音乐"
+    },
+    {
+      "key": "fun",
+      "label": "生活文化"
+    }
+  ],
+  "boardDirectories": {
+    "_doc": "外部榜单频道目录（rebang / open2hub）；keep=false 不进见报可选项",
+    "open2hub": [
+      {
+        "key": "综合",
+        "label": "综合",
+        "chip": "hot",
+        "keep": true
+      },
+      {
+        "key": "新闻",
+        "label": "新闻",
+        "chip": "current",
+        "keep": true
+      },
+      {
+        "key": "财经",
+        "label": "财经",
+        "chip": "biz",
+        "keep": true
+      },
+      {
+        "key": "科技",
+        "label": "科技",
+        "chip": "tech",
+        "keep": true
+      },
+      {
+        "key": "娱乐",
+        "label": "娱乐",
+        "chip": "ent",
+        "keep": true
+      },
+      {
+        "key": "体育",
+        "label": "体育",
+        "chip": null,
+        "keep": false
+      },
+      {
+        "key": "游戏",
+        "label": "游戏",
+        "chip": "fun",
+        "keep": true
+      },
+      {
+        "key": "汽车",
+        "label": "汽车",
+        "chip": null,
+        "keep": false
+      },
+      {
+        "key": "视频",
+        "label": "视频",
+        "chip": "ent",
+        "keep": true
+      },
+      {
+        "key": "音乐",
+        "label": "音乐",
+        "chip": "ent",
+        "keep": true
+      },
+      {
+        "key": "阅读",
+        "label": "阅读",
+        "chip": "deep",
+        "keep": true
+      },
+      {
+        "key": "其他",
+        "label": "其他",
+        "chip": "fun",
+        "keep": true
+      }
+    ],
+    "rebang": [
+      {
+        "key": "综合",
+        "label": "综合",
+        "chip": "hot",
+        "keep": true
+      },
+      {
+        "key": "科技",
+        "label": "科技",
+        "chip": "tech",
+        "keep": true
+      },
+      {
+        "key": "新闻",
+        "label": "新闻",
+        "chip": "current",
+        "keep": true
+      },
+      {
+        "key": "娱乐",
+        "label": "娱乐",
+        "chip": "ent",
+        "keep": true
+      },
+      {
+        "key": "社区",
+        "label": "社区",
+        "chip": "hot",
+        "keep": true
+      },
+      {
+        "key": "开发",
+        "label": "开发",
+        "chip": "dev",
+        "keep": true
+      },
+      {
+        "key": "财经",
+        "label": "财经",
+        "chip": "biz",
+        "keep": true
+      },
+      {
+        "key": "购物",
+        "label": "购物",
+        "chip": null,
+        "keep": false
+      }
+    ]
+  }
+}

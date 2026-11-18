@@ -1,0 +1,79 @@
+# 日更灌池：RSS/NewsNow → Supabase platform 共享池（标题+短摘要+链接）
+# Cloudflare Pages 只托管门户，不在这里铺 800 条 HTML。
+#
+# 仓库 Secrets（Settings → Secrets → Actions）：
+#   SUPABASE_URL
+#   SUPABASE_SERVICE_ROLE_KEY
+#
+# 手动：Actions → platform-ingest → Run workflow
+# 定时：每天 22:00 UTC = 上海 06:00
+name: platform-ingest
+
+on:
+  workflow_dispatch:
+    inputs:
+      per_tag:
+        description: '每内容包配额'
+        required: false
+        default: '100'
+      max_items:
+        description: 'RSS 合并上限'
+        required: false
+        default: '2670'
+  schedule:
+    - cron: '0 22 * * *'
+
+concurrency:
+  group: platform-ingest
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Write .env.local
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "::error::缺少 Secrets：SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY"
+            exit 1
+          fi
+          {
+            echo "SUPABASE_URL=$SUPABASE_URL"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY"
+            echo "SUPABASE_SCHEMA=platform"
+          } > .env.local
+
+      - name: Ingest shared pool
+        run: |
+          node tools/ingest-platform.mjs \
+            --per-tag "${{ github.event.inputs.per_tag || '100' }}" \
+            --max-items "${{ github.event.inputs.max_items || '2670' }}"
+
+      - name: Visual packs (best-effort)
+        continue-on-error: true
+        run: node tools/ingest-visual-packs.mjs --per-tag 12
+
+      - name: Coverage report (title + summary)
+        run: node tools/report-ingest-coverage.mjs --skip-fetch
+
+      - name: Upload coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ingest-coverage
+          path: |
+            tools/.cache/ingest-coverage.json
+            tools/.cache/ingest-coverage.md
+          if-no-files-found: warn
