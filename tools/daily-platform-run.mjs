@@ -69,8 +69,9 @@ function runNode(script, args = []) {
 
 function runIngest() {
   // 扩源后 ~900 源；配额过小会把 BestBlogs/timqian 新源挤成「版块空」
-  runNode('ingest-platform.mjs', ['--per-tag', '80', '--max-items', '2670']);
-  // 轻松一刻/人像/电影音乐对齐原站见笑·见她·听乐看片
+  // per-tag 软顶抬高：流水源按 pipeline-sources.json 的 dailyCap 收满日窗
+  runNode('ingest-platform.mjs', ['--per-tag', '400', '--max-items', '3200']);
+  // 轻松一刻/人像：站内见笑·见她图；电影音乐：听乐看片榜
   runNode('ingest-visual-packs.mjs', ['--per-tag', '12']);
 }
 

@@ -1,0 +1,12 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>hash probe</title></head><body><pre>probe</pre>
+<script type="module">
+import { contentHash } from '../lib/platform-model.mjs';
+import { normalizeUrl } from '../lib/ingest-map.mjs';
+const urls = [
+  'https://aihot.news/items/k036fkz6s64y292ovwq2qrx39',
+  'https://github.com/demo/staticgen',
+  'https://example.com/a/'
+];
+const out = urls.map(u => u + '=>' + contentHash(u, 't') + '|norm=' + normalizeUrl(u));
+document.title = 'HASHPROBE|' + out.join(';');
+</script></body></html>

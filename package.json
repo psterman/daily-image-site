@@ -38,7 +38,7 @@
     "groupbot:send": "node tools/send-groupbot.mjs",
     "preview": "node tools/preview-server.mjs",
     "fulltext:dev": "node tools/fulltext-dev.mjs",
-    "test:fulltext": "node tools/test-extract-article.mjs",
+    "test:fulltext": "node tools/test-extract-article.mjs && node tools/test-fulltext-fetch.mjs",
     "test:format-catalog": "node tools/test-format-catalog.mjs",
     "format:catalog": "node tools/build-format-catalog.mjs",
     "format:catalog:cache": "node tools/build-format-catalog.mjs --from-cache",

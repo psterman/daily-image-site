@@ -1,0 +1,24 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>live content probe</title></head><body><pre>probe</pre>
+<script type="module">
+import { createClient } from '../lib/sb-client.mjs';
+import { SB_CONFIG } from './config.js';
+const L=[]; const ok=(n,c,x='')=>L.push((c?'OK':'FAIL')+':'+n+(x?'('+x+')':''));
+try{
+  const c=createClient({url:SB_CONFIG.url,key:SB_CONFIG.key,schema:SB_CONFIG.schema,timeout:10000});
+  const items=await c.select('content_items',{columns:'id,title,canonical_url,rights_status,image_url,summary',limit:20});
+  ok('content_readable', items.length===8, 'rows='+items.length);
+  ok('rights_honest', items.every(i=>i.rights_status==='unknown'));
+  ok('no_image', items.every(i=>!i.image_url));
+  ok('has_link', items.every(i=>/^https?:\/\//.test(i.canonical_url)));
+  ok('has_summary', items.every(i=>typeof i.summary==='string'&&i.summary.length>0));
+  const tags=await c.select('content_tags',{columns:'content_item_id,tag_pack_id',limit:20});
+  ok('tags_linked', tags.length===8, 'tags='+tags.length);
+  // 模拟前端 buildCandidates 的读法：按 ai 标签包取内容
+  const packs=await c.select('tag_packs',{columns:'id,key',limit:20});
+  const aiPack=packs.find(p=>p.key==='ai');
+  const aiItemIds=new Set(tags.filter(t=>t.tag_pack_id===aiPack.id).map(t=>t.content_item_id));
+  ok('ai_column_items', [...aiItemIds].filter(id=>items.some(i=>i.id===id)).length===8, 'ai='+aiItemIds.size);
+  const fails=L.filter(x=>x.startsWith('FAIL')).length;
+  document.title='LIVECONTENT|'+(L.length-fails)+'/'+L.length+'|'+L.join('|');
+}catch(e){ document.title='LIVECONTENT|ERROR|'+(e&&e.message||e); }
+</script></body></html>

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><title>live auth probe</title></head>
+<body>
+<pre id="out">running…</pre>
+<script type="module">
+import { createClient } from '../lib/sb-client.mjs';
+import { SB_CONFIG } from './config.js';
+
+const lines = [];
+const ok = (n, c, x = '') => lines.push((c ? 'OK' : 'FAIL') + ':' + n + (x ? '(' + x + ')' : ''));
+
+try {
+  const c = createClient({ url: SB_CONFIG.url, key: SB_CONFIG.key, schema: SB_CONFIG.schema, timeout: 10000 });
+
+  // 1. 未登录：共享池可读
+  const packs = await c.select('tag_packs', { columns: 'key,name,status', limit: 20 });
+  ok('tag_packs_public_read', packs.length === 8, 'rows=' + packs.length);
+
+  // 2. 未登录：私有表被 RLS 拦住
+  const plats = await c.select('platforms', { columns: 'id', limit: 20 });
+  ok('rls_blocks_platforms', plats.length === 0, 'rows=' + plats.length);
+
+  const cands = await c.select('candidate_entries', { columns: 'id', limit: 20 });
+  ok('rls_blocks_candidates', cands.length === 0, 'rows=' + cands.length);
+
+  // 3. Auth 端点可达（错误码证明服务在线，而不是网络失败）
+  let authMsg = '';
+  try {
+    await c.auth.signIn('__probe_no_such_user__@example.invalid', 'wrongpass');
+    authMsg = 'unexpected_success';
+  } catch (e) {
+    authMsg = String(e.message || e);
+  }
+  ok('auth_reachable', /Supabase 4\d\d|invalid login credentials|email not confirmed/i.test(authMsg), authMsg.slice(0, 80));
+
+  const fails = lines.filter((l) => l.startsWith('FAIL')).length;
+  document.title = 'LIVEAUTH|' + (lines.length - fails) + '/' + lines.length + '|' + lines.join('|');
+} catch (e) {
+  document.title = 'LIVEAUTH|ERROR|' + (e && e.stack ? e.stack : e);
+}
+</script>
+</body>
+</html>

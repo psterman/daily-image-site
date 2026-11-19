@@ -47,6 +47,12 @@
 - **看板**（`/board/`）：投稿（口令保护）+ 点赞
 - **OG 分享卡片**：每期一张 1200×630 三栏拼图（见闻/见她/见笑各取一张），`og:` / `twitter:` 全套元数据
 - **RSS**（`/feed.xml`）：RSS 2.0，每期一条 item，链接与 guid 都是绝对 URL
+- **邮件推送（Newsletter）**：读者在 `/subscribe/` 按分类订阅，每天早上直接收邮件，不用登录网站 → 见 [`docs/newsletter-setup.md`](docs/newsletter-setup.md)
+- **群机器人日报**：企业微信 / 钉钉 / 飞书群每天收一条固定六栏目日报，点链接直达栏目 → 见 [`docs/newsletter-setup.md`](docs/newsletter-setup.md)
+- **用户自建平台数据模型**：注册用户、个人平台、栏目、候选池、关注、广告与版权投诉的可移植 SQL 模型 → 见 [`docs/data-model.md`](docs/data-model.md)
+- **第一阶段最小闭环（可运行）**：注册 → 选标签建栏目 → 灌内容（版权过滤）→ 候选池 → 审稿（人工/AI 自动）→ 发布 digest.json。纯函数实现，本地 JSON store 可离线跑通 → 见 [`docs/platform-pipeline.md`](docs/platform-pipeline.md)
+- **Supabase 真后端**：Auth 登录 + PostgREST + 23 张表 RLS 行级隔离，用户刷新不丢数据；业务函数零改动跑在真库上 → 见 [`docs/supabase-setup.md`](docs/supabase-setup.md)
+- **主源供给链路**：RSS 抓取/解析（复用 fetch-rss.mjs）→ 版权过滤 + 标签映射（lib/ingest-map.mjs）→ service_role 灌入共享池；已灌入真实 AI 资讯，前端读真数据 → 见 [`docs/main-source-pipeline.md`](docs/main-source-pipeline.md)
 - **模糊占位（LQIP）**：24px WebP 以 base64 data URI 内联进 manifest —— 零额外请求、零额外 R2 对象
 - **懒加载**：原图滚动到才加载
 - **轻依赖**：前端零外部 JS/CSS
@@ -169,7 +175,8 @@ daily-image-site/
 │   ├── likes/api.js      点赞
 │   └── _middleware.js    闸门
 ├── lib/                  共享模块（R2 JSON 读写 / 限流）
-├── docs/                 设计与迁移文档
+├── docs/                 设计与迁移文档（含 data-model.md）
+├── db/                   可移植 SQL 数据模型与种子数据
 ├── AGENTS.md             **开发手册 + 实测坑清单**（接手先读这个）
 ├── CHANGELOG.md          变更日志
 └── published/            构建产物（部署面，已 .gitignore）

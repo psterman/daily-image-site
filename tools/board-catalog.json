@@ -1,0 +1,2215 @@
+{
+  "_doc": "后台榜单目录：分类 + 中文榜单名。ingest=have 含既有 RSS/头条抓取 + 已接 NewsNow 白名单；planned=仍缺通道；skip=不收。抓取实现见 newsnow.config.json / fetch-newsnow.mjs。",
+  "fetchedAt": "2026-11-18T08:14:45.627Z",
+  "ourCategories": [
+    {
+      "key": "hot",
+      "label": "热议"
+    },
+    {
+      "key": "current",
+      "label": "时政要闻"
+    },
+    {
+      "key": "biz",
+      "label": "财经商业"
+    },
+    {
+      "key": "tech",
+      "label": "科技数码"
+    },
+    {
+      "key": "ai",
+      "label": "AI"
+    },
+    {
+      "key": "tools",
+      "label": "效率工具"
+    },
+    {
+      "key": "dev",
+      "label": "技术社区"
+    },
+    {
+      "key": "deep",
+      "label": "深度阅读"
+    },
+    {
+      "key": "ent",
+      "label": "影视音乐"
+    },
+    {
+      "key": "fun",
+      "label": "轻松一刻"
+    }
+  ],
+  "open2hub": {
+    "site": "https://top.open2hub.com/",
+    "channelMap": {
+      "综合": {
+        "our": "hot",
+        "pack": "hot",
+        "keep": true
+      },
+      "新闻": {
+        "our": "current",
+        "pack": "hot",
+        "keep": true
+      },
+      "财经": {
+        "our": "biz",
+        "pack": "finance",
+        "keep": true
+      },
+      "科技": {
+        "our": "tech",
+        "pack": "tech",
+        "keep": true
+      },
+      "娱乐": {
+        "our": "ent",
+        "pack": "movie",
+        "keep": true
+      },
+      "体育": {
+        "our": null,
+        "pack": null,
+        "keep": false,
+        "reason": "见报暂不收体育垂直榜"
+      },
+      "游戏": {
+        "our": "fun",
+        "pack": "funny",
+        "keep": true
+      },
+      "汽车": {
+        "our": null,
+        "pack": null,
+        "keep": false,
+        "reason": "垂直汽车榜暂不收"
+      },
+      "视频": {
+        "our": "ent",
+        "pack": "movie",
+        "keep": true
+      },
+      "音乐": {
+        "our": "ent",
+        "pack": "movie",
+        "keep": true
+      },
+      "阅读": {
+        "our": "deep",
+        "pack": "design",
+        "keep": true
+      },
+      "其他": {
+        "our": "fun",
+        "pack": "funny",
+        "keep": true
+      }
+    },
+    "channels": {
+      "综合": {
+        "path": "/channel/general",
+        "map": {
+          "our": "hot",
+          "pack": "hot",
+          "keep": true
+        },
+        "boards": [
+          {
+            "platform": "抖音",
+            "boardTitle": "热点榜",
+            "label": "抖音热点榜",
+            "ingest": "have",
+            "via": "newsnow",
+            "sourceName": "抖音热榜",
+            "category": "hot"
+          },
+          {
+            "platform": "小红书",
+            "boardTitle": "阅读榜",
+            "label": "小红书阅读榜",
+            "ingest": "planned",
+            "via": "newsnow-or-adapter"
+          },
+          {
+            "platform": "快手",
+            "boardTitle": "快手热榜",
+            "label": "快手·快手热榜",
+            "ingest": "planned",
+            "via": "newsnow-or-adapter"
+          },
+          {
+            "platform": "百度",
+            "boardTitle": "热搜榜",
+            "label": "百度热搜榜",
+            "ingest": "have",
+            "via": "newsnow",
+            "sourceName": "百度热搜",
+            "category": "hot"
+          },
+          {
+            "platform": "哔哩哔哩",
+            "boardTitle": "综合热门",
+            "label": "哔哩哔哩综合热门",
+            "ingest": "have",
+            "via": "newsnow",
+            "sourceName": "B站热搜",
+            "category": "hot"
+          },
+          {
+            "platform": "哔哩哔哩",
+            "boardTitle": "每周必看",
+            "label": "哔哩哔哩·每周必看",
+            "ingest": "have",
+            "via": "newsnow",
+            "sourceName": "B站热搜",
+            "category": "hot"
+          },
+          {
+            "platform": "知乎",
+            "boardTitle": "热榜",
+            "label": "知乎热榜",
+            "ingest": "have",
+            "sourceName": "知乎热榜",
+            "category": "hot"
+          },
+          {
+            "platform": "豆瓣",
+            "boardTitle": "实时热门讨论",
+            "label": "豆瓣实时热门讨论",
+            "ingest": "have",
+            "sourceName": "豆瓣实时热门",
+            "category": "ent"
+          },
+          {
+            "platform": "微博",
+            "boardTitle": "热搜",
+            "label": "微博热搜",
+            "ingest": "have",
+            "sourceName": "微博热搜",
+            "category": "hot"
+          },
+          {
+            "platform": "百度贴吧",
+            "boardTitle": "贴吧热议榜",
+            "label": "百度贴吧贴吧热议榜",
+            "ingest": "have",
+            "via": "newsnow",
+            "sourceName": "百度贴吧热议",
+            "category": "hot"
+          },
+          {
+            "platform": "腾讯新闻",
+            "boardTitle": "综合早报",
+            "label": "腾讯新闻·综合早报",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "腾讯新闻",
+            "boardTitle": "综合晚报",
+            "label": "腾讯新闻·综合晚报",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "腾讯新闻",
+            "boardTitle": "热问",
+            "label": "腾讯新闻·热问",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "虎扑",
+            "boardTitle": "步行街",
+            "label": "虎扑·步行街",
+            "ingest": "have",
+            "sourceName": "虎扑步行街",
+            "category": "hot"
+          },
+          {
+            "platform": "必应",
+            "boardTitle": "必应上的热点",
+            "label": "必应·必应上的热点",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "AcFun",
+            "boardTitle": "今日",
+            "label": "AcFun·今日",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "知乎日报",
+            "boardTitle": "日报",
+            "label": "知乎日报·日报",
+            "ingest": "have",
+            "sourceName": "知乎日报",
+            "category": "deep"
+          }
+        ],
+        "stats": {
+          "total": 17,
+          "have": 10,
+          "planned": 2,
+          "skip": 5
+        }
+      },
+      "新闻": {
+        "path": "/channel/news",
+        "map": {
+          "our": "current",
+          "pack": "hot",
+          "keep": true
+        },
+        "boards": [
+          {
+            "platform": "今日头条",
+            "boardTitle": "头条热榜",
+            "label": "今日头条头条热榜",
+            "ingest": "have",
+            "via": "newsnow",
+            "sourceName": "今日头条热榜",
+            "category": "hot"
+          },
+          {
+            "platform": "网易新闻",
+            "boardTitle": "热点排行",
+            "label": "网易新闻·热点排行",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "腾讯新闻",
+            "boardTitle": "热点榜",
+            "label": "腾讯新闻热点榜",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "腾讯新闻",
+            "boardTitle": "国际早报",
+            "label": "腾讯新闻·国际早报",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "腾讯新闻",
+            "boardTitle": "国际晚报",
+            "label": "腾讯新闻·国际晚报",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "澎湃新闻",
+            "boardTitle": "澎湃热榜",
+            "label": "澎湃新闻澎湃热榜",
+            "ingest": "have",
+            "sourceName": "澎湃新闻",
+            "category": "current"
+          },
+          {
+            "platform": "搜狐网",
+            "boardTitle": "最新",
+            "label": "搜狐网·最新",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "凤凰新闻",
+            "boardTitle": "热点·资讯",
+            "label": "凤凰新闻·热点·资讯",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "ZAKER",
+            "boardTitle": "热点",
+            "label": "ZAKER·热点",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "界面新闻",
+            "boardTitle": "Most Popular",
+            "label": "界面新闻·Most Popular",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "环球时报",
+            "boardTitle": "要闻",
+            "label": "环球时报·要闻",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "央视新闻",
+            "boardTitle": "列表浏览",
+            "label": "央视新闻·列表浏览",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "观察者网",
+            "boardTitle": "热点",
+            "label": "观察者网·热点",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "南方周末",
+            "boardTitle": "热门文章",
+            "label": "南方周末热门文章",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "新京报",
+            "boardTitle": "排行",
+            "label": "新京报·排行",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "新华网",
+            "boardTitle": "要闻聚焦",
+            "label": "新华网·要闻聚焦",
+            "ingest": "have",
+            "sourceName": "新华网·新华社新闻",
+            "category": "current"
+          }
+        ],
+        "stats": {
+          "total": 16,
+          "have": 3,
+          "planned": 0,
+          "skip": 13
+        }
+      },
+      "财经": {
+        "path": "/channel/finance",
+        "map": {
+          "our": "biz",
+          "pack": "finance",
+          "keep": true
+        },
+        "boards": [
+          {
+            "platform": "同花顺",
+            "boardTitle": "头条",
+            "label": "同花顺·头条",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "腾讯新闻",
+            "boardTitle": "财经早报",
+            "label": "腾讯新闻·财经早报",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "腾讯新闻",
+            "boardTitle": "财经晚报",
+            "label": "腾讯新闻·财经晚报",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "雪球",
+            "boardTitle": "热门话题",
+            "label": "雪球热门话题",
+            "ingest": "have",
+            "sourceName": "雪球",
+            "category": "biz"
+          },
+          {
+            "platform": "东方财富",
+            "boardTitle": "资讯精华",
+            "label": "东方财富·资讯精华",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "新浪财经",
+            "boardTitle": "点击量排行",
+            "label": "新浪财经·点击量排行",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "华尔街见闻",
+            "boardTitle": "最热文章",
+            "label": "华尔街见闻·最热文章",
+            "ingest": "have",
+            "sourceName": "华尔街见闻",
+            "category": "biz"
+          },
+          {
+            "platform": "财新",
+            "boardTitle": "要闻",
+            "label": "财新·要闻",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "金十数据",
+            "boardTitle": "综合",
+            "label": "金十数据·综合",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "金融界",
+            "boardTitle": "推荐",
+            "label": "金融界·推荐",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "第一财经",
+            "boardTitle": "头条",
+            "label": "第一财经·头条",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "格隆汇",
+            "boardTitle": "日排行",
+            "label": "格隆汇·日排行",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "证券时报",
+            "boardTitle": "时报热榜",
+            "label": "证券时报时报热榜",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          }
+        ],
+        "stats": {
+          "total": 13,
+          "have": 2,
+          "planned": 0,
+          "skip": 11
+        }
+      },
+      "科技": {
+        "path": "/channel/technology",
+        "map": {
+          "our": "tech",
+          "pack": "tech",
+          "keep": true
+        },
+        "boards": [
+          {
+            "platform": "哔哩哔哩",
+            "boardTitle": "科技数码",
+            "label": "哔哩哔哩·科技数码",
+            "ingest": "have",
+            "via": "newsnow",
+            "sourceName": "B站热搜",
+            "category": "hot"
+          },
+          {
+            "platform": "微博",
+            "boardTitle": "科技",
+            "label": "微博·科技",
+            "ingest": "have",
+            "sourceName": "微博热搜",
+            "category": "hot"
+          },
+          {
+            "platform": "腾讯新闻",
+            "boardTitle": "科技早报",
+            "label": "腾讯新闻·科技早报",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "CSDN",
+            "boardTitle": "全站综合热榜",
+            "label": "CSDN全站综合热榜",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "虎扑",
+            "boardTitle": "数码",
+            "label": "虎扑·数码",
+            "ingest": "have",
+            "sourceName": "虎扑步行街",
+            "category": "hot"
+          },
+          {
+            "platform": "36氪",
+            "boardTitle": "人气榜",
+            "label": "36氪人气榜",
+            "ingest": "have",
+            "sourceName": "36氪",
+            "category": "tech"
+          },
+          {
+            "platform": "中关村在线",
+            "boardTitle": "今日焦点",
+            "label": "中关村在线·今日焦点",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "人人都是产品经理",
+            "boardTitle": "日榜",
+            "label": "人人都是产品经理日榜",
+            "ingest": "have",
+            "sourceName": "人人都是产品经理",
+            "category": "deep"
+          },
+          {
+            "platform": "虎嗅",
+            "boardTitle": "虎嗅频道",
+            "label": "虎嗅·虎嗅频道",
+            "ingest": "have",
+            "sourceName": "虎嗅",
+            "category": "biz"
+          },
+          {
+            "platform": "果壳",
+            "boardTitle": "首页",
+            "label": "果壳·首页",
+            "ingest": "have",
+            "sourceName": "果壳网·科学人",
+            "category": "deep"
+          },
+          {
+            "platform": "少数派",
+            "boardTitle": "推荐",
+            "label": "少数派·推荐",
+            "ingest": "have",
+            "sourceName": "少数派",
+            "category": "tools"
+          },
+          {
+            "platform": "IT之家",
+            "boardTitle": "日榜",
+            "label": "IT之家日榜",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "51CTO",
+            "boardTitle": "热榜",
+            "label": "51CTO热榜",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "创业邦",
+            "boardTitle": "热榜",
+            "label": "创业邦热榜",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "博客园",
+            "boardTitle": "热榜",
+            "label": "博客园热榜",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "吾爱破解",
+            "boardTitle": "最新热门",
+            "label": "吾爱破解最新热门",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          }
+        ],
+        "stats": {
+          "total": 16,
+          "have": 8,
+          "planned": 0,
+          "skip": 8
+        }
+      },
+      "娱乐": {
+        "path": "/channel/entertainment",
+        "map": {
+          "our": "ent",
+          "pack": "movie",
+          "keep": true
+        },
+        "boards": [
+          {
+            "platform": "抖音",
+            "boardTitle": "娱乐榜",
+            "label": "抖音娱乐榜",
+            "ingest": "have",
+            "via": "newsnow",
+            "sourceName": "抖音热榜",
+            "category": "hot"
+          },
+          {
+            "platform": "哔哩哔哩",
+            "boardTitle": "娱乐",
+            "label": "哔哩哔哩·娱乐",
+            "ingest": "have",
+            "via": "newsnow",
+            "sourceName": "B站热搜",
+            "category": "hot"
+          },
+          {
+            "platform": "今日头条",
+            "boardTitle": "娱乐",
+            "label": "今日头条·娱乐",
+            "ingest": "have",
+            "via": "newsnow",
+            "sourceName": "今日头条热榜",
+            "category": "hot"
+          },
+          {
+            "platform": "微博",
+            "boardTitle": "文娱",
+            "label": "微博·文娱",
+            "ingest": "have",
+            "sourceName": "微博热搜",
+            "category": "hot"
+          },
+          {
+            "platform": "网易新闻",
+            "boardTitle": "娱乐",
+            "label": "网易新闻·娱乐",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "腾讯新闻",
+            "boardTitle": "娱乐",
+            "label": "腾讯新闻·娱乐",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "虎扑",
+            "boardTitle": "影视娱乐",
+            "label": "虎扑·影视娱乐",
+            "ingest": "have",
+            "sourceName": "虎扑步行街",
+            "category": "hot"
+          },
+          {
+            "platform": "搜狐网",
+            "boardTitle": "娱乐热点",
+            "label": "搜狐网·娱乐热点",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "ZAKER",
+            "boardTitle": "娱乐",
+            "label": "ZAKER·娱乐",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "环球时报",
+            "boardTitle": "大文娱",
+            "label": "环球时报·大文娱",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          }
+        ],
+        "stats": {
+          "total": 10,
+          "have": 5,
+          "planned": 0,
+          "skip": 5
+        }
+      },
+      "体育": {
+        "path": "/channel/sports",
+        "map": {
+          "our": null,
+          "pack": null,
+          "keep": false,
+          "reason": "见报暂不收体育垂直榜"
+        },
+        "boards": [
+          {
+            "platform": "哔哩哔哩",
+            "boardTitle": "体育运动",
+            "label": "哔哩哔哩·体育运动",
+            "ingest": "skip",
+            "reason": "频道整体不收录"
+          },
+          {
+            "platform": "微博",
+            "boardTitle": "体育",
+            "label": "微博·体育",
+            "ingest": "skip",
+            "reason": "频道整体不收录"
+          },
+          {
+            "platform": "腾讯新闻",
+            "boardTitle": "体育早报",
+            "label": "腾讯新闻·体育早报",
+            "ingest": "skip",
+            "reason": "频道整体不收录"
+          },
+          {
+            "platform": "腾讯新闻",
+            "boardTitle": "体育晚报",
+            "label": "腾讯新闻·体育晚报",
+            "ingest": "skip",
+            "reason": "频道整体不收录"
+          },
+          {
+            "platform": "虎扑",
+            "boardTitle": "NBA",
+            "label": "虎扑·NBA",
+            "ingest": "skip",
+            "reason": "频道整体不收录"
+          },
+          {
+            "platform": "虎扑",
+            "boardTitle": "国际足球",
+            "label": "虎扑·国际足球",
+            "ingest": "skip",
+            "reason": "频道整体不收录"
+          },
+          {
+            "platform": "虎扑",
+            "boardTitle": "中国足球",
+            "label": "虎扑·中国足球",
+            "ingest": "skip",
+            "reason": "频道整体不收录"
+          },
+          {
+            "platform": "虎扑",
+            "boardTitle": "CBA",
+            "label": "虎扑·CBA",
+            "ingest": "skip",
+            "reason": "频道整体不收录"
+          },
+          {
+            "platform": "虎扑",
+            "boardTitle": "综合体育",
+            "label": "虎扑·综合体育",
+            "ingest": "skip",
+            "reason": "频道整体不收录"
+          },
+          {
+            "platform": "虎扑",
+            "boardTitle": "装备",
+            "label": "虎扑·装备",
+            "ingest": "skip",
+            "reason": "频道整体不收录"
+          },
+          {
+            "platform": "懂球帝",
+            "boardTitle": "推荐",
+            "label": "懂球帝·推荐",
+            "ingest": "skip",
+            "reason": "频道整体不收录"
+          },
+          {
+            "platform": "央视体育",
+            "boardTitle": "热门",
+            "label": "央视体育热门",
+            "ingest": "skip",
+            "reason": "频道整体不收录"
+          },
+          {
+            "platform": "新浪体育",
+            "boardTitle": "体育热搜",
+            "label": "新浪体育体育热搜",
+            "ingest": "skip",
+            "reason": "频道整体不收录"
+          },
+          {
+            "platform": "体坛周报",
+            "boardTitle": "头条",
+            "label": "体坛周报·头条",
+            "ingest": "skip",
+            "reason": "频道整体不收录"
+          },
+          {
+            "platform": "搜狐网",
+            "boardTitle": "体育",
+            "label": "搜狐网·体育",
+            "ingest": "skip",
+            "reason": "频道整体不收录"
+          }
+        ],
+        "stats": {
+          "total": 15,
+          "have": 0,
+          "planned": 0,
+          "skip": 15
+        }
+      },
+      "游戏": {
+        "path": "/channel/games",
+        "map": {
+          "our": "fun",
+          "pack": "funny",
+          "keep": true
+        },
+        "boards": [
+          {
+            "platform": "哔哩哔哩",
+            "boardTitle": "游戏",
+            "label": "哔哩哔哩·游戏",
+            "ingest": "have",
+            "via": "newsnow",
+            "sourceName": "B站热搜",
+            "category": "hot"
+          },
+          {
+            "platform": "微博",
+            "boardTitle": "ACG",
+            "label": "微博·ACG",
+            "ingest": "have",
+            "sourceName": "微博热搜",
+            "category": "hot"
+          },
+          {
+            "platform": "虎扑",
+            "boardTitle": "电竞",
+            "label": "虎扑·电竞",
+            "ingest": "have",
+            "sourceName": "虎扑步行街",
+            "category": "hot"
+          },
+          {
+            "platform": "虎扑",
+            "boardTitle": "英雄联盟",
+            "label": "虎扑·英雄联盟",
+            "ingest": "have",
+            "sourceName": "虎扑步行街",
+            "category": "hot"
+          },
+          {
+            "platform": "游民星空",
+            "boardTitle": "热点资讯排行",
+            "label": "游民星空·热点资讯排行",
+            "ingest": "planned",
+            "via": "rank-adapter-or-existing-movie-music"
+          },
+          {
+            "platform": "游侠网",
+            "boardTitle": "热榜",
+            "label": "游侠网热榜",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "3DM游戏",
+            "boardTitle": "近期热门",
+            "label": "3DM游戏近期热门",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "篝火营地",
+            "boardTitle": "游戏热点",
+            "label": "篝火营地·游戏热点",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "A9玩家社区",
+            "boardTitle": "今日热文",
+            "label": "A9玩家社区·今日热文",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "17173",
+            "boardTitle": "今日焦点",
+            "label": "17173·今日焦点",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          }
+        ],
+        "stats": {
+          "total": 10,
+          "have": 4,
+          "planned": 1,
+          "skip": 5
+        }
+      },
+      "汽车": {
+        "path": "/channel/automobile",
+        "map": {
+          "our": null,
+          "pack": null,
+          "keep": false,
+          "reason": "垂直汽车榜暂不收"
+        },
+        "boards": [
+          {
+            "platform": "哔哩哔哩",
+            "boardTitle": "汽车",
+            "label": "哔哩哔哩·汽车",
+            "ingest": "skip",
+            "reason": "频道整体不收录"
+          },
+          {
+            "platform": "汽车之家",
+            "boardTitle": "热点榜",
+            "label": "汽车之家热点榜",
+            "ingest": "skip",
+            "reason": "频道整体不收录"
+          },
+          {
+            "platform": "汽车之家",
+            "boardTitle": "文章排行榜",
+            "label": "汽车之家文章排行榜",
+            "ingest": "skip",
+            "reason": "频道整体不收录"
+          },
+          {
+            "platform": "汽车之家",
+            "boardTitle": "视频排行榜",
+            "label": "汽车之家视频排行榜",
+            "ingest": "skip",
+            "reason": "频道整体不收录"
+          },
+          {
+            "platform": "汽车之家",
+            "boardTitle": "论坛热帖排行榜",
+            "label": "汽车之家论坛热帖排行榜",
+            "ingest": "skip",
+            "reason": "频道整体不收录"
+          },
+          {
+            "platform": "腾讯新闻",
+            "boardTitle": "汽车早报",
+            "label": "腾讯新闻·汽车早报",
+            "ingest": "skip",
+            "reason": "频道整体不收录"
+          }
+        ],
+        "stats": {
+          "total": 6,
+          "have": 0,
+          "planned": 0,
+          "skip": 6
+        }
+      },
+      "视频": {
+        "path": "/channel/video",
+        "map": {
+          "our": "ent",
+          "pack": "movie",
+          "keep": true
+        },
+        "boards": [
+          {
+            "platform": "爱奇艺",
+            "boardTitle": "热播榜",
+            "label": "爱奇艺热播榜",
+            "ingest": "planned",
+            "via": "rank-adapter-or-existing-movie-music"
+          },
+          {
+            "platform": "腾讯视频",
+            "boardTitle": "热搜",
+            "label": "腾讯视频热搜",
+            "ingest": "planned",
+            "via": "rank-adapter-or-existing-movie-music"
+          },
+          {
+            "platform": "红果短剧",
+            "boardTitle": "红果热播榜",
+            "label": "红果短剧红果热播榜",
+            "ingest": "planned",
+            "via": "rank-adapter-or-existing-movie-music"
+          },
+          {
+            "platform": "红果短剧",
+            "boardTitle": "真人剧热播榜",
+            "label": "红果短剧真人剧热播榜",
+            "ingest": "planned",
+            "via": "rank-adapter-or-existing-movie-music"
+          },
+          {
+            "platform": "红果短剧",
+            "boardTitle": "AI剧热播榜",
+            "label": "红果短剧AI剧热播榜",
+            "ingest": "planned",
+            "via": "rank-adapter-or-existing-movie-music"
+          },
+          {
+            "platform": "红果短剧",
+            "boardTitle": "漫剧热播榜",
+            "label": "红果短剧漫剧热播榜",
+            "ingest": "planned",
+            "via": "rank-adapter-or-existing-movie-music"
+          },
+          {
+            "platform": "百度",
+            "boardTitle": "电影榜",
+            "label": "百度电影榜",
+            "ingest": "have",
+            "via": "newsnow",
+            "sourceName": "百度热搜",
+            "category": "hot"
+          },
+          {
+            "platform": "百度",
+            "boardTitle": "电视剧榜",
+            "label": "百度电视剧榜",
+            "ingest": "have",
+            "via": "newsnow",
+            "sourceName": "百度热搜",
+            "category": "hot"
+          },
+          {
+            "platform": "哔哩哔哩",
+            "boardTitle": "番剧",
+            "label": "哔哩哔哩·番剧",
+            "ingest": "have",
+            "via": "newsnow",
+            "sourceName": "B站热搜",
+            "category": "hot"
+          },
+          {
+            "platform": "哔哩哔哩",
+            "boardTitle": "国创",
+            "label": "哔哩哔哩·国创",
+            "ingest": "have",
+            "via": "newsnow",
+            "sourceName": "B站热搜",
+            "category": "hot"
+          },
+          {
+            "platform": "哔哩哔哩",
+            "boardTitle": "电影",
+            "label": "哔哩哔哩·电影",
+            "ingest": "have",
+            "via": "newsnow",
+            "sourceName": "B站热搜",
+            "category": "hot"
+          },
+          {
+            "platform": "哔哩哔哩",
+            "boardTitle": "电视剧",
+            "label": "哔哩哔哩·电视剧",
+            "ingest": "have",
+            "via": "newsnow",
+            "sourceName": "B站热搜",
+            "category": "hot"
+          },
+          {
+            "platform": "哔哩哔哩",
+            "boardTitle": "综艺",
+            "label": "哔哩哔哩·综艺",
+            "ingest": "have",
+            "via": "newsnow",
+            "sourceName": "B站热搜",
+            "category": "hot"
+          },
+          {
+            "platform": "哔哩哔哩",
+            "boardTitle": "纪录片",
+            "label": "哔哩哔哩·纪录片",
+            "ingest": "have",
+            "via": "newsnow",
+            "sourceName": "B站热搜",
+            "category": "hot"
+          },
+          {
+            "platform": "豆瓣",
+            "boardTitle": "新片榜",
+            "label": "豆瓣新片榜",
+            "ingest": "have",
+            "sourceName": "豆瓣即将上映",
+            "category": "ent"
+          },
+          {
+            "platform": "豆瓣",
+            "boardTitle": "一周口碑榜",
+            "label": "豆瓣一周口碑榜",
+            "ingest": "have",
+            "sourceName": "豆瓣即将上映",
+            "category": "ent"
+          },
+          {
+            "platform": "豆瓣",
+            "boardTitle": "北美票房榜",
+            "label": "豆瓣北美票房榜",
+            "ingest": "have",
+            "sourceName": "豆瓣即将上映",
+            "category": "ent"
+          }
+        ],
+        "stats": {
+          "total": 17,
+          "have": 11,
+          "planned": 6,
+          "skip": 0
+        }
+      },
+      "音乐": {
+        "path": "/channel/music",
+        "map": {
+          "our": "ent",
+          "pack": "movie",
+          "keep": true
+        },
+        "boards": [
+          {
+            "platform": "酷狗音乐",
+            "boardTitle": "酷狗飙升榜",
+            "label": "酷狗音乐酷狗飙升榜",
+            "ingest": "planned",
+            "via": "rank-adapter-or-existing-movie-music"
+          },
+          {
+            "platform": "哔哩哔哩",
+            "boardTitle": "音乐",
+            "label": "哔哩哔哩·音乐",
+            "ingest": "have",
+            "via": "newsnow",
+            "sourceName": "B站热搜",
+            "category": "hot"
+          },
+          {
+            "platform": "网易云音乐",
+            "boardTitle": "飙升榜",
+            "label": "网易云音乐飙升榜",
+            "ingest": "planned",
+            "via": "rank-adapter-or-existing-movie-music"
+          },
+          {
+            "platform": "网易云音乐",
+            "boardTitle": "新歌榜",
+            "label": "网易云音乐新歌榜",
+            "ingest": "planned",
+            "via": "rank-adapter-or-existing-movie-music"
+          },
+          {
+            "platform": "QQ音乐",
+            "boardTitle": "飙升榜",
+            "label": "QQ音乐飙升榜",
+            "ingest": "planned",
+            "via": "rank-adapter-or-existing-movie-music"
+          },
+          {
+            "platform": "QQ音乐",
+            "boardTitle": "新歌榜",
+            "label": "QQ音乐新歌榜",
+            "ingest": "planned",
+            "via": "rank-adapter-or-existing-movie-music"
+          },
+          {
+            "platform": "豆瓣",
+            "boardTitle": "豆瓣新碟榜",
+            "label": "豆瓣·豆瓣新碟榜",
+            "ingest": "have",
+            "sourceName": "豆瓣音乐新碟",
+            "category": "ent"
+          },
+          {
+            "platform": "豆瓣",
+            "boardTitle": "本周流行音乐人",
+            "label": "豆瓣·本周流行音乐人",
+            "ingest": "have",
+            "sourceName": "豆瓣音乐新碟",
+            "category": "ent"
+          }
+        ],
+        "stats": {
+          "total": 8,
+          "have": 3,
+          "planned": 5,
+          "skip": 0
+        }
+      },
+      "阅读": {
+        "path": "/channel/reading",
+        "map": {
+          "our": "deep",
+          "pack": "design",
+          "keep": true
+        },
+        "boards": [
+          {
+            "platform": "百度",
+            "boardTitle": "小说榜",
+            "label": "百度小说榜",
+            "ingest": "have",
+            "via": "newsnow",
+            "sourceName": "百度热搜",
+            "category": "hot"
+          },
+          {
+            "platform": "喜马拉雅",
+            "boardTitle": "热播",
+            "label": "喜马拉雅热播",
+            "ingest": "planned",
+            "via": "rank-adapter-or-existing-movie-music"
+          },
+          {
+            "platform": "微信读书",
+            "boardTitle": "总榜",
+            "label": "微信读书总榜",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "豆瓣",
+            "boardTitle": "热门图书榜",
+            "label": "豆瓣热门图书榜",
+            "ingest": "have",
+            "sourceName": "豆瓣图书榜",
+            "category": "deep"
+          },
+          {
+            "platform": "豆瓣",
+            "boardTitle": "畅销图书榜",
+            "label": "豆瓣畅销图书榜",
+            "ingest": "have",
+            "sourceName": "豆瓣图书榜",
+            "category": "deep"
+          },
+          {
+            "platform": "七猫小说",
+            "boardTitle": "大热榜",
+            "label": "七猫小说大热榜",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "七猫小说",
+            "boardTitle": "新书榜",
+            "label": "七猫小说新书榜",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "QQ阅读",
+            "boardTitle": "上架30天内",
+            "label": "QQ阅读·上架30天内",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "起点读书",
+            "boardTitle": "全部分类",
+            "label": "起点读书·全部分类",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          }
+        ],
+        "stats": {
+          "total": 9,
+          "have": 3,
+          "planned": 1,
+          "skip": 5
+        }
+      },
+      "其他": {
+        "path": "/channel/other",
+        "map": {
+          "our": "fun",
+          "pack": "funny",
+          "keep": true
+        },
+        "boards": [
+          {
+            "platform": "抖音",
+            "boardTitle": "种草榜",
+            "label": "抖音种草榜",
+            "ingest": "have",
+            "via": "newsnow",
+            "sourceName": "抖音热榜",
+            "category": "hot"
+          },
+          {
+            "platform": "抖音",
+            "boardTitle": "社会榜",
+            "label": "抖音社会榜",
+            "ingest": "have",
+            "via": "newsnow",
+            "sourceName": "抖音热榜",
+            "category": "hot"
+          },
+          {
+            "platform": "哔哩哔哩",
+            "boardTitle": "鬼畜",
+            "label": "哔哩哔哩·鬼畜",
+            "ingest": "have",
+            "via": "newsnow",
+            "sourceName": "B站热搜",
+            "category": "hot"
+          },
+          {
+            "platform": "哔哩哔哩",
+            "boardTitle": "舞蹈",
+            "label": "哔哩哔哩·舞蹈",
+            "ingest": "have",
+            "via": "newsnow",
+            "sourceName": "B站热搜",
+            "category": "hot"
+          },
+          {
+            "platform": "哔哩哔哩",
+            "boardTitle": "知识",
+            "label": "哔哩哔哩·知识",
+            "ingest": "have",
+            "via": "newsnow",
+            "sourceName": "B站热搜",
+            "category": "hot"
+          },
+          {
+            "platform": "哔哩哔哩",
+            "boardTitle": "美食",
+            "label": "哔哩哔哩·美食",
+            "ingest": "have",
+            "via": "newsnow",
+            "sourceName": "B站热搜",
+            "category": "hot"
+          },
+          {
+            "platform": "哔哩哔哩",
+            "boardTitle": "时尚美妆",
+            "label": "哔哩哔哩·时尚美妆",
+            "ingest": "have",
+            "via": "newsnow",
+            "sourceName": "B站热搜",
+            "category": "hot"
+          },
+          {
+            "platform": "哔哩哔哩",
+            "boardTitle": "动物",
+            "label": "哔哩哔哩·动物",
+            "ingest": "have",
+            "via": "newsnow",
+            "sourceName": "B站热搜",
+            "category": "hot"
+          },
+          {
+            "platform": "哔哩哔哩",
+            "boardTitle": "动画",
+            "label": "哔哩哔哩·动画",
+            "ingest": "have",
+            "via": "newsnow",
+            "sourceName": "B站热搜",
+            "category": "hot"
+          },
+          {
+            "platform": "哔哩哔哩",
+            "boardTitle": "影视",
+            "label": "哔哩哔哩·影视",
+            "ingest": "have",
+            "via": "newsnow",
+            "sourceName": "B站热搜",
+            "category": "hot"
+          },
+          {
+            "platform": "微博",
+            "boardTitle": "生活",
+            "label": "微博·生活",
+            "ingest": "have",
+            "sourceName": "微博热搜",
+            "category": "hot"
+          },
+          {
+            "platform": "微博",
+            "boardTitle": "社会",
+            "label": "微博·社会",
+            "ingest": "have",
+            "sourceName": "微博热搜",
+            "category": "hot"
+          }
+        ],
+        "stats": {
+          "total": 12,
+          "have": 12,
+          "planned": 0,
+          "skip": 0
+        }
+      }
+    }
+  },
+  "rebang": {
+    "site": "https://rebang.today/",
+    "categoryMap": {
+      "综合": {
+        "our": "hot",
+        "pack": "hot",
+        "keep": true
+      },
+      "科技": {
+        "our": "tech",
+        "pack": "tech",
+        "keep": true
+      },
+      "新闻": {
+        "our": "current",
+        "pack": "hot",
+        "keep": true
+      },
+      "娱乐": {
+        "our": "ent",
+        "pack": "movie",
+        "keep": true
+      },
+      "社区": {
+        "our": "hot",
+        "pack": "hot",
+        "keep": true
+      },
+      "开发": {
+        "our": "dev",
+        "pack": "opensource",
+        "keep": true
+      },
+      "财经": {
+        "our": "biz",
+        "pack": "finance",
+        "keep": true
+      },
+      "购物": {
+        "our": null,
+        "pack": null,
+        "keep": false,
+        "reason": "购物不收录"
+      }
+    },
+    "categories": {
+      "综合": {
+        "url": "https://rebang.today/",
+        "map": {
+          "our": "hot",
+          "pack": "hot",
+          "keep": true
+        },
+        "boards": [
+          {
+            "platform": "知乎",
+            "boardTitle": "热榜",
+            "label": "知乎热榜",
+            "ingest": "have",
+            "sourceName": "知乎热榜",
+            "category": "hot"
+          },
+          {
+            "platform": "微博",
+            "boardTitle": "热榜",
+            "label": "微博热榜",
+            "ingest": "have",
+            "sourceName": "微博热搜",
+            "category": "hot"
+          },
+          {
+            "platform": "IT之家",
+            "boardTitle": "热榜",
+            "label": "IT之家热榜",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "公众号",
+            "boardTitle": "热榜",
+            "label": "公众号热榜",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "澎湃新闻",
+            "boardTitle": "热榜",
+            "label": "澎湃新闻热榜",
+            "ingest": "have",
+            "sourceName": "澎湃新闻",
+            "category": "current"
+          },
+          {
+            "platform": "36氪",
+            "boardTitle": "热榜",
+            "label": "36氪热榜",
+            "ingest": "have",
+            "sourceName": "36氪",
+            "category": "tech"
+          },
+          {
+            "platform": "虎扑",
+            "boardTitle": "热榜",
+            "label": "虎扑热榜",
+            "ingest": "have",
+            "sourceName": "虎扑步行街",
+            "category": "hot"
+          },
+          {
+            "platform": "腾讯新闻",
+            "boardTitle": "热榜",
+            "label": "腾讯新闻热榜",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "虎嗅",
+            "boardTitle": "热榜",
+            "label": "虎嗅热榜",
+            "ingest": "have",
+            "sourceName": "虎嗅",
+            "category": "biz"
+          },
+          {
+            "platform": "百度",
+            "boardTitle": "热榜",
+            "label": "百度热榜",
+            "ingest": "have",
+            "via": "newsnow",
+            "sourceName": "百度热搜",
+            "category": "hot"
+          },
+          {
+            "platform": "今日头条",
+            "boardTitle": "热榜",
+            "label": "今日头条热榜",
+            "ingest": "have",
+            "via": "newsnow",
+            "sourceName": "今日头条热榜",
+            "category": "hot"
+          },
+          {
+            "platform": "少数派",
+            "boardTitle": "热榜",
+            "label": "少数派热榜",
+            "ingest": "have",
+            "sourceName": "少数派",
+            "category": "tools"
+          },
+          {
+            "platform": "小红书",
+            "boardTitle": "热榜",
+            "label": "小红书热榜",
+            "ingest": "planned",
+            "via": "newsnow-or-adapter"
+          },
+          {
+            "platform": "豆瓣社区",
+            "boardTitle": "热榜",
+            "label": "豆瓣社区热榜",
+            "ingest": "planned",
+            "via": "rank-adapter-or-existing-movie-music"
+          },
+          {
+            "platform": "百度贴吧",
+            "boardTitle": "热榜",
+            "label": "百度贴吧热榜",
+            "ingest": "have",
+            "via": "newsnow",
+            "sourceName": "百度贴吧热议",
+            "category": "hot"
+          },
+          {
+            "platform": "网易新闻",
+            "boardTitle": "热榜",
+            "label": "网易新闻热榜",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "凤凰新闻",
+            "boardTitle": "热榜",
+            "label": "凤凰新闻热榜",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "什么值得买",
+            "boardTitle": "热榜",
+            "label": "什么值得买热榜",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "GitHub",
+            "boardTitle": "热榜",
+            "label": "GitHub热榜",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "雪球",
+            "boardTitle": "热榜",
+            "label": "雪球热榜",
+            "ingest": "have",
+            "sourceName": "雪球",
+            "category": "biz"
+          },
+          {
+            "platform": "豆瓣书影音",
+            "boardTitle": "热榜",
+            "label": "豆瓣书影音热榜",
+            "ingest": "planned",
+            "via": "rank-adapter-or-existing-movie-music"
+          },
+          {
+            "platform": "游民星空",
+            "boardTitle": "热榜",
+            "label": "游民星空热榜",
+            "ingest": "planned",
+            "via": "rank-adapter-or-existing-movie-music"
+          },
+          {
+            "platform": "直播吧",
+            "boardTitle": "热榜",
+            "label": "直播吧热榜",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "哔哩哔哩",
+            "boardTitle": "热榜",
+            "label": "哔哩哔哩热榜",
+            "ingest": "have",
+            "via": "newsnow",
+            "sourceName": "B站热搜",
+            "category": "hot"
+          },
+          {
+            "platform": "抖音",
+            "boardTitle": "热榜",
+            "label": "抖音热榜",
+            "ingest": "have",
+            "via": "newsnow",
+            "sourceName": "抖音热榜",
+            "category": "hot"
+          },
+          {
+            "platform": "微信读书",
+            "boardTitle": "热榜",
+            "label": "微信读书热榜",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "爱范儿",
+            "boardTitle": "热榜",
+            "label": "爱范儿热榜",
+            "ingest": "have",
+            "sourceName": "爱范儿",
+            "category": "tech"
+          },
+          {
+            "platform": "小众软件",
+            "boardTitle": "热榜",
+            "label": "小众软件热榜",
+            "ingest": "have",
+            "sourceName": "小众软件",
+            "category": "tools"
+          },
+          {
+            "platform": "吾爱破解",
+            "boardTitle": "热榜",
+            "label": "吾爱破解热榜",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "知乎日报",
+            "boardTitle": "热榜",
+            "label": "知乎日报热榜",
+            "ingest": "have",
+            "sourceName": "知乎日报",
+            "category": "deep"
+          },
+          {
+            "platform": "喷嚏网",
+            "boardTitle": "热榜",
+            "label": "喷嚏网热榜",
+            "ingest": "have",
+            "sourceName": "喷嚏网",
+            "category": "fun"
+          },
+          {
+            "platform": "观风闻",
+            "boardTitle": "热榜",
+            "label": "观风闻热榜",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "同花顺",
+            "boardTitle": "热榜",
+            "label": "同花顺热榜",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          }
+        ],
+        "stats": {
+          "total": 33,
+          "have": 17,
+          "planned": 4,
+          "skip": 12
+        }
+      },
+      "科技": {
+        "url": "https://rebang.today/tech",
+        "map": {
+          "our": "tech",
+          "pack": "tech",
+          "keep": true
+        },
+        "boards": [
+          {
+            "platform": "IT之家",
+            "boardTitle": "热榜",
+            "label": "IT之家热榜",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "公众号",
+            "boardTitle": "热榜",
+            "label": "公众号热榜",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "36氪",
+            "boardTitle": "热榜",
+            "label": "36氪热榜",
+            "ingest": "have",
+            "sourceName": "36氪",
+            "category": "tech"
+          },
+          {
+            "platform": "虎嗅",
+            "boardTitle": "热榜",
+            "label": "虎嗅热榜",
+            "ingest": "have",
+            "sourceName": "虎嗅",
+            "category": "biz"
+          },
+          {
+            "platform": "少数派",
+            "boardTitle": "热榜",
+            "label": "少数派热榜",
+            "ingest": "have",
+            "sourceName": "少数派",
+            "category": "tools"
+          },
+          {
+            "platform": "爱范儿",
+            "boardTitle": "热榜",
+            "label": "爱范儿热榜",
+            "ingest": "have",
+            "sourceName": "爱范儿",
+            "category": "tech"
+          },
+          {
+            "platform": "小众软件",
+            "boardTitle": "热榜",
+            "label": "小众软件热榜",
+            "ingest": "have",
+            "sourceName": "小众软件",
+            "category": "tools"
+          },
+          {
+            "platform": "吾爱破解",
+            "boardTitle": "热榜",
+            "label": "吾爱破解热榜",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          }
+        ],
+        "stats": {
+          "total": 8,
+          "have": 5,
+          "planned": 0,
+          "skip": 3
+        }
+      },
+      "新闻": {
+        "url": "https://rebang.today/news",
+        "map": {
+          "our": "current",
+          "pack": "hot",
+          "keep": true
+        },
+        "boards": [
+          {
+            "platform": "公众号",
+            "boardTitle": "热榜",
+            "label": "公众号热榜",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "澎湃新闻",
+            "boardTitle": "热榜",
+            "label": "澎湃新闻热榜",
+            "ingest": "have",
+            "sourceName": "澎湃新闻",
+            "category": "current"
+          },
+          {
+            "platform": "腾讯新闻",
+            "boardTitle": "热榜",
+            "label": "腾讯新闻热榜",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "百度",
+            "boardTitle": "热榜",
+            "label": "百度热榜",
+            "ingest": "have",
+            "via": "newsnow",
+            "sourceName": "百度热搜",
+            "category": "hot"
+          },
+          {
+            "platform": "今日头条",
+            "boardTitle": "热榜",
+            "label": "今日头条热榜",
+            "ingest": "have",
+            "via": "newsnow",
+            "sourceName": "今日头条热榜",
+            "category": "hot"
+          },
+          {
+            "platform": "网易新闻",
+            "boardTitle": "热榜",
+            "label": "网易新闻热榜",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "凤凰新闻",
+            "boardTitle": "热榜",
+            "label": "凤凰新闻热榜",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "观风闻",
+            "boardTitle": "热榜",
+            "label": "观风闻热榜",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          }
+        ],
+        "stats": {
+          "total": 8,
+          "have": 3,
+          "planned": 0,
+          "skip": 5
+        }
+      },
+      "娱乐": {
+        "url": "https://rebang.today/ent",
+        "map": {
+          "our": "ent",
+          "pack": "movie",
+          "keep": true
+        },
+        "boards": [
+          {
+            "platform": "微博",
+            "boardTitle": "热榜",
+            "label": "微博热榜",
+            "ingest": "have",
+            "sourceName": "微博热搜",
+            "category": "hot"
+          },
+          {
+            "platform": "公众号",
+            "boardTitle": "热榜",
+            "label": "公众号热榜",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "虎扑",
+            "boardTitle": "热榜",
+            "label": "虎扑热榜",
+            "ingest": "have",
+            "sourceName": "虎扑步行街",
+            "category": "hot"
+          },
+          {
+            "platform": "小红书",
+            "boardTitle": "热榜",
+            "label": "小红书热榜",
+            "ingest": "planned",
+            "via": "newsnow-or-adapter"
+          },
+          {
+            "platform": "豆瓣社区",
+            "boardTitle": "热榜",
+            "label": "豆瓣社区热榜",
+            "ingest": "planned",
+            "via": "rank-adapter-or-existing-movie-music"
+          },
+          {
+            "platform": "百度贴吧",
+            "boardTitle": "热榜",
+            "label": "百度贴吧热榜",
+            "ingest": "have",
+            "via": "newsnow",
+            "sourceName": "百度贴吧热议",
+            "category": "hot"
+          },
+          {
+            "platform": "豆瓣书影音",
+            "boardTitle": "热榜",
+            "label": "豆瓣书影音热榜",
+            "ingest": "planned",
+            "via": "rank-adapter-or-existing-movie-music"
+          },
+          {
+            "platform": "游民星空",
+            "boardTitle": "热榜",
+            "label": "游民星空热榜",
+            "ingest": "planned",
+            "via": "rank-adapter-or-existing-movie-music"
+          },
+          {
+            "platform": "直播吧",
+            "boardTitle": "热榜",
+            "label": "直播吧热榜",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "哔哩哔哩",
+            "boardTitle": "热榜",
+            "label": "哔哩哔哩热榜",
+            "ingest": "have",
+            "via": "newsnow",
+            "sourceName": "B站热搜",
+            "category": "hot"
+          },
+          {
+            "platform": "抖音",
+            "boardTitle": "热榜",
+            "label": "抖音热榜",
+            "ingest": "have",
+            "via": "newsnow",
+            "sourceName": "抖音热榜",
+            "category": "hot"
+          },
+          {
+            "platform": "微信读书",
+            "boardTitle": "热榜",
+            "label": "微信读书热榜",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "知乎日报",
+            "boardTitle": "热榜",
+            "label": "知乎日报热榜",
+            "ingest": "have",
+            "sourceName": "知乎日报",
+            "category": "deep"
+          },
+          {
+            "platform": "喷嚏网",
+            "boardTitle": "热榜",
+            "label": "喷嚏网热榜",
+            "ingest": "have",
+            "sourceName": "喷嚏网",
+            "category": "fun"
+          }
+        ],
+        "stats": {
+          "total": 14,
+          "have": 7,
+          "planned": 4,
+          "skip": 3
+        }
+      },
+      "社区": {
+        "url": "https://rebang.today/community",
+        "map": {
+          "our": "hot",
+          "pack": "hot",
+          "keep": true
+        },
+        "boards": [
+          {
+            "platform": "公众号",
+            "boardTitle": "热榜",
+            "label": "公众号热榜",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "虎扑",
+            "boardTitle": "热榜",
+            "label": "虎扑热榜",
+            "ingest": "have",
+            "sourceName": "虎扑步行街",
+            "category": "hot"
+          },
+          {
+            "platform": "豆瓣社区",
+            "boardTitle": "热榜",
+            "label": "豆瓣社区热榜",
+            "ingest": "planned",
+            "via": "rank-adapter-or-existing-movie-music"
+          },
+          {
+            "platform": "百度贴吧",
+            "boardTitle": "热榜",
+            "label": "百度贴吧热榜",
+            "ingest": "have",
+            "via": "newsnow",
+            "sourceName": "百度贴吧热议",
+            "category": "hot"
+          },
+          {
+            "platform": "观风闻",
+            "boardTitle": "热榜",
+            "label": "观风闻热榜",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          }
+        ],
+        "stats": {
+          "total": 5,
+          "have": 2,
+          "planned": 1,
+          "skip": 2
+        }
+      },
+      "开发": {
+        "url": "https://rebang.today/dev",
+        "map": {
+          "our": "dev",
+          "pack": "opensource",
+          "keep": true
+        },
+        "boards": [
+          {
+            "platform": "公众号",
+            "boardTitle": "热榜",
+            "label": "公众号热榜",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "GitHub",
+            "boardTitle": "热榜",
+            "label": "GitHub热榜",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "吾爱破解",
+            "boardTitle": "热榜",
+            "label": "吾爱破解热榜",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          }
+        ],
+        "stats": {
+          "total": 3,
+          "have": 0,
+          "planned": 0,
+          "skip": 3
+        }
+      },
+      "财经": {
+        "url": "https://rebang.today/finance",
+        "map": {
+          "our": "biz",
+          "pack": "finance",
+          "keep": true
+        },
+        "boards": [
+          {
+            "platform": "公众号",
+            "boardTitle": "热榜",
+            "label": "公众号热榜",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "雪球",
+            "boardTitle": "热榜",
+            "label": "雪球热榜",
+            "ingest": "have",
+            "sourceName": "雪球",
+            "category": "biz"
+          },
+          {
+            "platform": "同花顺",
+            "boardTitle": "热榜",
+            "label": "同花顺热榜",
+            "ingest": "skip",
+            "reason": "无稳定 RSS/适配器"
+          },
+          {
+            "platform": "虎嗅",
+            "boardTitle": "热榜",
+            "label": "虎嗅热榜",
+            "ingest": "have",
+            "sourceName": "虎嗅",
+            "category": "biz"
+          }
+        ],
+        "stats": {
+          "total": 4,
+          "have": 2,
+          "planned": 0,
+          "skip": 2
+        }
+      },
+      "购物": {
+        "url": "https://rebang.today/shopping",
+        "map": {
+          "our": null,
+          "pack": null,
+          "keep": false,
+          "reason": "购物不收录"
+        },
+        "boards": [
+          {
+            "platform": "公众号",
+            "boardTitle": "热榜",
+            "label": "公众号热榜",
+            "ingest": "skip",
+            "reason": "频道整体不收录"
+          },
+          {
+            "platform": "什么值得买",
+            "boardTitle": "热榜",
+            "label": "什么值得买热榜",
+            "ingest": "skip",
+            "reason": "频道整体不收录"
+          }
+        ],
+        "stats": {
+          "total": 2,
+          "have": 0,
+          "planned": 0,
+          "skip": 2
+        }
+      }
+    }
+  },
+  "summary": {
+    "open2hubBoards": 149,
+    "rebangBoards": 77,
+    "have": 97,
+    "planned": 24,
+    "skip": 105,
+    "newsnowWired": 42
+  }
+}

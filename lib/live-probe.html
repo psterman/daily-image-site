@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><title>LIVE_PROBE_PENDING</title></head>
+<body>
+<script type="module">
+import { createClient } from '../lib/sb-client.mjs';
+
+const URL = 'https://efqljinkeatzpobvuouj.supabase.co';
+const PUB = 'sb_publishable_IOwVQqr7oTB2mYYWJw9k0g_YksWTtKU';
+const R = [];
+const ok = (n, c, extra) => R.push((c ? 'OK' : 'FAIL') + ':' + n + (extra ? '(' + extra + ')' : ''));
+
+async function probe() {
+  // 只用 publishable key，绝不注入 secret
+  const client = createClient({ url: URL, key: PUB, timeout: 20000 });
+
+  // 1) 直接 fetch 根 REST，判断项目是否可达（不依赖具体表）
+  try {
+    const res = await fetch(URL + '/rest/v1/', { headers: { apikey: PUB, Authorization: 'Bearer ' + PUB } });
+    ok('project_reachable', res.status < 500, 'http' + res.status);
+  } catch (e) {
+    ok('project_reachable', false, 'network:' + (e && e.message ? e.message.slice(0, 40) : 'err'));
+  }
+
+  // 2) 探测 tag_packs 表是否存在（迁移是否跑过）
+  try {
+    const rows = await client.select('tag_packs', { columns: 'key,name', limit: 5 });
+    ok('tag_packs_readable', true, 'rows=' + rows.length);
+    if (rows.length) R.push('SAMPLE:' + rows.map((r) => r.key).join('/'));
+  } catch (e) {
+    const m = (e && e.message ? e.message : String(e));
+    ok('tag_packs_readable', false, m.slice(0, 90));
+  }
+
+  // 3) 私有表 platforms：匿名（无登录 token）应被 RLS 拦住 -> 空数组
+  try {
+    const rows = await client.select('platforms', { columns: 'id,name', limit: 5 });
+    ok('platforms_rls_blocks_anon', rows.length === 0, 'rows=' + rows.length);
+  } catch (e) {
+    const m = (e && e.message ? e.message : String(e));
+    // 401/403 也算 RLS 拦截成功
+    ok('platforms_rls_blocks_anon', /401|403|permission|row-level/i.test(m), m.slice(0, 60));
+  }
+
+  // 4) Auth 服务可达
+  try {
+    const res = await fetch(URL + '/auth/v1/health', { headers: { apikey: PUB } });
+    ok('auth_reachable', res.ok, 'http' + res.status);
+  } catch (e) {
+    ok('auth_reachable', false, 'network');
+  }
+
+  // 5) 对照：不带 apikey 应被拒（401），证明上面的 404 是 key 生效的结果
+  try {
+    const res = await fetch(URL + '/rest/v1/tag_packs?select=key&limit=1');
+    ok('no_key_rejected', res.status === 401, 'http' + res.status);
+  } catch (e) {
+    ok('no_key_rejected', false, 'network');
+  }
+
+  document.title = 'LIVE|' + R.join('|');
+}
+probe().catch((e) => { document.title = 'LIVE_EXCEPTION:' + (e && e.message ? e.message : String(e)); });
+</script>
+</body>
+</html>

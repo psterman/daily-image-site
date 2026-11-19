@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><title>CORS_PROBE_PENDING</title></head>
+<body>
+<script type="module">
+const API = 'https://api.supabase.com/v1/projects/efqljinkeatzpobvuouj/database/query';
+const out = [];
+
+// 1) 简单 GET 探测域名可达（无需 token）
+try {
+  const r = await fetch('https://api.supabase.com/v1/projects/efqljinkeatzpobvuouj', {
+    headers: { Authorization: 'Bearer probe-invalid' }, mode: 'cors',
+  });
+  out.push('GET_HTTP=' + r.status);
+  out.push('ALLOW_ORIGIN=' + (r.headers.get('access-control-allow-origin') || 'none'));
+} catch (e) {
+  out.push('GET_ERR=' + (e && e.message ? e.message : 'err'));
+}
+
+// 2) 预检：带自定义头触发 OPTIONS，验证 Management API 是否允许浏览器跨域
+try {
+  const r = await fetch(API, {
+    method: 'OPTIONS',
+    headers: { Authorization: 'Bearer probe-invalid', 'Content-Type': 'application/json' },
+    mode: 'cors',
+  });
+  out.push('PREFLIGHT_HTTP=' + r.status);
+  out.push('PREFLIGHT_ALLOW=' + (r.headers.get('access-control-allow-origin') || 'none'));
+} catch (e) {
+  out.push('PREFLIGHT_ERR=' + (e && e.message ? e.message : 'err'));
+}
+
+document.title = 'CORS|' + out.join('|');
+</script>
+</body>
+</html>

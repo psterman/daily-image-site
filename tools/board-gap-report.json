@@ -1,0 +1,787 @@
+{
+  "generatedAt": "2026-11-18T08:23:12.725Z",
+  "newsnowOk": [
+    "weibo",
+    "zhihu",
+    "baidu",
+    "douyin",
+    "bilibili-hot-search",
+    "bilibili",
+    "toutiao",
+    "thepaper",
+    "cls-hot",
+    "cls",
+    "ithome",
+    "sspai",
+    "tieba",
+    "hupu",
+    "v2ex",
+    "github-trending-today",
+    "ifeng",
+    "wallstreetcn-hot",
+    "xueqiu",
+    "jin10",
+    "coolapk",
+    "juejin",
+    "producthunt"
+  ],
+  "newsnowFail": [
+    {
+      "id": "bilibili-hot-video",
+      "status": 500,
+      "err": "Invalid source id"
+    },
+    {
+      "id": "36kr",
+      "status": 500,
+      "err": "Invalid source id"
+    },
+    {
+      "id": "douban-movie",
+      "status": 500,
+      "err": "Invalid source id"
+    },
+    {
+      "id": "douban-group",
+      "status": 500,
+      "err": "Invalid source id"
+    },
+    {
+      "id": "kuaishou",
+      "status": 500,
+      "err": "Invalid source id"
+    },
+    {
+      "id": "xiaohongshu",
+      "status": 500,
+      "err": "Invalid source id"
+    },
+    {
+      "id": "netease-news",
+      "status": 500,
+      "err": "Invalid source id"
+    },
+    {
+      "id": "qq-news",
+      "status": 500,
+      "err": "Invalid source id"
+    },
+    {
+      "id": "weread",
+      "status": 500,
+      "err": "Invalid source id"
+    },
+    {
+      "id": "zq",
+      "status": 500,
+      "err": "Invalid source id"
+    },
+    {
+      "id": "csdn",
+      "status": 500,
+      "err": "Invalid source id"
+    }
+  ],
+  "counts": {
+    "ready-newsnow": 42,
+    "newsnow-id-dead": 9,
+    "none": 55,
+    "wont": 105,
+    "need-rss-or-adapter": 3,
+    "need-rank-adapter": 12
+  },
+  "connectedHave": [
+    {
+      "label": "知乎热榜",
+      "site": "open2hub",
+      "cat": "综合",
+      "our": "hot",
+      "source": "知乎热榜"
+    },
+    {
+      "label": "豆瓣实时热门讨论",
+      "site": "open2hub",
+      "cat": "综合",
+      "our": "hot",
+      "source": "豆瓣实时热门"
+    },
+    {
+      "label": "微博热搜",
+      "site": "open2hub",
+      "cat": "综合",
+      "our": "hot",
+      "source": "微博热搜"
+    },
+    {
+      "label": "虎扑·步行街",
+      "site": "open2hub",
+      "cat": "综合",
+      "our": "hot",
+      "source": "虎扑步行街"
+    },
+    {
+      "label": "知乎日报·日报",
+      "site": "open2hub",
+      "cat": "综合",
+      "our": "hot",
+      "source": "知乎日报"
+    },
+    {
+      "label": "澎湃新闻澎湃热榜",
+      "site": "open2hub",
+      "cat": "新闻",
+      "our": "current",
+      "source": "澎湃新闻"
+    },
+    {
+      "label": "新华网·要闻聚焦",
+      "site": "open2hub",
+      "cat": "新闻",
+      "our": "current",
+      "source": "新华网·新华社新闻"
+    },
+    {
+      "label": "雪球热门话题",
+      "site": "open2hub",
+      "cat": "财经",
+      "our": "biz",
+      "source": "雪球"
+    },
+    {
+      "label": "华尔街见闻·最热文章",
+      "site": "open2hub",
+      "cat": "财经",
+      "our": "biz",
+      "source": "华尔街见闻"
+    },
+    {
+      "label": "微博·科技",
+      "site": "open2hub",
+      "cat": "科技",
+      "our": "tech",
+      "source": "微博热搜"
+    },
+    {
+      "label": "虎扑·数码",
+      "site": "open2hub",
+      "cat": "科技",
+      "our": "tech",
+      "source": "虎扑步行街"
+    },
+    {
+      "label": "36氪人气榜",
+      "site": "open2hub",
+      "cat": "科技",
+      "our": "tech",
+      "source": "36氪"
+    },
+    {
+      "label": "人人都是产品经理日榜",
+      "site": "open2hub",
+      "cat": "科技",
+      "our": "tech",
+      "source": "人人都是产品经理"
+    },
+    {
+      "label": "虎嗅·虎嗅频道",
+      "site": "open2hub",
+      "cat": "科技",
+      "our": "tech",
+      "source": "虎嗅"
+    },
+    {
+      "label": "果壳·首页",
+      "site": "open2hub",
+      "cat": "科技",
+      "our": "tech",
+      "source": "果壳网·科学人"
+    },
+    {
+      "label": "少数派·推荐",
+      "site": "open2hub",
+      "cat": "科技",
+      "our": "tech",
+      "source": "少数派"
+    },
+    {
+      "label": "微博·文娱",
+      "site": "open2hub",
+      "cat": "娱乐",
+      "our": "ent",
+      "source": "微博热搜"
+    },
+    {
+      "label": "虎扑·影视娱乐",
+      "site": "open2hub",
+      "cat": "娱乐",
+      "our": "ent",
+      "source": "虎扑步行街"
+    },
+    {
+      "label": "微博·ACG",
+      "site": "open2hub",
+      "cat": "游戏",
+      "our": "fun",
+      "source": "微博热搜"
+    },
+    {
+      "label": "虎扑·电竞",
+      "site": "open2hub",
+      "cat": "游戏",
+      "our": "fun",
+      "source": "虎扑步行街"
+    },
+    {
+      "label": "虎扑·英雄联盟",
+      "site": "open2hub",
+      "cat": "游戏",
+      "our": "fun",
+      "source": "虎扑步行街"
+    },
+    {
+      "label": "豆瓣新片榜",
+      "site": "open2hub",
+      "cat": "视频",
+      "our": "ent",
+      "source": "豆瓣即将上映"
+    },
+    {
+      "label": "豆瓣一周口碑榜",
+      "site": "open2hub",
+      "cat": "视频",
+      "our": "ent",
+      "source": "豆瓣即将上映"
+    },
+    {
+      "label": "豆瓣北美票房榜",
+      "site": "open2hub",
+      "cat": "视频",
+      "our": "ent",
+      "source": "豆瓣即将上映"
+    },
+    {
+      "label": "豆瓣·豆瓣新碟榜",
+      "site": "open2hub",
+      "cat": "音乐",
+      "our": "ent",
+      "source": "豆瓣音乐新碟"
+    },
+    {
+      "label": "豆瓣·本周流行音乐人",
+      "site": "open2hub",
+      "cat": "音乐",
+      "our": "ent",
+      "source": "豆瓣音乐新碟"
+    },
+    {
+      "label": "豆瓣热门图书榜",
+      "site": "open2hub",
+      "cat": "阅读",
+      "our": "deep",
+      "source": "豆瓣图书榜"
+    },
+    {
+      "label": "豆瓣畅销图书榜",
+      "site": "open2hub",
+      "cat": "阅读",
+      "our": "deep",
+      "source": "豆瓣图书榜"
+    },
+    {
+      "label": "微博·生活",
+      "site": "open2hub",
+      "cat": "其他",
+      "our": "fun",
+      "source": "微博热搜"
+    },
+    {
+      "label": "微博·社会",
+      "site": "open2hub",
+      "cat": "其他",
+      "our": "fun",
+      "source": "微博热搜"
+    },
+    {
+      "label": "知乎热榜",
+      "site": "rebang",
+      "cat": "综合",
+      "our": "hot",
+      "source": "知乎热榜"
+    },
+    {
+      "label": "微博热榜",
+      "site": "rebang",
+      "cat": "娱乐",
+      "our": "ent",
+      "source": "微博热搜"
+    },
+    {
+      "label": "澎湃新闻热榜",
+      "site": "rebang",
+      "cat": "新闻",
+      "our": "current",
+      "source": "澎湃新闻"
+    },
+    {
+      "label": "36氪热榜",
+      "site": "rebang",
+      "cat": "科技",
+      "our": "tech",
+      "source": "36氪"
+    },
+    {
+      "label": "虎扑热榜",
+      "site": "rebang",
+      "cat": "社区",
+      "our": "hot",
+      "source": "虎扑步行街"
+    },
+    {
+      "label": "虎嗅热榜",
+      "site": "rebang",
+      "cat": "财经",
+      "our": "biz",
+      "source": "虎嗅"
+    },
+    {
+      "label": "少数派热榜",
+      "site": "rebang",
+      "cat": "科技",
+      "our": "tech",
+      "source": "少数派"
+    },
+    {
+      "label": "雪球热榜",
+      "site": "rebang",
+      "cat": "财经",
+      "our": "biz",
+      "source": "雪球"
+    },
+    {
+      "label": "爱范儿热榜",
+      "site": "rebang",
+      "cat": "科技",
+      "our": "tech",
+      "source": "爱范儿"
+    },
+    {
+      "label": "小众软件热榜",
+      "site": "rebang",
+      "cat": "科技",
+      "our": "tech",
+      "source": "小众软件"
+    },
+    {
+      "label": "知乎日报热榜",
+      "site": "rebang",
+      "cat": "娱乐",
+      "our": "ent",
+      "source": "知乎日报"
+    },
+    {
+      "label": "喷嚏网热榜",
+      "site": "rebang",
+      "cat": "娱乐",
+      "our": "ent",
+      "source": "喷嚏网"
+    }
+  ],
+  "readyNewsnow": [
+    {
+      "label": "抖音热点榜",
+      "site": "open2hub",
+      "cat": "综合",
+      "our": "hot",
+      "newsnowId": "douyin"
+    },
+    {
+      "label": "百度热搜榜",
+      "site": "open2hub",
+      "cat": "综合",
+      "our": "hot",
+      "newsnowId": "baidu"
+    },
+    {
+      "label": "哔哩哔哩综合热门",
+      "site": "open2hub",
+      "cat": "综合",
+      "our": "hot",
+      "newsnowId": "bilibili-hot-search"
+    },
+    {
+      "label": "哔哩哔哩·每周必看",
+      "site": "open2hub",
+      "cat": "综合",
+      "our": "hot",
+      "newsnowId": "bilibili-hot-search"
+    },
+    {
+      "label": "百度贴吧贴吧热议榜",
+      "site": "open2hub",
+      "cat": "综合",
+      "our": "hot",
+      "newsnowId": "baidu"
+    },
+    {
+      "label": "今日头条头条热榜",
+      "site": "open2hub",
+      "cat": "新闻",
+      "our": "current",
+      "newsnowId": "toutiao"
+    },
+    {
+      "label": "哔哩哔哩·科技数码",
+      "site": "open2hub",
+      "cat": "科技",
+      "our": "tech",
+      "newsnowId": "bilibili-hot-search"
+    },
+    {
+      "label": "抖音娱乐榜",
+      "site": "open2hub",
+      "cat": "娱乐",
+      "our": "ent",
+      "newsnowId": "douyin"
+    },
+    {
+      "label": "哔哩哔哩·娱乐",
+      "site": "open2hub",
+      "cat": "娱乐",
+      "our": "ent",
+      "newsnowId": "bilibili-hot-search"
+    },
+    {
+      "label": "今日头条·娱乐",
+      "site": "open2hub",
+      "cat": "娱乐",
+      "our": "ent",
+      "newsnowId": "toutiao"
+    },
+    {
+      "label": "哔哩哔哩·游戏",
+      "site": "open2hub",
+      "cat": "游戏",
+      "our": "fun",
+      "newsnowId": "bilibili-hot-search"
+    },
+    {
+      "label": "百度电影榜",
+      "site": "open2hub",
+      "cat": "视频",
+      "our": "ent",
+      "newsnowId": "baidu"
+    },
+    {
+      "label": "百度电视剧榜",
+      "site": "open2hub",
+      "cat": "视频",
+      "our": "ent",
+      "newsnowId": "baidu"
+    },
+    {
+      "label": "哔哩哔哩·番剧",
+      "site": "open2hub",
+      "cat": "视频",
+      "our": "ent",
+      "newsnowId": "bilibili-hot-search"
+    },
+    {
+      "label": "哔哩哔哩·国创",
+      "site": "open2hub",
+      "cat": "视频",
+      "our": "ent",
+      "newsnowId": "bilibili-hot-search"
+    },
+    {
+      "label": "哔哩哔哩·电影",
+      "site": "open2hub",
+      "cat": "视频",
+      "our": "ent",
+      "newsnowId": "bilibili-hot-search"
+    },
+    {
+      "label": "哔哩哔哩·电视剧",
+      "site": "open2hub",
+      "cat": "视频",
+      "our": "ent",
+      "newsnowId": "bilibili-hot-search"
+    },
+    {
+      "label": "哔哩哔哩·综艺",
+      "site": "open2hub",
+      "cat": "视频",
+      "our": "ent",
+      "newsnowId": "bilibili-hot-search"
+    },
+    {
+      "label": "哔哩哔哩·纪录片",
+      "site": "open2hub",
+      "cat": "视频",
+      "our": "ent",
+      "newsnowId": "bilibili-hot-search"
+    },
+    {
+      "label": "哔哩哔哩·音乐",
+      "site": "open2hub",
+      "cat": "音乐",
+      "our": "ent",
+      "newsnowId": "bilibili-hot-search"
+    },
+    {
+      "label": "百度小说榜",
+      "site": "open2hub",
+      "cat": "阅读",
+      "our": "deep",
+      "newsnowId": "baidu"
+    },
+    {
+      "label": "抖音种草榜",
+      "site": "open2hub",
+      "cat": "其他",
+      "our": "fun",
+      "newsnowId": "douyin"
+    },
+    {
+      "label": "抖音社会榜",
+      "site": "open2hub",
+      "cat": "其他",
+      "our": "fun",
+      "newsnowId": "douyin"
+    },
+    {
+      "label": "哔哩哔哩·鬼畜",
+      "site": "open2hub",
+      "cat": "其他",
+      "our": "fun",
+      "newsnowId": "bilibili-hot-search"
+    },
+    {
+      "label": "哔哩哔哩·舞蹈",
+      "site": "open2hub",
+      "cat": "其他",
+      "our": "fun",
+      "newsnowId": "bilibili-hot-search"
+    },
+    {
+      "label": "哔哩哔哩·知识",
+      "site": "open2hub",
+      "cat": "其他",
+      "our": "fun",
+      "newsnowId": "bilibili-hot-search"
+    },
+    {
+      "label": "哔哩哔哩·美食",
+      "site": "open2hub",
+      "cat": "其他",
+      "our": "fun",
+      "newsnowId": "bilibili-hot-search"
+    },
+    {
+      "label": "哔哩哔哩·时尚美妆",
+      "site": "open2hub",
+      "cat": "其他",
+      "our": "fun",
+      "newsnowId": "bilibili-hot-search"
+    },
+    {
+      "label": "哔哩哔哩·动物",
+      "site": "open2hub",
+      "cat": "其他",
+      "our": "fun",
+      "newsnowId": "bilibili-hot-search"
+    },
+    {
+      "label": "哔哩哔哩·动画",
+      "site": "open2hub",
+      "cat": "其他",
+      "our": "fun",
+      "newsnowId": "bilibili-hot-search"
+    },
+    {
+      "label": "哔哩哔哩·影视",
+      "site": "open2hub",
+      "cat": "其他",
+      "our": "fun",
+      "newsnowId": "bilibili-hot-search"
+    },
+    {
+      "label": "百度热榜",
+      "site": "rebang",
+      "cat": "新闻",
+      "our": "current",
+      "newsnowId": "baidu"
+    },
+    {
+      "label": "今日头条热榜",
+      "site": "rebang",
+      "cat": "新闻",
+      "our": "current",
+      "newsnowId": "toutiao"
+    },
+    {
+      "label": "百度贴吧热榜",
+      "site": "rebang",
+      "cat": "社区",
+      "our": "hot",
+      "newsnowId": "baidu"
+    },
+    {
+      "label": "哔哩哔哩热榜",
+      "site": "rebang",
+      "cat": "娱乐",
+      "our": "ent",
+      "newsnowId": "bilibili-hot-search"
+    },
+    {
+      "label": "抖音热榜",
+      "site": "rebang",
+      "cat": "娱乐",
+      "our": "ent",
+      "newsnowId": "douyin"
+    }
+  ],
+  "gaps": {
+    "needRankAdapter": [
+      {
+        "label": "爱奇艺热播榜",
+        "site": "open2hub",
+        "cat": "视频",
+        "our": "ent",
+        "note": "听乐/看片类，需专用适配器或已有 fetch-rank 扩展"
+      },
+      {
+        "label": "腾讯视频热搜",
+        "site": "open2hub",
+        "cat": "视频",
+        "our": "ent",
+        "note": "听乐/看片类，需专用适配器或已有 fetch-rank 扩展"
+      },
+      {
+        "label": "红果短剧红果热播榜",
+        "site": "open2hub",
+        "cat": "视频",
+        "our": "ent",
+        "note": "听乐/看片类，需专用适配器或已有 fetch-rank 扩展"
+      },
+      {
+        "label": "红果短剧真人剧热播榜",
+        "site": "open2hub",
+        "cat": "视频",
+        "our": "ent",
+        "note": "听乐/看片类，需专用适配器或已有 fetch-rank 扩展"
+      },
+      {
+        "label": "红果短剧AI剧热播榜",
+        "site": "open2hub",
+        "cat": "视频",
+        "our": "ent",
+        "note": "听乐/看片类，需专用适配器或已有 fetch-rank 扩展"
+      },
+      {
+        "label": "红果短剧漫剧热播榜",
+        "site": "open2hub",
+        "cat": "视频",
+        "our": "ent",
+        "note": "听乐/看片类，需专用适配器或已有 fetch-rank 扩展"
+      },
+      {
+        "label": "酷狗音乐酷狗飙升榜",
+        "site": "open2hub",
+        "cat": "音乐",
+        "our": "ent",
+        "note": "听乐/看片类，需专用适配器或已有 fetch-rank 扩展"
+      },
+      {
+        "label": "网易云音乐飙升榜",
+        "site": "open2hub",
+        "cat": "音乐",
+        "our": "ent",
+        "note": "听乐/看片类，需专用适配器或已有 fetch-rank 扩展"
+      },
+      {
+        "label": "网易云音乐新歌榜",
+        "site": "open2hub",
+        "cat": "音乐",
+        "our": "ent",
+        "note": "听乐/看片类，需专用适配器或已有 fetch-rank 扩展"
+      },
+      {
+        "label": "QQ音乐飙升榜",
+        "site": "open2hub",
+        "cat": "音乐",
+        "our": "ent",
+        "note": "听乐/看片类，需专用适配器或已有 fetch-rank 扩展"
+      },
+      {
+        "label": "QQ音乐新歌榜",
+        "site": "open2hub",
+        "cat": "音乐",
+        "our": "ent",
+        "note": "听乐/看片类，需专用适配器或已有 fetch-rank 扩展"
+      },
+      {
+        "label": "喜马拉雅热播",
+        "site": "open2hub",
+        "cat": "阅读",
+        "our": "deep",
+        "note": "听乐/看片类，需专用适配器或已有 fetch-rank 扩展"
+      }
+    ],
+    "needRssOrAdapter": [
+      {
+        "label": "游民星空·热点资讯排行",
+        "site": "open2hub",
+        "cat": "游戏",
+        "our": "fun",
+        "note": "无稳定公开 RSS / NewsNow id 未覆盖"
+      },
+      {
+        "label": "游民星空热榜",
+        "site": "rebang",
+        "cat": "娱乐",
+        "our": "ent",
+        "note": "无稳定公开 RSS / NewsNow id 未覆盖"
+      }
+    ],
+    "newsnowIdDead": [
+      {
+        "label": "小红书阅读榜",
+        "site": "open2hub",
+        "cat": "综合",
+        "our": "hot",
+        "deadId": "xiaohongshu"
+      },
+      {
+        "label": "快手·快手热榜",
+        "site": "open2hub",
+        "cat": "综合",
+        "our": "hot",
+        "deadId": "kuaishou"
+      },
+      {
+        "label": "小红书热榜",
+        "site": "rebang",
+        "cat": "娱乐",
+        "our": "ent",
+        "deadId": "xiaohongshu"
+      },
+      {
+        "label": "豆瓣社区热榜",
+        "site": "rebang",
+        "cat": "社区",
+        "our": "hot",
+        "deadId": "douban-movie"
+      },
+      {
+        "label": "豆瓣书影音热榜",
+        "site": "rebang",
+        "cat": "娱乐",
+        "our": "ent",
+        "deadId": "douban-movie"
+      }
+    ]
+  },
+  "wont": 105,
+  "rssFeedCount": 78,
+  "taxSourceCount": 82
+}

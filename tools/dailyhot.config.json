@@ -1,0 +1,22 @@
+{
+  "_doc": "DailyHotApi 热榜白名单（imsyy/DailyHotApi）。补 NewsNow 缺口：NGA/吾爱/豆瓣小组/快手等。生产请设 DAILYHOT_BASE_URL 指向自建；公共镜像可能限流或挂源。",
+  "enabled": true,
+  "baseUrl": "https://hot-api.liiiu.cn",
+  "timeoutMs": 12000,
+  "perSource": 15,
+  "sources": [
+    { "id": "52pojie", "name": "吾爱破解", "category": "tools" },
+    { "id": "nodeseek", "name": "NodeSeek", "category": "dev" },
+    { "id": "miyoushe", "name": "米游社", "category": "fun" },
+    { "id": "acfun", "name": "AcFun", "category": "ent" },
+    { "id": "kuaishou", "name": "快手热榜", "category": "hot" },
+    { "id": "csdn", "name": "CSDN", "category": "dev" }
+  ],
+  "probeOnly": [
+    { "id": "ngabbs", "name": "NGA", "note": "全站游戏热帖；综合改走 fetch-hot-extras NGA网事杂谈" },
+    { "id": "douban-group", "name": "豆瓣小组", "note": "讨论精选偏日记，非热榜；不上线" },
+    { "id": "jianshu", "name": "简书", "note": "条少+营销垃圾；不上线" },
+    { "id": "hostloc", "name": "HostLoc", "note": "公共镜像 500；自建后再开" },
+    { "id": "coolapk", "name": "酷安热榜", "note": "本镜像 500；已走 NewsNow" }
+  ]
+}

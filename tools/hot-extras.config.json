@@ -1,0 +1,9 @@
+{
+  "_doc": "综合热榜补洞（非 NewsNow / 非 DailyHot 脏路由）。小红书走 OmniTrends；抽屉走 ichouti；NGA 筛网事杂谈向。",
+  "enabled": true,
+  "sources": [
+    { "id": "xiaohongshu", "name": "小红书热榜", "category": "hot" },
+    { "id": "chouti", "name": "抽屉热榜", "category": "hot" },
+    { "id": "nga", "name": "NGA网事杂谈", "category": "hot" }
+  ]
+}

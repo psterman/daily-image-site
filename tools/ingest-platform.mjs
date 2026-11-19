@@ -16,8 +16,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createClient } from '../lib/sb-client.mjs';
 import { mapFeedItems } from '../lib/ingest-map.mjs';
+import { pipelinePublisherCaps } from '../lib/pipeline-policy.mjs';
 import { fetchHeadlines, loadConfig } from './fetch-rss.mjs';
 import { fetchNewsnowHeadlines, loadNewsnowConfig } from './fetch-newsnow.mjs';
+import { fetchDailyhotHeadlines, loadDailyhotConfig } from './fetch-dailyhot.mjs';
+import { fetchChoutiHot, fetchXiaohongshuHot, fetchNgaWangshi } from './fetch-hot-extras.mjs';
 import { loadTaxonomy, classifyItem } from './news-taxonomy.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -49,10 +52,10 @@ function sqlEsc(s) {
 
 async function main() {
   const dry = process.argv.includes('--dry-run');
-  // 默认 36：热榜 publisher 常 >20，名额太小则后排源（B站/头条）永远 0
-  const perTag = Math.max(1, Number(arg('--per-tag', '80')) || 80);
+  // 流水白名单按源 dailyCap 先收；per-tag 作软顶（过小会把热榜挤瘦）
+  const perTag = Math.max(1, Number(arg('--per-tag', '400')) || 400);
   // 源变多后 fairCap≈maxItems/源数；太小会把电影/搞笑挤没
-  const maxItems = Math.max(10, Number(arg('--max-items', '2670')) || 2670);
+  const maxItems = Math.max(10, Number(arg('--max-items', '3200')) || 3200);
 
   const env = loadEnv();
   if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -81,8 +84,9 @@ async function main() {
 
   const cfg = loadConfig();
   cfg.maxItems = maxItems;
+  // 普通源仍 8；video/podcast 在 fetch-rss 里按格式抬到周榜量级（展示区另截 3 条）
   cfg.perFeed = Math.min(Number(cfg.perFeed) || 6, 8);
-  console.log(`抓取 RSS ${cfg.feeds?.length || 0} 源（maxItems=${maxItems}）…`);
+  console.log(`抓取 RSS ${cfg.feeds?.length || 0} 源（maxItems=${maxItems} perFeed≤${cfg.perFeed}）…`);
   const { items, failures, stale } = await fetchHeadlines(cfg);
   console.log(`RSS 抓到 ${items.length} 条；失败源 ${failures.length}；过期丢弃源 ${stale.length}`);
 
@@ -94,6 +98,40 @@ async function main() {
     items.push(...nn.items);
     for (const f of nn.failures) failures.push({ name: f.name, error: `newsnow:${f.error}` });
     console.log(`NewsNow 抓到 ${nn.items.length} 条；失败 ${nn.failures.length}`);
+  }
+
+  // NewsNow 缺口：DailyHotApi（白名单见 dailyhot.config.json）
+  const dhCfg = loadDailyhotConfig();
+  if (dhCfg.enabled) {
+    console.log(`抓取 DailyHot ${dhCfg.sources?.length || 0} 源（${dhCfg.baseUrl}）…`);
+    const dh = await fetchDailyhotHeadlines(dhCfg);
+    items.push(...dh.items);
+    for (const f of dh.failures) failures.push({ name: f.name, error: `dailyhot:${f.error}` });
+    console.log(`DailyHot 抓到 ${dh.items.length} 条；失败 ${dh.failures.length}`);
+  }
+
+  // 抽屉 / 小红书 / NGA网事杂谈（hot-extras.config.json）
+  const hxPath = path.join(__dirname, 'hot-extras.config.json');
+  const hxCfg = fs.existsSync(hxPath) ? JSON.parse(fs.readFileSync(hxPath, 'utf8')) : { enabled: false };
+  if (hxCfg.enabled) {
+    const extras = [
+      ['抽屉热榜', fetchChoutiHot],
+      ['小红书热榜', fetchXiaohongshuHot],
+      ['NGA网事杂谈', fetchNgaWangshi],
+    ];
+    let hxN = 0;
+    // HotExtras 按源抓全：勿复用 NewsNow perSource=15（抽屉热榜 API 一页约 25）
+    const hxLimit = Math.max(50, Number(nnCfg.perSource) || 0);
+    for (const [name, fn] of extras) {
+      const r = await fn({ limit: hxLimit });
+      if (!r.ok) {
+        failures.push({ name, error: `extras:${r.error || 'fail'}` });
+        continue;
+      }
+      items.push(...r.items);
+      hxN += r.items.length;
+    }
+    console.log(`HotExtras 抓到 ${hxN} 条；失败记入 failures`);
   }
 
   const taxonomy = loadTaxonomy(ROOT);
@@ -110,6 +148,7 @@ async function main() {
         ts: it.ts,
         categories: c.keys, // 老见报分类 key → ingest-map CATEGORY_TO_TAGS
         imageUrl: it.imgs && it.imgs[0] && it.imgs[0].url,
+        channelAvatar: it.channelAvatar || it.publisherAvatar || '',
         contentType: it.contentType || it.content_type,
       });
     } catch {
@@ -133,8 +172,9 @@ async function main() {
   );
 
   // 每标签配额：按标签轮询挑满 perTag，避免全挤进 ai
-  // 跳过 funny/portrait/movie —— 这三包由 ingest-visual-packs 按原站见笑/见她/听乐看片灌
-  const VISUAL_KEYS = new Set(['funny', 'portrait', 'movie']);
+  // 只跳过站内图包（见笑/见她/见闻）。movie 含 B站每周必看等 RSS，主抓取要收全；
+  // 听乐看片配图仍由 ingest-visual-packs 另灌。
+  const VISUAL_KEYS = new Set(['funny', 'portrait', 'sight']);
   const picked = [];
   const pickedIds = new Set();
   const countByTag = Object.fromEntries(Object.keys(tagIdByKey).map((k) => [k, 0]));
@@ -150,9 +190,12 @@ async function main() {
   // 否则 Map 插入顺序下「联合早报」等先占满 24 格，B站/头条永远分不到。
   const preferPubs = new Set([
     ...(nnCfg.sources || []).map((s) => String(s.name || '')),
-    '百度热搜', '微博热搜', '知乎热榜', '抖音热榜', '今日头条热榜', 'B站热搜', '抽屉热榜',
+    '百度热搜', '微博热搜', '知乎热榜', '抖音热榜', '今日头条热榜', 'B站热搜',
+    '抽屉热榜', '小红书热榜', 'NGA网事杂谈', '快手热榜',
     'GitHub趋势', 'AIHOT精选', 'AI前线', '机器之心', '新智元', '量子位',
     '晚点LatePost', 'APPSO',
+    // HotExtras 配置名也进优先队列（与上面硬编码互补）
+    ...(hxCfg.sources || []).map((s) => String(s.name || '')),
     // 格式白名单（带 contentType 的 feed）优先占格，避免被话痨源挤成「版块空」
     ...(cfg.feeds || [])
       .filter((f) => f && f.contentType)
@@ -186,10 +229,23 @@ async function main() {
     }
     return false;
   };
-  // 优先源先各拿最多 3 条，避免微博/知乎/机器之心等只剩 1 条样例
-  const preferCap = 3;
+  // Pass 0：流水白名单（board/wire/media）按源 dailyCap 收满，不受 preferCap 截断
+  const pipeCaps = pipelinePublisherCaps();
   for (const [k, pubLists] of queues) {
     for (const q of pubLists) {
+      const pub = String(q[0]?.metadata?.publisher || '');
+      const cap = pipeCaps.get(pub);
+      if (!cap) continue;
+      let n = 0;
+      while (n < cap && (countByTag[k] || 0) < perTag && takeOne(k, q)) n++;
+    }
+  }
+  // Pass 1：其余优先源打底（门户演示另截 3 条）
+  const preferCap = 8;
+  for (const [k, pubLists] of queues) {
+    for (const q of pubLists) {
+      const pub = String(q[0]?.metadata?.publisher || '');
+      if (pipeCaps.has(pub)) continue; // 已在 pass 0 处理
       let n = 0;
       while (n < preferCap && (countByTag[k] || 0) < perTag && takeOne(k, q)) n++;
     }

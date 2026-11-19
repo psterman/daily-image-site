@@ -17,6 +17,7 @@ import {
   domainForSource,
 } from '../lib/source-catalog.mjs';
 import { curatedSourcesForTag } from '../lib/tag-options.mjs';
+import { VISUAL_SOURCE_EXTRAS } from '../lib/source-dims.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -71,11 +72,33 @@ function main() {
     extras.push({ name, url: '', taxonomy: 'hot', contentType: 'article' });
   }
 
+  // 站内视觉源（见笑/见她/见闻）无 RSS，仍进完整目录
+  for (const v of VISUAL_SOURCE_EXTRAS) {
+    if (!v?.name || seen.has(v.name)) continue;
+    seen.add(v.name);
+    extras.push({
+      name: v.name,
+      url: v.url || '',
+      taxonomy: v.taxonomy || 'fun',
+      contentType: v.contentType || 'image',
+    });
+  }
+
   const entries = buildSourceCatalogEntries({
     feeds: rss.feeds || [],
     sourceCategory: tax.sourceCategory || {},
     extras,
   });
+
+  // 视觉源 packs / format 以 VISUAL_SOURCE_EXTRAS 为准（taxonomy fun 本身不映射内容包）
+  for (const e of entries) {
+    const v = VISUAL_SOURCE_EXTRAS.find((x) => x.name === e.name);
+    if (!v) continue;
+    e.domain = v.domain || e.domain;
+    e.contentType = v.contentType || e.contentType;
+    e.formatLabel = v.formatLabel || e.formatLabel;
+    e.packs = Array.isArray(v.packs) ? v.packs.slice() : e.packs;
+  }
 
   // 热议源强制用官方域图标
   for (const e of entries) {

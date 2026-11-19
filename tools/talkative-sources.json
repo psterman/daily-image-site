@@ -1,0 +1,657 @@
+{
+  "generatedAt": "2026-11-19T05:57:40.746Z",
+  "probed": 890,
+  "definition": "单次RSS窗口条数；话痨媒体=≥25且非播客整库/非Twitter页帽/非个人博客历史堆",
+  "mediaTalkative": [
+    {
+      "name": "Victor42",
+      "n": 539,
+      "ct": "link",
+      "host": "victor42.eth.limo"
+    },
+    {
+      "name": "国家统计局数据解读",
+      "n": 500,
+      "ct": "article",
+      "host": "www.stats.gov.cn"
+    },
+    {
+      "name": "国家统计局最新发布",
+      "n": 500,
+      "ct": "article",
+      "host": "www.stats.gov.cn"
+    },
+    {
+      "name": "二丫讲梵",
+      "n": 472,
+      "ct": "link",
+      "host": "wiki.eryajf.net"
+    },
+    {
+      "name": "路透中文",
+      "n": 300,
+      "ct": "(none)",
+      "host": "reuters.buzzing.cc"
+    },
+    {
+      "name": "蚊子前端博客",
+      "n": 252,
+      "ct": "link",
+      "host": "www.xiabingbao.com"
+    },
+    {
+      "name": "素生",
+      "n": 200,
+      "ct": "link",
+      "host": "z.arlmy.me"
+    },
+    {
+      "name": "Luenci的技术博客",
+      "n": 160,
+      "ct": "link",
+      "host": "luenci.com"
+    },
+    {
+      "name": "Tony's Lab",
+      "n": 158,
+      "ct": "link",
+      "host": "u1-lab.xiaoxia.io"
+    },
+    {
+      "name": "贼歪",
+      "n": 157,
+      "ct": "link",
+      "host": "varzy.me"
+    },
+    {
+      "name": "映屿",
+      "n": 156,
+      "ct": "link",
+      "host": "www.glowisle.me"
+    },
+    {
+      "name": "胡涂说",
+      "n": 147,
+      "ct": "link",
+      "host": "hutusi.com"
+    },
+    {
+      "name": "莫尔索",
+      "n": 147,
+      "ct": "link",
+      "host": "liduos.com"
+    },
+    {
+      "name": "BMPI",
+      "n": 145,
+      "ct": "link",
+      "host": "www.bmpi.dev"
+    },
+    {
+      "name": "竹林里有冰的博客",
+      "n": 138,
+      "ct": "link",
+      "host": "zhul.in"
+    },
+    {
+      "name": "Android Performance",
+      "n": 137,
+      "ct": "link",
+      "host": "www.androidperformance.com"
+    },
+    {
+      "name": "Indie Dev Weekly",
+      "n": 136,
+      "ct": "link",
+      "host": "www.shudao.wang"
+    },
+    {
+      "name": "CSS森林",
+      "n": 132,
+      "ct": "link",
+      "host": "www.cssforest.org"
+    },
+    {
+      "name": "Mox的笔记库",
+      "n": 130,
+      "ct": "link",
+      "host": "mocusez.site"
+    },
+    {
+      "name": "流动",
+      "n": 117,
+      "ct": "link",
+      "host": "liudon.com"
+    },
+    {
+      "name": "初然忆",
+      "n": 112,
+      "ct": "link",
+      "host": "www.imcry.vip"
+    },
+    {
+      "name": "smallyu的博客",
+      "n": 111,
+      "ct": "link",
+      "host": "smallyu.net"
+    },
+    {
+      "name": "GeekPlux",
+      "n": 107,
+      "ct": "link",
+      "host": "geekplux.com"
+    },
+    {
+      "name": "RYANUO的博客",
+      "n": 102,
+      "ct": "link",
+      "host": "ryanuo.cc"
+    },
+    {
+      "name": "菲兹克斯喵",
+      "n": 100,
+      "ct": "link",
+      "host": "physnya.top"
+    },
+    {
+      "name": "每日环球视野",
+      "n": 100,
+      "ct": "(none)",
+      "host": "plink.anyfeeder.com"
+    },
+    {
+      "name": "豌豆花下猫 - Python猫",
+      "n": 100,
+      "ct": "link",
+      "host": "pythoncat.top"
+    },
+    {
+      "name": "卫星社中文",
+      "n": 100,
+      "ct": "(none)",
+      "host": "sputniknews.cn"
+    },
+    {
+      "name": "新华网·新华社新闻",
+      "n": 100,
+      "ct": "(none)",
+      "host": "plink.anyfeeder.com"
+    },
+    {
+      "name": "Sagasu",
+      "n": 100,
+      "ct": "link",
+      "host": "www.sagasu.art"
+    },
+    {
+      "name": "XINDOO的博客",
+      "n": 100,
+      "ct": "link",
+      "host": "zxs.io"
+    },
+    {
+      "name": "豆瓣热映",
+      "n": 79,
+      "ct": "(none)",
+      "host": "rsshub.bestblogs.dev"
+    },
+    {
+      "name": "Moatkon's Blog",
+      "n": 77,
+      "ct": "link",
+      "host": "blog.moatkon.com"
+    },
+    {
+      "name": "Hsu Yeung 的博客",
+      "n": 69,
+      "ct": "link",
+      "host": "www.hsuyeung.com"
+    },
+    {
+      "name": "虎嗅",
+      "n": 67,
+      "ct": "(none)",
+      "host": "rss.huxiu.com"
+    },
+    {
+      "name": "Nala Ginrut's Blog",
+      "n": 60,
+      "ct": "link",
+      "host": "nalaginrut.com"
+    },
+    {
+      "name": "AI Notes",
+      "n": 59,
+      "ct": "link",
+      "host": "notes.yachiyo.im"
+    },
+    {
+      "name": "德国之声中文",
+      "n": 54,
+      "ct": "(none)",
+      "host": "rss.dw.com"
+    },
+    {
+      "name": "XBSTACK",
+      "n": 54,
+      "ct": "link",
+      "host": "www.xbstack.com"
+    },
+    {
+      "name": "Java不加糖's Blog",
+      "n": 51,
+      "ct": "link",
+      "host": "blog.javazero.top"
+    },
+    {
+      "name": "Reorx",
+      "n": 51,
+      "ct": "link",
+      "host": "reorx.com"
+    },
+    {
+      "name": "宝玉的分享",
+      "n": 50,
+      "ct": "article",
+      "host": "s.baoyu.io"
+    },
+    {
+      "name": "喷嚏网",
+      "n": 50,
+      "ct": "(none)",
+      "host": "www.dapenti.com"
+    },
+    {
+      "name": "愆伏",
+      "n": 50,
+      "ct": "link",
+      "host": "www.tortorse.com"
+    },
+    {
+      "name": "求是网",
+      "n": 50,
+      "ct": "(none)",
+      "host": "plink.anyfeeder.com"
+    },
+    {
+      "name": "碎言博客",
+      "n": 50,
+      "ct": "link",
+      "host": "suiyan.cc"
+    },
+    {
+      "name": "太隐",
+      "n": 50,
+      "ct": "link",
+      "host": "wangyurui.com"
+    },
+    {
+      "name": "云原生",
+      "n": 50,
+      "ct": "link",
+      "host": "jimmysong.io"
+    },
+    {
+      "name": "AIHOT精选",
+      "n": 50,
+      "ct": "(none)",
+      "host": "aihot.news"
+    },
+    {
+      "name": "Arthur's Review",
+      "n": 50,
+      "ct": "link",
+      "host": "blog.leesaitool.com"
+    },
+    {
+      "name": "B站每周必看",
+      "n": 50,
+      "ct": "video",
+      "host": "rsshub.bestblogs.dev"
+    },
+    {
+      "name": "fengc's Blog",
+      "n": 50,
+      "ct": "link",
+      "host": "rssweball.top"
+    },
+    {
+      "name": "Lei Mao's Log Book",
+      "n": 50,
+      "ct": "link",
+      "host": "leimao.github.io"
+    },
+    {
+      "name": "seisamuse",
+      "n": 50,
+      "ct": "link",
+      "host": "www.seis-jun.xyz"
+    },
+    {
+      "name": "The Type — 文字 / 设计 / 文化",
+      "n": 50,
+      "ct": "article",
+      "host": "feeds.feedburner.com"
+    },
+    {
+      "name": "V2EX·技术",
+      "n": 50,
+      "ct": "(none)",
+      "host": "www.v2ex.com"
+    },
+    {
+      "name": "V2EX创意",
+      "n": 50,
+      "ct": "(none)",
+      "host": "www.v2ex.com"
+    },
+    {
+      "name": "whyes的博客",
+      "n": 50,
+      "ct": "link",
+      "host": "whyes.org"
+    },
+    {
+      "name": "LINUX DO",
+      "n": 49,
+      "ct": "(none)",
+      "host": "linuxdorss.longpink.com"
+    },
+    {
+      "name": "CRIVU",
+      "n": 46,
+      "ct": "link",
+      "host": "cbc688.com"
+    },
+    {
+      "name": "peago · 空想家",
+      "n": 43,
+      "ct": "link",
+      "host": "peagothedreamer.github.io"
+    },
+    {
+      "name": "Vulkey_Chen's Blog",
+      "n": 43,
+      "ct": "link",
+      "host": "gh0st.cn"
+    },
+    {
+      "name": "龙爪槐守望者",
+      "n": 40,
+      "ct": "link",
+      "host": "www.ftium4.com"
+    },
+    {
+      "name": "V2EX 热榜",
+      "n": 40,
+      "ct": "(none)",
+      "host": "rss.mifaw.com"
+    },
+    {
+      "name": "石龙仔文库",
+      "n": 37,
+      "ct": "link",
+      "host": "shilongzai.com"
+    },
+    {
+      "name": "财联社深度",
+      "n": 34,
+      "ct": "(none)",
+      "host": "rsshub.bestblogs.dev"
+    },
+    {
+      "name": "36氪",
+      "n": 30,
+      "ct": "article",
+      "host": "wechat2rss.bestblogs.dev"
+    },
+    {
+      "name": "大江小浪",
+      "n": 30,
+      "ct": "link",
+      "host": "popsite.cn"
+    },
+    {
+      "name": "法广中文",
+      "n": 30,
+      "ct": "(none)",
+      "host": "www.rfi.fr"
+    },
+    {
+      "name": "极客公园",
+      "n": 30,
+      "ct": "article",
+      "host": "wechat2rss.bestblogs.dev"
+    },
+    {
+      "name": "披萨盒的博客",
+      "n": 30,
+      "ct": "link",
+      "host": "blog.pushihao.com"
+    },
+    {
+      "name": "听说了吗",
+      "n": 30,
+      "ct": "link",
+      "host": "anymesgs.com"
+    },
+    {
+      "name": "危墙",
+      "n": 30,
+      "ct": "link",
+      "host": "weiqiang.org"
+    },
+    {
+      "name": "宙と木 - 一個寫代碼的人，偶爾造點東西",
+      "n": 30,
+      "ct": "link",
+      "host": "koimsurai.com"
+    },
+    {
+      "name": "Evan",
+      "n": 30,
+      "ct": "link",
+      "host": "evan.xin"
+    },
+    {
+      "name": "Luckydesigner",
+      "n": 30,
+      "ct": "article",
+      "host": "www.luckydesigner.space"
+    },
+    {
+      "name": "Mobility",
+      "n": 30,
+      "ct": "link",
+      "host": "lichuanyang.top"
+    },
+    {
+      "name": "VPS录",
+      "n": 30,
+      "ct": "link",
+      "host": "vpslu.com"
+    },
+    {
+      "name": "技术派罗恩",
+      "n": 29,
+      "ct": "link",
+      "host": "luoruihuan.top"
+    },
+    {
+      "name": "栖迟处",
+      "n": 29,
+      "ct": "link",
+      "host": "cavill.site"
+    },
+    {
+      "name": "getgiffgaff 中文教程 · giffgaff 与海外手机卡使用、保号、写卡教程",
+      "n": 29,
+      "ct": "link",
+      "host": "getgiffgaff.com"
+    },
+    {
+      "name": "JaSpirit 的万事屋",
+      "n": 26,
+      "ct": "link",
+      "host": "blog.jaspirit.cc"
+    },
+    {
+      "name": "抽屉热榜",
+      "n": 25,
+      "ct": "(none)",
+      "host": "dig.ichouti.cn"
+    },
+    {
+      "name": "少数派发现",
+      "n": 25,
+      "ct": "(none)",
+      "host": "meta.appinn.net"
+    },
+    {
+      "name": "闲人Life",
+      "n": 25,
+      "ct": "link",
+      "host": "www.xianrenlife.com"
+    },
+    {
+      "name": "cnBeta",
+      "n": 25,
+      "ct": "(none)",
+      "host": "plink.anyfeeder.com"
+    },
+    {
+      "name": "ICDYCT我能你也行",
+      "n": 25,
+      "ct": "link",
+      "host": "zelikk.blogspot.com"
+    },
+    {
+      "name": "LiaoKe的博客",
+      "n": 25,
+      "ct": "link",
+      "host": "blog.liao-ke.com"
+    }
+  ],
+  "twitterPageCap50": 153,
+  "podcastArchives_ge100": [
+    {
+      "name": "故事FM",
+      "n": 1001
+    },
+    {
+      "name": "RSS",
+      "n": 700
+    },
+    {
+      "name": "Steve说",
+      "n": 481
+    },
+    {
+      "name": "看理想电台",
+      "n": 465
+    },
+    {
+      "name": "文學生活",
+      "n": 400
+    },
+    {
+      "name": "津津乐道",
+      "n": 305
+    },
+    {
+      "name": "随机波动",
+      "n": 299
+    },
+    {
+      "name": "没理想编辑部",
+      "n": 273
+    },
+    {
+      "name": "RSS1",
+      "n": 268
+    },
+    {
+      "name": "枫言枫语",
+      "n": 178
+    },
+    {
+      "name": "别任性",
+      "n": 177
+    },
+    {
+      "name": "牛油果烤面包",
+      "n": 154
+    },
+    {
+      "name": "踏浪寻星广播电台",
+      "n": 121
+    },
+    {
+      "name": "UX Coffee 设计咖",
+      "n": 101
+    }
+  ],
+  "blogArchives_ge80": [
+    {
+      "name": "資工小廢物 - JN",
+      "n": 288,
+      "host": "blog.giveanornot.com"
+    },
+    {
+      "name": "Posts on Changkun's Blog",
+      "n": 286,
+      "host": "changkun.de"
+    },
+    {
+      "name": "Eric's Blog",
+      "n": 204,
+      "host": "wsdjeg.net"
+    },
+    {
+      "name": "UWillno's Blog",
+      "n": 185,
+      "host": "uwillno.com"
+    },
+    {
+      "name": "DataShare 数据人阿多",
+      "n": 171,
+      "host": "datashare-duo.github.io"
+    },
+    {
+      "name": "Yuko's Blog",
+      "n": 149,
+      "host": "yuukoamamiya.github.io"
+    },
+    {
+      "name": "Seven's blog",
+      "n": 134,
+      "host": "blog.diqigan.cn"
+    },
+    {
+      "name": "Razeen's Blog",
+      "n": 113,
+      "host": "razeen.me"
+    },
+    {
+      "name": "东东's Blog",
+      "n": 100,
+      "host": "blog.yasking.org"
+    },
+    {
+      "name": "Louis Aeilot's Blog",
+      "n": 98,
+      "host": "blog.aeilot.top"
+    },
+    {
+      "name": "范叶亮的博客 - Leo Van's Blog",
+      "n": 96,
+      "host": "leovan.me"
+    },
+    {
+      "name": "暮冬Z羡慕的博客",
+      "n": 81,
+      "host": "forcheetah.github.io"
+    }
+  ],
+  "unnamedRssPodcasts": 2
+}

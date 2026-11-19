@@ -2,43 +2,35 @@
 /**
  * ingest-visual-packs.mjs —— 灌「轻松一刻 / 人像美学 / 电影音乐」视觉包
  *
- * 对齐原站 daily_grab_all.py / daily.onetone.app：
- *   轻松一刻 ≈ 见笑  ← TG：每日沙雕墙 / 平壤卫视 / 煎蛋无聊图
- *   人像美学 ≈ 见她  ← 煎蛋女装区 API + 福利吧图帖
- *   电影音乐 ≈ 听乐+看片 ← fetch-rank（猫眼/网易云/Apple），带封面+简介+地区
+ * 轻松一刻 / 人像美学：读 daily.onetone.app 当日（及昨日）manifest 的站内图
+ *   （见笑 / 见她 → /img/<日期>/…webp，已过滤、已上 Cloudflare）。
+ *   TG RSS 热链进不了浏览器池，不再用作图源。
+ * 电影音乐：仍走 fetch-rank（猫眼/网易云/Apple 封面热链）。
  *
- * 版权：只存 title + ≤160 摘要 + 原文链接 + 远程 image_url 热链；不转存。
+ * 版权：只存 title + ≤160 摘要 + 原文链接 + 站内 image_url；不二次转存。
  *
  *   node tools/ingest-visual-packs.mjs
  *   node tools/ingest-visual-packs.mjs --dry-run --per-tag 8
+ *   node tools/ingest-visual-packs.mjs --site https://daily.onetone.app --date 2026-11-19
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createClient } from '../lib/sb-client.mjs';
-import { mapFeedItems, stripHtml, MAX_SUMMARY } from '../lib/ingest-map.mjs';
-import { fetchHeadlines } from './fetch-rss.mjs';
+import { mapFeedItems, MAX_SUMMARY } from '../lib/ingest-map.mjs';
 import { fetchRank, GROUP_LABEL } from './fetch-rank.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const MAIN_SOURCE_ID = '74d9887f-a1d4-4e26-92c2-4005e8829c21';
+const DEFAULT_SITE = 'https://daily.onetone.app';
 
-/** 见笑：与 daily_grab_all.TG_CHANNELS 一致 */
-const FUNNY_FEEDS = [
-  { name: 'TG每日沙雕墙', url: 'https://rsshub.bestblogs.dev/telegram/channel/woshadiao' },
-  { name: 'TG平壤卫视', url: 'https://rsshub.bestblogs.dev/telegram/channel/pingrangTV' },
-  { name: 'TG煎蛋无聊图', url: 'https://rsshub.bestblogs.dev/telegram/channel/jandan_pic' },
-];
-
-/** 见她补充源：福利吧（女图/汇总帖）；煎蛋女装走官方 API */
-const PORTRAIT_FEEDS = [
-  { name: '福利吧', url: 'https://fuliba2023.net/feed' },
-];
-
-const JANDAN_BEAUTY_SID = 108629;
-// 福利吧整站 RSS 很杂：只收汇总图帖 / 明确女图向，避开游戏·动漫资讯
-const FULIBA_KEEP = /福利汇总|写真|女装|街拍|人像|美女|小姐姐|啤酒妹/i;
+/** 原站 media tab → 平台标签包 */
+const SITE_TAB_TO_PACK = Object.freeze({
+  jianxiao: { tag: 'funny', source: '见笑', label: '见笑精选' },
+  jianshe: { tag: 'portrait', source: '见她', label: '见她精选' },
+  jianwen: { tag: 'sight', source: '见闻', label: '见闻精选' },
+});
 
 function loadEnv() {
   const raw = fs.readFileSync(path.join(ROOT, '.env.local'), 'utf8');
@@ -59,57 +51,110 @@ function arg(name, fallback) {
   return v == null || v.startsWith('-') ? fallback : v;
 }
 
-function imageTitle(raw, fallback) {
-  let t = stripHtml(raw && raw.title).replace(/[:：]\s*$/, '').trim();
-  // TG 标题常是「🖼 xxx」—— 去掉装饰符
-  t = t.replace(/^[🖼🎬⚠️\s]+/u, '').trim();
-  if (!t || t.length < 2) t = fallback;
-  return t.slice(0, 200);
+function todayShanghai() {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
 }
 
-function toHttps(u) {
-  return String(u || '').replace(/^http:\/\//i, 'https://');
+function shiftDate(ymd, deltaDays) {
+  const [y, m, d] = ymd.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + deltaDays);
+  return dt.toISOString().slice(0, 10);
 }
 
-/** 煎蛋女装区：与 grab_jandan_beauty 同源 API（section 108629）。 */
-async function fetchJandanBeauty(limit = 12) {
-  const headers = {
-    'User-Agent': 'Mozilla/5.0 (compatible; visual-packs/1.0)',
-    Referer: 'https://jandan.net/beauty',
-    Origin: 'https://jandan.net',
-    Accept: 'application/json',
-  };
-  const head = await fetch(
-    `https://jandan.net/api/comment/post/${JANDAN_BEAUTY_SID}?order=desc`,
-    { headers },
-  );
-  if (!head.ok) throw new Error(`jandan beauty HTTP ${head.status}`);
-  const hj = await head.json();
-  const page = Number(hj?.data?.current_page) || 1;
+function baseUrl(u) {
+  return String(u || '').replace(/\/+$/, '');
+}
+
+/** 解析 window.__DAILY_MANIFEST__={...} */
+export function parseDailyManifestJs(text) {
+  const m = String(text || '').match(/__DAILY_MANIFEST__\s*=\s*(\{[\s\S]*\})\s*;?\s*$/);
+  if (!m) throw new Error('manifest 不是 __DAILY_MANIFEST__ 赋值');
+  return JSON.parse(m[1]);
+}
+
+/**
+ * 见笑/见她：一天一期整期收录（不拆成 N 张独立条目）。
+ * limitByTag = 单期最多收几张（默认收满，上限 200）。
+ */
+export function siteItemsToRaw(manifest, site, limitByTag = 200) {
+  const siteBase = baseUrl(site || manifest.siteUrl || DEFAULT_SITE);
+  const date = String(manifest.date || '');
+  const cap = Math.max(1, Math.min(200, Number(limitByTag) || 200));
   const out = [];
-  for (let p = page; p >= Math.max(1, page - 2) && out.length < limit; p--) {
-    const r = p === page ? hj : await (await fetch(
-      `https://jandan.net/api/comment/post/${JANDAN_BEAUTY_SID}?order=desc&page=${p}`,
-      { headers },
-    )).json();
-    for (const c of r?.data?.list || []) {
-      const html = String(c.content || '');
-      const imgs = [...html.matchAll(/src=["']([^"']+)["']/gi)].map((m) => toHttps(m[1]));
-      const img = imgs.find((u) => /\.(?:jpg|jpeg|png|gif|webp)(?:\?|$)/i.test(u));
-      if (!img) continue;
-      const id = c.id || c.comment_ID;
-      out.push({
-        title: String(c.author || '煎蛋女装').replace(/[:：]\s*$/, ''),
-        link: `https://jandan.net/t/${id}`,
-        desc: '煎蛋女装',
-        source: '煎蛋女装',
-        ts: c.date_gmt ? Date.parse(c.date_gmt) : Date.now(),
-        imgs: [{ url: img }],
+  for (const tab of manifest.tabs || []) {
+    const map = SITE_TAB_TO_PACK[tab.key];
+    if (!map) continue;
+    const images = [];
+    for (const it of tab.items || []) {
+      if (images.length >= cap) break;
+      const rel = String(it.full || it.thumb || '').trim();
+      if (!rel.startsWith('/img/')) continue;
+      const full = `${siteBase}${rel}`;
+      const thumbRel = String(it.thumb || it.full || '').trim();
+      images.push({
+        full,
+        thumb: thumbRel.startsWith('/img/') ? `${siteBase}${thumbRel}` : full,
       });
-      if (out.length >= limit) break;
     }
+    if (!images.length) continue;
+    out.push({
+      title: `${map.source} · ${date}（${images.length} 张）`,
+      // 用 ?pack= 去重（normalizeUrl 会丢掉 #jianxiao，见笑/见她会撞车）
+      link: `${siteBase}/${date}/?pack=${tab.key}`,
+      desc: `大佬请批阅 · ${map.source} · ${date} · 共 ${images.length} 张`.slice(0, MAX_SUMMARY),
+      source: map.source,
+      ts: Date.parse(`${date}T12:00:00+08:00`) || Date.now(),
+      imageUrl: images[0].full,
+      images,
+      tagKeys: [map.tag],
+      contentType: 'image',
+      region: 'zh-CN',
+      language: 'zh-CN',
+      ingestedBy: 'visual-packs',
+      issueKind: tab.key,
+      issueDate: date,
+    });
   }
   return out;
+}
+
+async function fetchText(url, timeoutMs = 20000) {
+  const ac = new AbortController();
+  const t = setTimeout(() => ac.abort(), timeoutMs);
+  try {
+    const r = await fetch(url, {
+      signal: ac.signal,
+      headers: {
+        'user-agent': 'Mozilla/5.0 (compatible; visual-packs/1.0)',
+        accept: 'text/html,application/javascript,*/*',
+      },
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return await r.text();
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+/** 拉一期站内 manifest → 见笑/见她 raw 条目 */
+export async function fetchSiteVisualDay(site, date, limitByTag = 200) {
+  const root = baseUrl(site);
+  const pageUrl = `${root}/${date}/`;
+  const html = await fetchText(pageUrl);
+  const src = [...html.matchAll(/<script[^>]+src=["']([^"']*manifest[^"']*\.js)["']/gi)]
+    .map((m) => m[1])
+    .find(Boolean);
+  if (!src) throw new Error(`${date} 页面无 manifest script`);
+  const manUrl = new URL(src, pageUrl).href;
+  const js = await fetchText(manUrl);
+  const manifest = parseDailyManifestJs(js);
+  return siteItemsToRaw(manifest, root, limitByTag);
 }
 
 function regionOfRankItem(it) {
@@ -117,7 +162,6 @@ function regionOfRankItem(it) {
   const tags = Array.isArray(it && it.tags) ? it.tags : [];
   if (source.includes('猫眼') || source.includes('豆瓣')) return 'zh-CN';
   if (source.includes('网易云')) {
-    // 中文榜 → zh-CN；国际/场景榜 → intl（可被非中文 locale 优先命中）
     if (tags.some((t) => String(t).includes(GROUP_LABEL.cn))) return 'zh-CN';
     return 'intl';
   }
@@ -130,7 +174,7 @@ function rankToRaw(it, kind) {
   const link = String((it && it.link) || '').trim();
   if (!title || !/^https?:\/\//i.test(link)) return null;
   const cover = String((it && it.cover) || '').trim();
-  if (!cover) return null; // 电影音乐预览必须有图
+  if (!cover) return null;
   const bits = [it.subtitle, it.meta, it.tag].map((x) => String(x || '').trim()).filter(Boolean);
   return {
     title,
@@ -215,6 +259,9 @@ async function clearStaleVisualPack(admin, packId, key) {
 async function main() {
   const dry = process.argv.includes('--dry-run');
   const perTag = Math.max(3, Number(arg('--per-tag', '10')) || 10);
+  const site = baseUrl(arg('--site', process.env.VISUAL_SITE_URL || process.env.SITE_URL || DEFAULT_SITE));
+  const date = arg('--date', todayShanghai());
+  const dates = [date, shiftDate(date, -1)];
 
   const env = loadEnv();
   if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -232,12 +279,12 @@ async function main() {
   });
   const tagIdByKey = Object.fromEntries(packs.map((p) => [p.key, p.id]));
 
-  // 1) 清掉不合格旧挂；见笑/见她换源后整包重挂（避免 ooxx/热榜残留）
-  for (const key of ['funny', 'portrait', 'movie']) {
+  // 1) 清掉不合格旧挂；见笑/见她换源后整包重挂（避免 TG 热链残留）
+  for (const key of ['funny', 'portrait', 'sight', 'movie']) {
     const cleared = await clearStaleVisualPack(admin, tagIdByKey[key], key);
     if (cleared) console.log(`清理陈旧 ${key} 标签 ${cleared} 条`);
   }
-  for (const key of ['funny', 'portrait']) {
+  for (const key of ['funny', 'portrait', 'sight']) {
     const packId = tagIdByKey[key];
     if (!packId) continue;
     const tags = await admin.select('content_tags', {
@@ -255,94 +302,43 @@ async function main() {
     if (tags.length) console.log(`重置 ${key} 标签 ${tags.length} 条（换源重灌）`);
   }
 
-  // 2) 见笑：三个 TG 频道；见她：煎蛋女装 API + 福利吧女图帖
-  const funnyCfg = {
-    enabled: true,
-    perFeed: Math.max(perTag, 8),
-    maxItems: FUNNY_FEEDS.length * Math.max(perTag, 8),
-    timeoutMs: 20000,
-    maxAgeDays: 14,
-    feeds: FUNNY_FEEDS,
-  };
-  const portraitCfg = {
-    enabled: true,
-    perFeed: Math.max(perTag, 8),
-    maxItems: PORTRAIT_FEEDS.length * Math.max(perTag, 8),
-    timeoutMs: 20000,
-    maxAgeDays: 14,
-    feeds: PORTRAIT_FEEDS,
-  };
-  const [funnyRes, portraitRes, beautyItems] = await Promise.all([
-    fetchHeadlines(funnyCfg),
-    fetchHeadlines(portraitCfg),
-    fetchJandanBeauty(Math.max(perTag, 10)).catch((e) => {
-      console.log('煎蛋女装 API 失败', e.message);
-      return [];
-    }),
-  ]);
-  const failures = [...(funnyRes.failures || []), ...(portraitRes.failures || [])];
-  if (failures.length) console.log('图片源失败', failures.map((f) => f.name || f));
-
+  // 2) 站内见笑/见她：每天各一整期（今日优先，昨日补缺）
   const classified = [];
-  const pushImg = (it, tag, fallback) => {
-    const img = toHttps(it.imgs && it.imgs[0] && it.imgs[0].url);
-    if (!img || !/^https?:\/\//i.test(img)) return;
-    // 跳过 TG 的 NSFW 预警纯文字、视频条
-    const title = imageTitle(it, fallback);
-    if (/#NSFW|提前预警/i.test(title) && !img) return;
-    classified.push({
-      title,
-      link: it.link,
-      desc: stripHtml(it.desc || '').slice(0, MAX_SUMMARY) || fallback,
-      source: it.source,
-      ts: it.ts,
-      imageUrl: img,
-      tagKeys: [tag],
-      contentType: 'image',
-      region: 'zh-CN',
-      language: 'zh-CN',
-      ingestedBy: 'visual-packs',
-    });
-  };
-
-  // 见笑：三频道交错，避免单一源占满配额
-  {
-    const bySrc = new Map();
-    for (const it of funnyRes.items || []) {
-      if (!bySrc.has(it.source)) bySrc.set(it.source, []);
-      bySrc.get(it.source).push(it);
-    }
-    const queues = [...bySrc.values()];
-    let guard = 0;
-    while (queues.some((q) => q.length) && guard++ < 200) {
-      for (const q of queues) {
-        const it = q.shift();
-        if (it) pushImg(it, 'funny', '趣味图片');
+  const seenIssue = new Set();
+  for (const d of dates) {
+    try {
+      const rows = await fetchSiteVisualDay(site, d, 300);
+      let added = 0;
+      for (const row of rows) {
+        const k = `${row.tagKeys[0]}:${row.issueDate || d}`;
+        if (seenIssue.has(k)) continue;
+        seenIssue.add(k);
+        classified.push(row);
+        added++;
       }
-    }
-  }
-  // 见她：女装 API 与福利吧女图帖交错
-  {
-    const fuliba = (portraitRes.items || []).filter((it) =>
-      FULIBA_KEEP.test(String(it.title || '') + ' ' + String(it.desc || '')),
-    );
-    const n = Math.max(beautyItems.length, fuliba.length);
-    for (let i = 0; i < n; i++) {
-      if (i < beautyItems.length) pushImg(beautyItems[i], 'portrait', '煎蛋女装');
-      if (i < fuliba.length) pushImg(fuliba[i], 'portrait', '福利吧');
+      const nImg = rows.reduce((n, r) => n + (r.images ? r.images.length : 0), 0);
+      console.log(`site ${d}: +${added} 期 / ${nImg} 张（累计 ${classified.length} 期）`);
+    } catch (e) {
+      console.log(`site ${d} 失败`, e.message || e);
     }
   }
   console.log(
-    `image ok: funny=${classified.filter((x) => x.tagKeys[0] === 'funny').length}` +
-    ` beauty=${beautyItems.length}` +
-    ` portrait=${classified.filter((x) => x.tagKeys[0] === 'portrait').length}`,
+    `image ok: funny=${classified.filter((x) => x.tagKeys[0] === 'funny').length}期` +
+    ` portrait=${classified.filter((x) => x.tagKeys[0] === 'portrait').length}期` +
+    ` sight=${classified.filter((x) => x.tagKeys[0] === 'sight').length}期` +
+    ` imgs=${classified.reduce((n, r) => n + ((r.images && r.images.length) || 0), 0)}`,
   );
+  if (!classified.some((x) => x.tagKeys[0] === 'funny')) {
+    console.log('警告：站内见笑为空 —— 检查 SITE / 日期是否已发布');
+  }
+  if (!classified.some((x) => x.tagKeys[0] === 'sight')) {
+    console.log('警告：站内见闻为空 —— 检查 SITE / 日期是否已发布');
+  }
 
   // 3) 电影音乐：复用原站 fetch-rank（封面 + 简介 + 地区）
   console.log('抓取听乐/看片榜单…');
-  const rank = await fetchRank({ date: new Date().toISOString().slice(0, 10), checkCovers: false });
+  const rank = await fetchRank({ date, checkCovers: false });
   const payload = rank.payload || rank;
-  // 院线（偏 zh-CN）+ 乐榜（中文/国际各半），预览按用户 locale 筛选
   const half = Math.max(2, Math.ceil(perTag / 2));
   const moviePick = (payload.movie || []).filter((x) => x.cover).slice(0, half);
   const musicAll = (payload.music || []).filter((x) => x.cover);
@@ -350,18 +346,16 @@ async function main() {
   const musicIntl = musicAll.filter((x) => regionOfRankItem(x) === 'intl').slice(0, Math.ceil(half / 2));
   const musicPick = [...musicCn, ...musicIntl];
   if (rank.allFailed) console.log('警告：听乐/看片源全部失败', rank.sources?.filter((s) => s.error).map((s) => s.name));
-  const interleaved = [];
   for (let i = 0; i < Math.max(moviePick.length, musicPick.length); i++) {
     if (i < moviePick.length) {
       const raw = rankToRaw(moviePick[i], 'movie');
-      if (raw) interleaved.push(raw);
+      if (raw) classified.push(raw);
     }
     if (i < musicPick.length) {
       const raw = rankToRaw(musicPick[i], 'music');
-      if (raw) interleaved.push(raw);
+      if (raw) classified.push(raw);
     }
   }
-  classified.push(...interleaved);
   console.log(`rank ok: movie=${moviePick.length} musicCn=${musicCn.length} musicIntl=${musicIntl.length} classified=${classified.length}`);
 
   const mapped = mapFeedItems(classified, {
@@ -369,18 +363,16 @@ async function main() {
     allowSnippet: true,
     allowImage: true,
     rightsStatus: 'unknown',
-    // publisher 留给各条 raw.source（TG 频道名 / 煎蛋女装 / 福利吧）
     resolveTagId: (k) => tagIdByKey[k] || null,
   });
 
-  // 每包配额
   const picked = [];
   const pickedIds = new Set();
-  const countByTag = { funny: 0, portrait: 0, movie: 0 };
+  const countByTag = { funny: 0, portrait: 0, sight: 0, movie: 0 };
   const byTag = new Map();
   for (const row of mapped.rows) {
     for (const k of row.metadata.tag_keys || []) {
-      if (!countByTag.hasOwnProperty(k)) continue;
+      if (!Object.prototype.hasOwnProperty.call(countByTag, k)) continue;
       if (!byTag.has(k)) byTag.set(k, []);
       byTag.get(k).push(row);
     }
@@ -415,26 +407,29 @@ async function main() {
   console.log('配额', JSON.stringify(countByTag), 'picked', picked.length);
   if (dry) {
     console.log('[dry-run]', picked.slice(0, 6).map((r) => ({
-      title: r.title, tags: r.metadata.tag_keys, region: r.metadata.region, img: !!r.image_url,
+      title: r.title, tags: r.metadata.tag_keys, img: String(r.image_url || '').slice(0, 72),
     })));
     return;
   }
 
-  const existing = await admin.select('content_items', {
-    columns: 'id,content_hash',
-    filters: [{ col: 'source_id', op: 'eq', value: MAIN_SOURCE_ID }],
-    limit: 5000,
-  });
-  const have = new Set(existing.map((r) => r.content_hash));
-  const fresh = picked.filter((r) => !have.has(r.content_hash));
+  // 只按本批 hash 查重（避免 5000 截断漏判 → insert 409）
+  const hashList = [...new Set(picked.map((r) => r.content_hash))];
+  const existing = hashList.length
+    ? await admin.select('content_items', {
+      columns: 'id,content_hash',
+      filters: [
+        { col: 'source_id', op: 'eq', value: MAIN_SOURCE_ID },
+        { col: 'content_hash', op: 'in', value: hashList },
+      ],
+    })
+    : [];
+  const byHash = Object.fromEntries(existing.map((r) => [r.content_hash, r.id]));
+  const fresh = picked.filter((r) => !byHash[r.content_hash]);
   const tagRows = [];
   for (const r of fresh) {
     for (const l of linkByItem.get(r.id) || []) tagRows.push(l);
   }
-  // 已存在条目也补标签（同 hash 换包）
-  const byHash = Object.fromEntries(existing.map((r) => [r.content_hash, r.id]));
   for (const r of picked) {
-    if (!have.has(r.content_hash)) continue;
     const id = byHash[r.content_hash];
     if (!id) continue;
     for (const l of linkByItem.get(r.id) || []) {
@@ -446,7 +441,10 @@ async function main() {
   console.log(`完成：新插 ${inserted}，标签 upsert ${tagRows.length}；按包`, JSON.stringify(countByTag));
 }
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (isMain) {
+  main().catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
+}

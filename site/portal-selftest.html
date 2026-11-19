@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PORTAL_SELFTEST_PENDING</title>
+<link rel="stylesheet" href="portal.css">
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><div class="brand-logo">头</div><div><div class="brand-name">我的头条</div><div class="brand-sub">自建平台 · 真数据原型</div></div></div>
+    <nav class="nav">
+      <button class="nav-item active" data-view="platform"><span class="nav-ico">主</span>我的平台</button>
+      <button class="nav-item" data-view="tags"><span class="nav-ico">1</span>标签市场</button>
+      <button class="nav-item" data-view="columns"><span class="nav-ico">2</span>我的栏目</button>
+      <button class="nav-item" data-view="review"><span class="nav-ico">3</span>今日审稿</button>
+      <button class="nav-item" data-view="digest"><span class="nav-ico">4</span>日报预览</button>
+    </nav>
+    <div class="side-foot"><div class="ai-box"><div class="ai-title">数据链路状态</div><div class="ai-line"><span>digest</span><span id="sideDigest">—</span></div><div class="ai-line"><span>栏目</span><span id="sideCols">0</span></div><div class="ai-line"><span>候选池</span><span id="sideCands">0</span></div><div class="ai-line"><span>已放行</span><span id="sideApproved">0</span></div></div></div>
+  </aside>
+  <div class="main">
+    <header class="topbar"><div class="top-title" id="topTitle">我的平台</div><div class="top-meta"><span class="pill" id="topDate">2026-11-18</span><span class="pill on">● 接真 platform-flow</span><span class="avatar">我</span></div></header>
+    <div class="wrap">
+      <section class="view active" id="view-platform">
+        <div class="page-head"><div><h1>我的平台</h1><p class="desc">真函数链路。</p></div></div>
+        <div class="platform-hero card"><div><h2>你的头条</h2></div><div class="platform-score"><div class="n" id="heroScore">0</div></div></div>
+        <div class="card pad" id="pipelineView"></div>
+      </section>
+      <section class="view" id="view-tags"><div class="grid tags" id="tagGrid"></div><b id="tagChosen">0</b></section>
+      <section class="view" id="view-columns"><div class="card" id="colList"></div></section>
+      <section class="view" id="view-review">
+        <aside id="reviewDirs"></aside>
+        <div class="toolbar"><button class="chip active" data-filter="all">全部</button><button class="chip" data-filter="pending">待审</button><button class="chip" data-filter="approved">已放行</button><input class="search" id="candSearch" placeholder="搜标题 / 来源"></div>
+        <div class="cand-list" id="candList"></div>
+        <div id="candPreview"></div>
+        <button id="autoReview">AI 自动审稿</button><button id="publishBtn">发布并生成 digest</button><button id="resetReview">重置审稿</button>
+        <span id="rvTotal">0</span><span id="rvApproved">0</span><span id="rvRejected">0</span><span id="rvPinned">0</span>
+      </section>
+      <section class="view" id="view-digest">
+        <div class="reader-shell" id="readerRoot"></div>
+        <div class="reader-foot"><span id="readerSummary">—</span><a href="#" id="reRender">重新渲染</a></div>
+      </section>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script type="module" src="portal-app.mjs"></script>
+<script type="module">
+import { emptyDb, seedTagPacks, ensureMainSource, CORE_TAG_PACKS } from '../lib/platform-model.mjs';
+import {
+  registerUser, createPlatform, setPlatformTagPacks, reorderColumns,
+  ingestContent, buildCandidates, reviewCandidates, buildPlatformDigest,
+} from '../lib/platform-flow.mjs';
+import { safeHref, currentTab, switchTab, renderReader } from './portal-render.mjs';
+
+const R = [];
+const ok = (name, cond) => R.push((cond ? 'OK' : 'FAIL') + ':' + name);
+
+function rebuild() {
+  const db = emptyDb();
+  seedTagPacks(db);
+  ensureMainSource(db);
+  const u = registerUser(db, { email: 't@e.com', displayName: 'T' });
+  const built = createPlatform(db, {
+    userId: u.id, name: 'T', tagKeys: ['opensource', 'ai', 'movie'], siteUrl: 'https://x.dev',
+  });
+  ingestContent(db, [
+    { title: 'A', url: 'https://a.example.com/1', summary: 'sa', tagKeys: ['opensource'] },
+    { title: 'B', url: 'https://b.example.com/2', summary: 'sb', tagKeys: ['ai'] },
+    { title: 'C', url: 'https://c.example.com/3', summary: 'sc', tagKeys: ['movie'] },
+  ]);
+  buildCandidates(db, { platformId: built.platform.id, date: '2026-11-18' });
+  reviewCandidates(db, { platformId: built.platform.id, date: '2026-11-18', auto: true, autoPerColumn: 2 });
+  return { db, platform: built.platform };
+}
+
+function run() {
+  try {
+    // A. 纯函数链路（真 platform-flow）
+    const { db, platform } = rebuild();
+    ok('seed8', Object.keys(db.tag_packs).length === CORE_TAG_PACKS.length);
+    const d = buildPlatformDigest(db, { platformId: platform.id, date: '2026-11-18', siteUrl: 'https://x.dev' });
+    ok('digest_schema2', d.schema === 2);
+    ok('tabkeys3', d.tabKeys.length === 3);
+    ok('tabs3', d.tabs.length === 3);
+    ok('total>0', d.total > 0);
+    ok('highlights_shape', d.tabs.some(t => t.highlights.length > 0 && t.highlights[0].title && t.highlights[0].url));
+
+    // B. 改标签 → 重建栏目 + digest 同步
+    setPlatformTagPacks(db, { platformId: platform.id, tagKeys: ['funny', 'design'] });
+    const cands2 = (() => { buildCandidates(db, { platformId: platform.id, date: '2026-11-18' }); return true; })();
+    reviewCandidates(db, { platformId: platform.id, date: '2026-11-18', auto: true, autoPerColumn: 2 });
+    const d2 = buildPlatformDigest(db, { platformId: platform.id, date: '2026-11-18', siteUrl: 'https://x.dev' });
+    ok('retag_tabkeys', d2.tabKeys.length === 2 && d2.tabKeys.indexOf('funny') >= 0 && d2.tabKeys.indexOf('design') >= 0);
+    // C. 排序 → digest.tabKeys 顺序同步
+    reorderColumns(db, { platformId: platform.id, keys: ['design', 'funny'] });
+    const d3 = buildPlatformDigest(db, { platformId: platform.id, date: '2026-11-18', siteUrl: 'https://x.dev' });
+    ok('reorder_tabkeys', d3.tabKeys[0] === 'design' && d3.tabKeys[1] === 'funny');
+
+    // D. 渲染内核安全与切栏目
+    ok('safeHref_xss', safeHref('javascript:alert(1)') === '');
+    ok('safeHref_http', safeHref('https://ok.example.com') === 'https://ok.example.com');
+    const box = document.createElement('div');
+    renderReader(box, d);
+    ok('reader_tabs_dom', box.querySelectorAll('#tabs .tab, .tabs .tab').length === d.tabs.length);
+    switchTab(d.tabs[0].key, false);
+    ok('switchtab', currentTab() === d.tabs[0].key);
+
+    // E. portal-app.mjs 真跑通（DOM 由它渲染）
+    ok('app_pipeline', document.querySelectorAll('#pipelineView .stack-row').length === 6);
+    ok('app_tags8', document.querySelectorAll('#tagGrid .tag-card').length === CORE_TAG_PACKS.length);
+    ok('app_cols3', document.querySelectorAll('#colList .col-item').length === 3);
+    ok('app_cands', document.querySelectorAll('#candList .cand').length > 0);
+    ok('app_reader_tabs', document.querySelectorAll('#readerRoot .tab').length === 3);
+    ok('app_side_digest', (document.getElementById('sideDigest').textContent || '').indexOf('schema 2') >= 0);
+  } catch (e) {
+    R.push('EXCEPTION:' + (e && e.message ? e.message : String(e)));
+  }
+  const pass = R.filter(x => x.indexOf('OK:') === 0).length;
+  const fail = R.filter(x => x.indexOf('OK:') !== 0);
+  document.title = 'SELFTEST|' + pass + '/' + R.length + '|' + (fail.length ? fail.join(',') : 'ALLPASS');
+}
+setTimeout(run, 250);
+</script>
+</body>
+</html>

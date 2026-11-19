@@ -1,0 +1,30 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>live repo probe</title></head><body><pre>probe</pre>
+<script type="module">
+import { createClient } from '../lib/sb-client.mjs';
+import { loadDb } from '../lib/sb-repo.mjs';
+import * as flow from '../lib/platform-flow.mjs';
+import { SB_CONFIG } from './config.js';
+const L=[];const ok=(n,c,x='')=>L.push((c?'OK':'FAIL')+':'+n+(x?'('+x+')':''));
+try{
+  // 匿名 loadDb：共享池可读，私有表 RLS 为空
+  const c=createClient({url:SB_CONFIG.url,key:SB_CONFIG.key,schema:SB_CONFIG.schema,timeout:12000});
+  const db=await loadDb(c);
+  ok('load_items', Object.keys(db.content_items).length===8, 'items='+Object.keys(db.content_items).length);
+  ok('load_tags', db.content_tags.length===8, 'tags='+db.content_tags.length);
+  ok('load_packs', Object.keys(db.tag_packs).length===8, 'packs='+Object.keys(db.tag_packs).length);
+  ok('load_private_empty', Object.keys(db.platforms).length===0);
+
+  // 用真内容跑一次 buildCandidates：造一个内存平台，用 ai 栏目，验证候选非空
+  const user=flow.registerUser(db,{email:'probe@example.com',displayName:'probe'});
+  const built=flow.createPlatform(db,{userId:user.id,name:'probe',tagKeys:['ai'],siteUrl:'https://x.pages.dev',reviewPolicy:'human_confirm'});
+  const cands=flow.buildCandidates(db,{platformId:built.platform.id,date:'2026-11-18'});
+  ok('candidates_from_real', cands.length===6, 'cands='+cands.length+' (col.max_items=6 截断)');
+  flow.reviewCandidates(db,{platformId:built.platform.id,date:'2026-11-18',auto:true,autoPerColumn:3});
+  const digest=flow.buildPlatformDigest(db,{platformId:built.platform.id,date:'2026-11-18',siteUrl:'https://x.pages.dev'});
+  ok('digest_total', digest.total===3, 'total='+digest.total);
+  ok('digest_from_real_title', digest.tabs[0].highlights[0].title.length>0);
+  ok('digest_link_only', digest.tabs[0].highlights.every(h=>/^https?:\/\//.test(h.url)));
+  const fails=L.filter(x=>x.startsWith('FAIL')).length;
+  document.title='LIVEREPO|'+(L.length-fails)+'/'+L.length+'|'+L.join('|');
+}catch(e){document.title='LIVEREPO|ERROR|'+(e&&e.stack||e);}
+</script></body></html>

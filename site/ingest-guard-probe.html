@@ -1,0 +1,15 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>ingest guard probe</title></head><body><pre>probe</pre>
+<script type="module">
+// 浏览器里复刻 checkIngest 的断言，直接吃真实 ingest-map.mjs 源码
+const src = await (await fetch('../lib/ingest-map.mjs')).text();
+const L=[];const ok=(n,c,x='')=>L.push((c?'OK':'FAIL')+':'+n+(x?'('+x+')':''));
+const need=['toContentItem','mapFeedItems','CATEGORY_TO_TAGS','MAX_SUMMARY','contentHash'];
+ok('need_tokens', need.every(t=>src.includes(t)));
+ok('no_node', !/from\s+['"]node:/.test(src));
+ok('image_null', /image_url:\s*null/.test(src));
+ok('rights_unknown', /rights_status:\s*String\(opts\.rightsStatus\s*\|\|\s*'unknown'\)/.test(src));
+ok('summary_cap', /slice\(0,\s*MAX_SUMMARY\)/.test(src));
+ok('hot_current_blank', /hot:\s*\[\]/.test(src)&&/current:\s*\[\]/.test(src));
+const fails=L.filter(x=>x.startsWith('FAIL')).length;
+document.title='INGESTGUARD|'+(L.length-fails)+'/'+L.length+'|'+L.join('|');
+</script></body></html>

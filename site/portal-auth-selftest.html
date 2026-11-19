@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>portal auth selftest</title>
+<link rel="stylesheet" href="portal.css">
+</head>
+<body>
+<!-- 与 portal.html 相同的 DOM 骨架，供 portal-app.mjs 挂载 -->
+<div class="auth-overlay" id="authOverlay">
+  <div class="auth-brand"><div class="auth-logo">头</div><h1>我的头条</h1><p>搭一个属于你自己的信息平台</p></div>
+  <div id="authRoot"></div>
+  <div class="auth-backend" id="authBackend">正在检查后端连接…</div>
+</div>
+<div class="app" id="appRoot" hidden>
+  <aside class="sidebar">
+    <div class="brand"><div class="brand-logo">头</div><div><div class="brand-name">我的头条</div><div class="brand-sub">创作中心</div></div></div>
+    <nav class="nav" id="mainNav">
+      <div class="nav-group">
+        <button class="nav-item active" data-view="platform"><span class="nav-ico">⌂</span>首页</button>
+      </div>
+      <div class="nav-group">
+        <div class="nav-label">日常</div>
+        <button class="nav-item" data-view="review"><span class="nav-ico">审</span>今日审稿<span class="nav-badge" id="navReviewBadge" hidden>0</span></button>
+        <button class="nav-item" data-view="digest"><span class="nav-ico">报</span>日报预览</button>
+      </div>
+      <div class="nav-group">
+        <div class="nav-label">搭建</div>
+        <button class="nav-item" data-view="tags"><span class="nav-ico">包</span>选内容包</button>
+        <button class="nav-item" data-view="columns"><span class="nav-ico">栏</span>我的栏目</button>
+      </div>
+    </nav>
+    <div class="side-foot">
+      <div class="side-auth" id="sideAuth"></div>
+      <div class="ai-box"><div class="ai-title">今日摘要</div><div class="ai-line"><span>栏目</span><span id="sideCols">0</span></div><div class="ai-line"><span>候选</span><span id="sideCands">0</span></div><div class="ai-line"><span>待审</span><span id="sidePending">0</span></div><div class="ai-line"><span>已放行</span><span id="sideApproved">0</span></div></div>
+    </div>
+  </aside>
+  <div class="main">
+    <header class="topbar">
+      <div class="top-left"><div class="top-title" id="topTitle">首页</div><div class="top-welcome" id="topWelcome">欢迎回来</div></div>
+      <div class="top-meta"><span class="pill" id="topDate">2026-11-18</span><span class="pill on" id="backendBadge">● 演示模式</span><span class="avatar" id="topAvatar">我</span></div>
+    </header>
+    <div class="wrap">
+      <section class="view" id="view-onboard">
+        <div class="onboard">
+          <div class="page-head">
+            <div><h1>先选内容包</h1><p class="desc">已选 <b id="onboardCount">0</b></p></div>
+            <button class="btn primary" id="onboardConfirm" disabled>搭好我的平台</button>
+          </div>
+          <div class="grid tags" id="onboardGrid"></div>
+        </div>
+      </section>
+      <section class="view active" id="view-platform">
+        <div class="page-head home-head"><div><h1>创作中心</h1><p class="desc" id="homeTodo">selftest</p></div></div>
+        <div class="home-stats" id="homeStats">
+          <div class="stat-card card"><div class="stat-n" id="statCols">0</div><div class="stat-l">栏目</div></div>
+          <div class="stat-card card"><div class="stat-n" id="statCands">0</div><div class="stat-l">今日候选</div></div>
+          <div class="stat-card card"><div class="stat-n" id="statPending">0</div><div class="stat-l">待审</div></div>
+          <div class="stat-card card"><div class="stat-n" id="statApproved">0</div><div class="stat-l">已放行</div></div>
+        </div>
+        <div class="home-actions" id="homeActions">
+          <button type="button" class="home-action card" data-view="review" id="homeActionReview"><span class="home-action-title">今日审稿</span><span class="home-action-badge" id="homeReviewBadge" hidden>0</span></button>
+          <button type="button" class="home-action card" data-view="tags"><span class="home-action-title">选内容包</span></button>
+          <button type="button" class="home-action card" data-view="digest"><span class="home-action-title">日报预览</span></button>
+        </div>
+      </section>
+      <section class="view" id="view-tags">
+        <div class="page-head"><div><h1>选内容包</h1><p class="desc">已选：<b id="tagChosen">0</b> 个。<span id="tagPoolHint" class="pool-hint"></span></p></div><button class="btn primary" data-view="columns">查看我的栏目 →</button></div>
+        <div class="grid tags" id="tagGrid"></div>
+      </section>
+      <section class="view" id="view-columns"><div class="card" id="colList"></div></section>
+      <section class="view" id="view-review">
+        <div class="review-layout">
+          <aside id="reviewDirs"></aside>
+          <div class="review-main">
+            <div class="toolbar"><button class="chip active" data-filter="all">全部</button><button class="chip" data-filter="pending">待审</button><button class="chip" data-filter="approved">已放行</button><button class="chip" data-filter="rejected">已拒绝</button><input class="search" id="candSearch" placeholder="搜标题"></div>
+            <div class="cand-list" id="candList"></div>
+          </div>
+          <div class="side-panel"><div id="candPreview"></div><span id="rvTotal"></span><span id="rvApproved"></span><span id="rvRejected"></span><span id="rvPinned"></span>
+            <button id="autoReview">AI 自动审稿</button><button id="publishBtn">发布</button><button id="resetReview">重置</button></div>
+        </div>
+      </section>
+      <section class="view" id="view-digest">
+        <div class="reader-shell" id="readerRoot"></div>
+        <div class="reader-foot"><span id="readerSummary"></span><a href="#" id="reRender">重新渲染</a></div>
+      </section>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script type="module">
+window.addEventListener('error', (e) => {
+  document.title = 'AUTHSELF|ERR|' + (e.message || 'error') + '|' + (e.filename || '') + ':' + (e.lineno || '');
+});
+window.addEventListener('unhandledrejection', (e) => {
+  document.title = 'AUTHSELF|REJECT|' + String((e.reason && e.reason.message) || e.reason || 'reject');
+});
+/* 在 import portal-app.mjs 之前替换 fetch，验证「登录 → 云端 → 同步」全流程 */
+const calls = [];
+function json(body, status = 200) {
+  return { ok: status >= 200 && status < 300, status,
+    text: async () => JSON.stringify(body) };
+}
+function mockFetch(url, init = {}) {
+  const u = String(url);
+  const h = init.headers || {};
+  calls.push({ u, method: init.method || 'GET', profile: h['Accept-Profile'] || null,
+    bearer: String(h.Authorization || '').slice(0, 24) });
+  if (u.includes('/rest/v1/tag_packs') && (init.method || 'GET') === 'GET') {
+    // 固定 id，便于 content_tags 与栏目 tag_pack_id 对齐（云端不再假灌 DEMO）
+    return json([
+      { key: 'funny', name: '轻松一刻', status: 'active', id: 'tp-funny' },
+      { key: 'portrait', name: '人像美学', status: 'active', id: 'tp-portrait' },
+      { key: 'opensource', name: '开源推荐', status: 'active', id: 'tp-os' },
+      { key: 'ai', name: 'AI 资讯', status: 'active', id: 'tp-ai' },
+      { key: 'design', name: '设计灵感', status: 'active', id: 'tp-design' },
+      { key: 'finance', name: '财经早报', status: 'active', id: 'tp-finance' },
+      { key: 'tech', name: '科技新品', status: 'active', id: 'tp-tech' },
+      { key: 'movie', name: '电影音乐', status: 'active', id: 'tp-movie' },
+    ]);
+  }
+  if (u.includes('/auth/v1/token')) {
+    const body = typeof init.body === 'string' ? init.body : '';
+    if (u.includes('grant_type=refresh_token') || body.includes('refresh_token')) {
+      return json({ access_token: 'tok_refreshed', refresh_token: 'r2', expires_in: 3600,
+        user: { id: 'uid_test', email: 'test@example.com' } });
+    }
+    return json({ access_token: 'tok_test_123', refresh_token: 'r1', expires_in: 3600,
+      user: { id: 'uid_test', email: 'test@example.com' } });
+  }
+  if (u.includes('/auth/v1/recover')) return json({});
+  if (u.includes('/auth/v1/resend')) return json({});
+  if (u.includes('/auth/v1/user') && (init.method || 'GET').toUpperCase() === 'PUT') {
+    return json({ id: 'uid_test', email: 'test@example.com' });
+  }
+  if (u.includes('/auth/v1/user')) {
+    return json({ id: 'uid_test', email: 'test@example.com' });
+  }
+  if (u.includes('/auth/v1/logout')) return json({});
+  if (u.includes('/rest/v1/') && init.method === 'DELETE') return json(null, 204);
+  if (u.includes('/rest/v1/')) {
+    const table = u.split('/rest/v1/')[1].split('?')[0];
+    if ((init.method || 'GET') === 'GET') {
+      if (table === 'users') return json([{ id: 'uid_test', email: 'test@example.com', display_name: 'test' }]);
+      // 共享池最小可读集：云端 boot 只认池内真内容，不再合并 DEMO 缓存
+      if (table === 'sources') return json([{ id: 'src1', name: 'main', status: 'active', rights_status: 'summary_only' }]);
+      if (table === 'content_items') return json([
+        { id: 'ci1', title: '零依赖静态站', canonical_url: 'https://example.com/a', summary: '配置驱动', source_id: 'src1', rights_status: 'unknown', content_hash: 'h1', published_at: '2026-11-18T00:00:00Z', created_at: '2026-11-18T00:00:00Z' },
+        { id: 'ci2', title: '新模型发布', canonical_url: 'https://example.com/b', summary: '推理降本', source_id: 'src1', rights_status: 'unknown', content_hash: 'h2', published_at: '2026-11-18T00:00:00Z', created_at: '2026-11-18T00:00:00Z' },
+        { id: 'ci3', title: '本周片单', canonical_url: 'https://example.com/c', summary: '五部电影', source_id: 'src1', rights_status: 'unknown', content_hash: 'h3', published_at: '2026-11-18T00:00:00Z', created_at: '2026-11-18T00:00:00Z' },
+      ]);
+      if (table === 'content_tags') return json([
+        { content_item_id: 'ci1', tag_pack_id: 'tp-os', confidence: 1 },
+        { content_item_id: 'ci2', tag_pack_id: 'tp-ai', confidence: 1 },
+        { content_item_id: 'ci3', tag_pack_id: 'tp-movie', confidence: 1 },
+      ]);
+      return json([]);
+    }
+    return json([]); // insert / upsert / patch
+  }
+  return json({ ok: true });
+}
+globalThis.fetch = mockFetch;
+
+/* mode=login：测登录闭环；mode=restore：预置 session 后测刷新自动恢复 */
+const mode = new URLSearchParams(location.search).get('mode') === 'restore' ? 'restore' : 'login';
+if (mode === 'restore') {
+  try {
+    // 故意写成已过期，逼出 refreshSession 路径
+    localStorage.setItem('platform.session.v1', JSON.stringify({
+      access_token: 'tok_expired', refresh_token: 'r1',
+      expires_at: Math.floor(Date.now() / 1000) - 30,
+      user: { id: 'uid_test', email: 'test@example.com' },
+    }));
+  } catch {}
+} else {
+  try { localStorage.removeItem('platform.session.v1'); } catch {}
+}
+const results = [];
+function ok(name, cond, extra = '') {
+  results.push((cond ? 'OK' : 'FAIL') + ':' + name + (extra ? '(' + extra + ')' : ''));
+}
+const $ = (s) => document.querySelector(s);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+try {
+  await import('./portal-app.mjs');
+  // 等 boot 跑完：登录表单出现，且不再「正在检查后端」
+  for (let i = 0; i < 50; i++) {
+    const ready = $('.auth-form') && $('#authBackend') &&
+      !String($('#authBackend').textContent || '').includes('正在检查');
+    if (ready) break;
+    await sleep(100);
+  }
+
+  if (mode === 'login') {
+  // 1. 初始停在登录页
+  ok('overlay_visible', !$('#authOverlay').hidden);
+  ok('app_hidden', $('#appRoot').hidden);
+  ok('auth_form', !!$('.auth-form') && !!$('.auth-submit'));
+
+  // 2. 后端探测已发起（带 platform schema）
+  ok('probe_schema', calls.some((c) => c.u.includes('tag_packs') && c.profile === 'platform'));
+
+  // 3. 切注册（勿点 .auth-link：登录页上还有「忘记密码」）
+  document.querySelector('[data-auth-action="switch"]').click();
+  await sleep(30);
+  ok('switch_signup', String($('.auth-title').textContent).includes('创建账号'));
+  document.querySelector('[data-auth-action="switch"]').click();
+  await sleep(30);
+  ok('switch_login', String($('.auth-title').textContent).includes('登录'));
+
+  // 4. 错误提示翻译 + 会话工具
+  const { authError, normalizeSession, sessionNeedsRefresh, parseAuthHash } = await import('./auth-ui.mjs');
+  ok('auth_error_cn', authError(new Error('invalid login credentials')).includes('邮箱或密码不正确'));
+  ok('auth_error_confirm', authError(new Error('email not confirmed')).includes('邮箱尚未验证'));
+  const norm = normalizeSession({ access_token: 'a', refresh_token: 'r', expires_in: 3600, user: { id: '1', email: 'a@b.c' } });
+  ok('norm_expires_at', !!norm && typeof norm.expires_at === 'number' && norm.expires_at > Date.now() / 1000);
+  ok('needs_refresh_expired', sessionNeedsRefresh({ access_token: 'a', expires_at: Math.floor(Date.now() / 1000) - 10 }));
+  ok('needs_refresh_fresh', !sessionNeedsRefresh({ access_token: 'a', expires_at: Math.floor(Date.now() / 1000) + 3600 }));
+  const parsed = parseAuthHash('#access_token=tok&refresh_token=rr&expires_in=3600&type=recovery');
+  ok('parse_hash_recovery', !!parsed && parsed.type === 'recovery' && parsed.access_token === 'tok');
+
+  // 4b. 忘记密码入口
+  const forgot = document.querySelector('[data-auth-action="recover"]');
+  ok('forgot_link', !!forgot);
+  forgot.click();
+  await sleep(30);
+  ok('switch_recover', String($('.auth-title').textContent).includes('找回密码'));
+  document.querySelector('[data-auth-action="switch-login"]').click();
+  await sleep(30);
+  ok('recover_back_login', String($('.auth-title').textContent).includes('登录'));
+
+  // 5. 真登录 → 云模式
+  const form = $('.auth-form');
+  form.elements.email.value = 'test@example.com';
+  form.elements.password.value = 'secret123';
+  form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+  await sleep(600);
+
+  ok('logged_in_overlay_hidden', $('#authOverlay').hidden);
+  ok('app_shown', !$('#appRoot').hidden);
+  ok('badge_cloud', /云端|Supabase/.test(String($('#backendBadge').textContent)));
+  ok('avatar_email', $('#topAvatar').textContent.toUpperCase() === 'T');
+  ok('side_has_logout', !!$('#sideLogout'));
+
+  // 5b. 落盘会话带 expires_at
+  let stored = null;
+  try { stored = JSON.parse(localStorage.getItem('platform.session.v1')); } catch {}
+  ok('session_has_expires', !!stored && typeof stored.expires_at === 'number');
+
+  // 5c. 新用户向导：预览样例 → 确认搭站（预勾 opensource/ai/movie）
+  ok('onboard_visible', !!$('#view-onboard') && $('#view-onboard').classList.contains('active'));
+  const { CORE_TAG_PACKS } = await import('../lib/platform-model.mjs');
+  ok('onboard_cards', $('#onboardGrid').querySelectorAll('.tag-card').length === CORE_TAG_PACKS.length);
+  ok('onboard_samples', $('#onboardGrid').querySelectorAll('.granule,.tag-samples li').length > 0);
+  const confirmBtn = $('#onboardConfirm');
+  ok('onboard_ready', !!confirmBtn && !confirmBtn.disabled);
+  confirmBtn.click();
+  await sleep(800);
+
+  // 6. 搭好后落首页 + 真链路
+  ok('onboard_done', !$('#view-onboard').classList.contains('active'));
+  ok('home_active', $('#view-platform').classList.contains('active'));
+  ok('home_stats', $('#homeStats').querySelectorAll('.stat-card').length === 4);
+  ok('home_actions', $('#homeActions').querySelectorAll('.home-action').length === 3);
+  ok('tag_cards', $('#tagGrid').querySelectorAll('.tag-card').length === CORE_TAG_PACKS.length);
+  ok('tag_real_samples', $('#tagGrid').textContent.includes('零依赖静态站') || $('#onboardGrid').textContent.includes('零依赖'));
+  ok('columns_3', $('#colList').querySelectorAll('.col-item').length === 3);
+  ok('candidates', $('#candList').querySelectorAll('.cand').length > 0);
+  ok('review_dirs', $('#reviewDirs') && $('#reviewDirs').querySelectorAll('.dir-item').length >= 2);
+  ok('cand_preview', $('#candPreview') && String($('#candPreview').textContent || '').length > 8);
+  ok('digest_tabs', $('#readerRoot').querySelectorAll('.tab').length === 3);
+  ok('digest_items', $('#readerRoot').querySelectorAll('.news-row,.photo,.rank-row').length > 0);
+
+  // 7. 云模式写回：saveDb 必须带 Content-Profile
+  ok('write_profile', calls.some((c) => c.method === 'POST' && c.u.includes('/rest/v1/') && c.profile === 'platform'));
+  ok('bearer_token', calls.some((c) => c.bearer.includes('tok_test_123')));
+
+  // 8. 列切换
+  $('#readerRoot').querySelectorAll('.tab')[1].click();
+  await sleep(30);
+  ok('tab_switch', $('#readerRoot').querySelectorAll('.tab')[1].classList.contains('active'));
+
+  // 9. 退出登录 → 回到登录页 + 演示模式
+  $('#sideLogout').click();
+  await sleep(200);
+    ok('logout_overlay', !$('#authOverlay').hidden);
+    ok('logout_demo_badge', String($('#backendBadge').textContent).includes('演示模式'));
+  } else {
+  // 会话恢复模式：预置已过期 session → 必须走 refresh 再进云端
+  for (let i = 0; i < 40; i++) {
+    if ($('#authOverlay') && $('#authOverlay').hidden) break;
+    await sleep(50);
+  }
+  ok('restore_overlay_hidden', $('#authOverlay').hidden);
+  ok('restore_app_shown', !$('#appRoot').hidden);
+  ok('restore_badge_cloud', /云端|Supabase/.test(String($('#backendBadge').textContent)));
+  ok('restore_user_api', calls.some((c) => c.u.includes('/auth/v1/user')));
+  ok('restore_did_refresh', calls.some((c) => c.u.includes('grant_type=refresh_token')));
+  let storedR = null;
+  try { storedR = JSON.parse(localStorage.getItem('platform.session.v1')); } catch {}
+  ok('restore_new_token', !!storedR && storedR.access_token === 'tok_refreshed');
+  // mock 无私有平台 → 恢复后也进向导；走完搭站再验首页
+  const rc = $('#onboardConfirm');
+  if (rc && !rc.disabled) {
+    rc.click();
+    await sleep(800);
+  }
+  ok('restore_home', $('#homeStats').querySelectorAll('.stat-card').length === 4
+    && $('#homeActions').querySelectorAll('.home-action').length === 3);
+  }
+
+  const fails = results.filter((r) => r.startsWith('FAIL')).length;
+  document.title = 'AUTHSELF|' + (results.length - fails) + '/' + results.length + '|' + results.join('|');
+} catch (e) {
+  document.title = 'AUTHSELF|ERROR|' + (e && e.stack ? e.stack : e);
+}
+</script>
+</body>
+</html>

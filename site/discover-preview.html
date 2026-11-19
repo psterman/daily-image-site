@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>选内容包 · 来源与按日系列</title>
+<style>
+:root{
+  --bg:#f5f6f8; --surface:#fff; --surface-2:#fafafa; --border:#e7e8eb;
+  --text:#1a1a1a; --muted:#8c8c8c; --muted-2:#b0b0b0;
+  --primary:#07c160; --primary-soft:#e8f8ef;
+  --radius:8px; --shadow:0 1px 2px rgba(0,0,0,.04);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+button{font:inherit;cursor:pointer}
+.wrap{max-width:1320px;margin:0 auto;padding:28px 20px 56px}
+.page-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:14px;flex-wrap:wrap}
+h1{font-size:22px;margin:0 0 6px;font-weight:500;letter-spacing:-.3px}
+.desc{margin:0;color:var(--muted);max-width:780px}
+.desc b{color:var(--text)}
+.meta{font-size:12px;color:var(--muted);margin-top:8px}
+.btn{border:1px solid var(--border);background:var(--surface);padding:8px 14px;border-radius:8px;box-shadow:var(--shadow)}
+.btn.primary{background:var(--primary);border-color:var(--primary);color:#fff}
+.btn.ghost{background:transparent}
+.filters{display:flex;flex-direction:column;gap:10px;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--border)}
+.f-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.f-label{font-size:11px;color:var(--muted-2);width:52px;flex:none}
+.chip{border:1px solid var(--border);background:var(--surface);color:var(--muted);padding:5px 11px;border-radius:999px;font-size:12px}
+.chip:hover{color:var(--text);border-color:#c7c9cf}
+.chip.active{background:var(--primary-soft);border-color:#b7ebcf;color:var(--primary);font-weight:500}
+.chip .n{font-size:10px;opacity:.75;margin-left:3px}
+.kind{
+  display:inline-flex;align-items:center;padding:0 5px;height:16px;border-radius:3px;
+  font-size:10px;font-weight:500;letter-spacing:.02em;flex:none;
+}
+.kind.weibo{background:#fff1f0;color:#cf1322}
+.kind.wechat{background:#e8f8ef;color:#07c160}
+.kind.website{background:#e6f4ff;color:#1677ff}
+.kind.toutiao{background:#fff7e6;color:#d46b08}
+.kind.bilibili{background:#fff0f6;color:#c41d7f}
+.kind.zhihu{background:#e6f4ff;color:#0958d9}
+.kind.community{background:#f6ffed;color:#389e0d}
+.kind.visual{background:#f9f0ff;color:#722ed1}
+.kind.rss{background:#f5f5f5;color:#595959}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+@media (max-width:960px){.grid{grid-template-columns:1fr}}
+.card{position:relative;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;display:flex;flex-direction:column;gap:10px;min-height:560px}
+.card.selected{border-color:var(--primary);box-shadow:0 0 0 2px rgba(7,193,96,.12)}
+.card[hidden]{display:none !important}
+.badge{position:absolute;top:12px;right:12px;z-index:1;border:0;font-size:11px;padding:2px 7px;border-radius:999px;background:var(--primary-soft);color:var(--primary)}
+.badge.soft{background:#f4f4f5;color:var(--muted)}
+.head{display:flex;gap:12px;align-items:flex-start;padding-right:72px;cursor:pointer}
+.mark{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-weight:500;font-size:13px;flex:none}
+.mark.g{background:#dcfce7;color:#166534}
+.mark.p{background:#f3e8ff;color:#6b21a8}
+.mark.o{background:#ffedd5;color:#9a3412}
+.mark.y{background:#fef9c3;color:#854d0e}
+.mark.b{background:#e0e7ff;color:#3730a3}
+.mark.r{background:#fee2e2;color:#991b1b}
+.name{font-weight:500;font-size:16px;line-height:1.3}
+.sub{font-size:12px;color:var(--muted);margin-top:2px}
+.pack-desc{font-size:12px;margin-top:6px;line-height:1.45}
+.source-strip{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px}
+.source-pill{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:999px;background:var(--surface-2);border:1px solid var(--border);font-size:11px;color:var(--text)}
+.source-pill .mute{color:var(--muted)}
+.board{border:1px solid var(--border);border-radius:8px;background:var(--surface-2);overflow:hidden}
+.board-h{display:flex;align-items:center;gap:8px;padding:8px 10px;background:#fff;border-bottom:1px solid var(--border)}
+.board-title{font-size:13px;font-weight:500;min-width:0;flex:1}
+.board-date{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;flex:none}
+.board-meta{font-size:11px;color:var(--muted-2)}
+.list{display:flex;flex-direction:column;gap:10px;flex:1;max-height:440px;overflow:auto;padding-right:2px}
+.row{display:flex;gap:10px;align-items:flex-start;width:100%;padding:8px 10px;border:0;border-top:1px solid var(--border);background:transparent;text-align:left;color:inherit}
+.row:first-child{border-top:0}
+.row:hover{background:#fff}
+.rank{width:20px;flex:none;font-size:12px;color:var(--muted-2);font-variant-numeric:tabular-nums;padding-top:2px}
+.rank.top{color:#b45309;font-weight:600}
+.thumb{width:48px;height:48px;border-radius:6px;object-fit:cover;background:#eef2f7;flex:none}
+.thumb.ico{display:inline-flex;align-items:center;justify-content:center;font-weight:500;font-size:14px}
+.body{min-width:0;flex:1;display:flex;flex-direction:column;gap:2px}
+.title{font-size:13px;font-weight:500;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.sum{font-size:11px;color:var(--muted);line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.src-line{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:3px;font-size:10px;color:var(--muted-2)}
+.src-line .src-name{color:var(--muted)}
+.foot{font-size:11px;color:var(--muted);margin-top:2px}
+.note{margin-top:20px;font-size:12px;color:var(--muted);line-height:1.5}
+.note a{color:var(--primary)}
+.legend{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px;font-size:11px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:4px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="page-head">
+    <div>
+      <h1>选内容包 · 来源目录</h1>
+      <p class="desc">每个内容包下按<strong>来源类型</strong>（公众号 / 网站 / 微博 / 头条…）与<strong>具名系列（按日期）</strong>组织。条目显示：系列标题、来源名、正文标题与摘要。已选：<b id="chosen">0</b> 个。</p>
+      <p class="meta">示意：对齐 tophub 多榜 + Folo 订阅源命名；正式站写入 metadata.source_kind / publisher / series</p>
+    </div>
+    <button type="button" class="btn primary" id="goRead">去今日阅读 →</button>
+  </div>
+
+  <div class="legend" id="legend"></div>
+
+  <div class="filters">
+    <div class="f-row" id="groupFilters"><span class="f-label">栏目</span></div>
+    <div class="f-row" id="kindFilters"><span class="f-label">来源</span></div>
+    <div class="f-row" id="dateFilters"><span class="f-label">日期</span></div>
+  </div>
+
+  <div class="grid" id="grid" aria-live="polite"></div>
+
+  <p class="note">
+    系列命名约定：<code>来源名 + 榜/栏目 + 日期</code>，例如「微博热搜榜 · 2026-11-18」「晚点LatePost · 2026-11-18」。
+    视觉包对齐 <a href="https://daily.onetone.app/#jianshe" target="_blank" rel="noopener">见她</a> /
+    <a href="https://daily.onetone.app/#jianxiao" target="_blank" rel="noopener">见笑</a>。
+  </p>
+</div>
+
+<script>
+const TODAY = '2026-11-18';
+const YDAY = '2026-11-17';
+
+/** 来源类型：用户要能一眼区分 */
+const KINDS = [
+  { key: 'all', label: '全部类型' },
+  { key: 'weibo', label: '微博' },
+  { key: 'wechat', label: '公众号' },
+  { key: 'website', label: '网站' },
+  { key: 'toutiao', label: '头条' },
+  { key: 'zhihu', label: '知乎' },
+  { key: 'bilibili', label: 'B站' },
+  { key: 'community', label: '社区' },
+  { key: 'visual', label: '视觉源' },
+  { key: 'rss', label: 'RSS' },
+];
+
+const KIND_LABEL = Object.fromEntries(KINDS.map((k) => [k.key, k.label]));
+
+/* 与 lib/tag-options.mjs DIRECTORIES 对齐 */
+const GROUPS = ['全部', '资讯', '社区', '科技', '娱乐', '财经', '视觉', '文化'];
+
+/**
+ * boards: 按日系列
+ * series = 给人看的系列标题（含日期）
+ * sourceName = 具名来源
+ * kind = 来源类型
+ */
+function board(opts) {
+  return {
+    series: opts.series,
+    date: opts.date,
+    sourceName: opts.sourceName,
+    kind: opts.kind,
+    items: opts.items.map((it, i) => ({
+      rank: i + 1,
+      title: it.t,
+      sum: it.s,
+      img: it.img || null,
+    })),
+  };
+}
+
+const PACKS = [
+  {
+    key: 'hot', name: '热议', group: '社区', mark: 'r',
+    desc: '多平台热榜聚合：微博 / 头条 / 知乎 / 网站，各自成「按日系列」。',
+    boards: [
+      board({
+        date: TODAY, kind: 'weibo', sourceName: '微博',
+        series: '微博热搜榜 · ' + TODAY,
+        items: [
+          { t: '深圳人全妆出街迎 APEC', s: '热搜持续升温，城市氛围与行程成为焦点。' },
+          { t: 'DeepSeek 用户呼吁取消 7 天限制', s: '试用周期与配额讨论集中。' },
+          { t: '金价一直下跌原因', s: '宏观预期与避险情绪回落解读。' },
+          { t: '雷军晒深圳风景', s: '企业家行程与城市形象叠加。' },
+          { t: 'GTA6 请假梗又来了', s: '发售预期带动职场段子。' },
+        ],
+      }),
+      board({
+        date: TODAY, kind: 'toutiao', sourceName: '今日头条',
+        series: '头条热榜 · ' + TODAY,
+        items: [
+          { t: '129 万一针抗癌药进医保', s: '可及性与落地细则讨论。' },
+          { t: '两个鸡蛋一瓶可乐做蛋糕', s: '短视频食谱挑战冲榜。' },
+          { t: '冬日额尔古纳一步一景', s: '文旅短视频带动搜索。' },
+          { t: '供应商快被车企拖死了', s: '账期问题再被集中吐槽。' },
+        ],
+      }),
+      board({
+        date: TODAY, kind: 'zhihu', sourceName: '知乎',
+        series: '知乎热榜 · ' + TODAY,
+        items: [
+          { t: '41 人没症状被 AI 查出早期肠癌', s: 'AI 医疗辅助边界讨论。' },
+          { t: '不要让自己成为任何事情的最后一环', s: '职场金句式短文传播。' },
+          { t: '原来潮汐车道是这么变出来的', s: '城市交通冷知识出圈。' },
+        ],
+      }),
+      board({
+        date: TODAY, kind: 'website', sourceName: '澎湃新闻',
+        series: '澎湃热榜 · ' + TODAY,
+        items: [
+          { t: '作家斯琴高娃逝世', s: '文化界悼念与作品回顾。' },
+          { t: '普京抵达深圳', s: '外事行程与安保细节。' },
+        ],
+      }),
+      board({
+        date: YDAY, kind: 'weibo', sourceName: '微博',
+        series: '微博热搜榜 · ' + YDAY,
+        items: [
+          { t: 'APEC 合影引发礼仪解读', s: '截图传播与立场争论。' },
+          { t: '波司登王力宏非凡登场', s: '品牌活动冲上热搜。' },
+        ],
+      }),
+    ],
+  },
+  {
+    key: 'ai', name: 'AI 资讯', group: '科技', mark: 'b',
+    desc: '公众号长文 + 科技网站 + RSS 源，按发布日成系列。',
+    boards: [
+      board({
+        date: TODAY, kind: 'wechat', sourceName: '机器之心',
+        series: '机器之心 · ' + TODAY,
+        items: [
+          { t: '开源推理引擎更新：吞吐再提一档', s: '本地部署显存与批处理优化。' },
+          { t: '端侧小模型一周进展', s: '手机与 PC 本地助手延迟下降。' },
+          { t: 'RAG 评测别只看召回', s: '答案可引用率比 hit@k 更有用。' },
+        ],
+      }),
+      board({
+        date: TODAY, kind: 'wechat', sourceName: '量子位',
+        series: '量子位 · ' + TODAY,
+        items: [
+          { t: 'Agent 工作流如何少踩坑', s: '超时、记忆窗口与人工确认闸门。' },
+          { t: '多 Agent 辩论式审稿', s: '适合日报人工闸门。' },
+        ],
+      }),
+      board({
+        date: TODAY, kind: 'website', sourceName: 'LatePost 晚点',
+        series: '晚点LatePost · ' + TODAY,
+        items: [
+          { t: '企业私有知识库落地清单', s: '权限、溯源与幻觉拦截。' },
+          { t: '长上下文账单怎么算才清醒', s: '按 token 分层计价的坑。' },
+        ],
+      }),
+      board({
+        date: TODAY, kind: 'rss', sourceName: 'PaperWeekly',
+        series: 'PaperWeekly RSS · ' + TODAY,
+        items: [
+          { t: '多模态评测集本周补丁', s: '中文场景与长图理解题。' },
+          { t: '开源数据集清洗流水线', s: '去重、PII 与协议分类。' },
+        ],
+      }),
+      board({
+        date: YDAY, kind: 'wechat', sourceName: '新智元',
+        series: '新智元 · ' + YDAY,
+        items: [
+          { t: '安全红队周报', s: '提示注入与工具越权案例。' },
+          { t: '模型卡怎么写才诚实', s: '能力边界与数据披露模板。' },
+        ],
+      }),
+    ],
+  },
+  {
+    key: 'tech', name: '科技新品', group: '科技', mark: 'b',
+    desc: '科技媒体 + GitHub / V2EX 开发者热帖。',
+    boards: [
+      board({
+        date: TODAY, kind: 'website', sourceName: 'GitHub趋势',
+        series: 'GitHub Trending · ' + TODAY,
+        items: [
+          { t: 'SQLite 全文检索扩展', s: '中文分词插件笔记。' },
+          { t: 'API 契约生成客户端', s: 'OpenAPI 到 TypeScript。' },
+          { t: '容器一键开发环境', s: '前后端编排模板。' },
+        ],
+      }),
+      board({
+        date: TODAY, kind: 'community', sourceName: 'V2EX',
+        series: 'V2EX 今日热帖 · ' + TODAY,
+        items: [
+          { t: '把 RSS 变成每日简报的 Agent', s: '可接邮件与人工审稿闸门。' },
+          { t: '零依赖静态站图片代理', s: 'Pages Function 读私有存储。' },
+          { t: '本地优先同步引擎', s: 'CRDT 入门示例。' },
+        ],
+      }),
+      board({
+        date: TODAY, kind: 'website', sourceName: '爱范儿',
+        series: '爱范儿 · ' + TODAY,
+        items: [
+          { t: '新款折叠屏续航实测', s: '外屏与内屏差距约两成。' },
+          { t: '便携屏支持 120Hz', s: '笔记本扩展对剪辑友好。' },
+        ],
+      }),
+      board({
+        date: YDAY, kind: 'website', sourceName: '少数派',
+        series: '少数派 · ' + YDAY,
+        items: [
+          { t: '键盘固件开源了自定义层', s: 'Win/mac 双模布局分享。' },
+          { t: '开源笔记同步协议', s: '自托管与端到端加密。' },
+        ],
+      }),
+    ],
+  },
+  {
+    key: 'opensource', name: '开源推荐', group: '社区', mark: 'g',
+    desc: '开源论坛与独立开发社区。',
+    boards: [
+      board({
+        date: TODAY, kind: 'community', sourceName: 'NodeSeek',
+        series: 'NodeSeek · ' + TODAY,
+        items: [
+          { t: '本周主机与脚本讨论', s: '部署与运维短帖。' },
+          { t: '开源面板更新笔记', s: '备份与权限。' },
+        ],
+      }),
+      board({
+        date: TODAY, kind: 'community', sourceName: '掘金',
+        series: '掘金 · ' + TODAY,
+        items: [
+          { t: '前端工程化周报', s: '构建与测试。' },
+          { t: 'TypeScript 技巧合集', s: '类型体操入门。' },
+        ],
+      }),
+      board({
+        date: YDAY, kind: 'community', sourceName: 'LINUX DO',
+        series: 'LINUX DO · ' + YDAY,
+        items: [
+          { t: '许可证兼容性检查器', s: 'CI 拦高风险组合。' },
+          { t: '日志结构化采集器', s: '低开销 stdout 解析。' },
+        ],
+      }),
+    ],
+  },
+  {
+    key: 'funny', name: '轻松一刻', group: '娱乐', mark: 'y',
+    desc: '视觉源（对齐见笑）+ 微博娱乐热搜。',
+    boards: [
+      board({
+        date: TODAY, kind: 'visual', sourceName: '每日沙雕墙',
+        series: '见笑 · 沙雕墙 · ' + TODAY,
+        items: [
+          { t: '今日沙雕墙精选', s: '工位、会议与摸鱼三则。', img: 'https://picsum.photos/seed/sd1/96/96' },
+          { t: '会议纪要体段子', s: '「同步一下」合集。', img: 'https://picsum.photos/seed/sd2/96/96' },
+          { t: '外卖备注文学', s: '年度金句候选。', img: 'https://picsum.photos/seed/sd3/96/96' },
+          { t: '周末计划 vs 现实', s: '对比图杀伤力大。', img: 'https://picsum.photos/seed/sd4/96/96' },
+        ],
+      }),
+      board({
+        date: TODAY, kind: 'visual', sourceName: '煎蛋无聊图',
+        series: '见笑 · 煎蛋 · ' + TODAY,
+        items: [
+          { t: '无聊图精选', s: '无剧透纯图。', img: 'https://picsum.photos/seed/jd1/96/96' },
+          { t: '表情包考古', s: '2016 经典回潮。', img: 'https://picsum.photos/seed/jd2/96/96' },
+        ],
+      }),
+      board({
+        date: TODAY, kind: 'weibo', sourceName: '微博·搞笑',
+        series: '微博搞笑榜 · ' + TODAY,
+        items: [
+          { t: '键盘侠急救包', s: '截图体，适合周五。' },
+          { t: '猫奴周报', s: '拆家现场与无罪证明。' },
+        ],
+      }),
+    ],
+  },
+  {
+    key: 'finance', name: '财经早报', group: '财经', mark: 'o',
+    desc: '财经网站 + 公众号早报，按日期成刊。',
+    boards: [
+      board({
+        date: TODAY, kind: 'website', sourceName: '华尔街见闻',
+        series: '华尔街见闻早报 · ' + TODAY,
+        items: [
+          { t: '央行公开市场操作速览', s: '净投放与资金利率一句话。' },
+          { t: '汇率波动对出口商', s: '锁汇工具使用率上升。' },
+          { t: '大宗商品周观察', s: '铜铝与航运指数。' },
+        ],
+      }),
+      board({
+        date: TODAY, kind: 'wechat', sourceName: '虎嗅网',
+        series: '虎嗅 · ' + TODAY,
+        items: [
+          { t: '消费电子供应链周报', s: '稼动率与备货分歧。' },
+          { t: '本地生活战报', s: '补贴效率与留存。' },
+        ],
+      }),
+      board({
+        date: TODAY, kind: 'toutiao', sourceName: '头条·财经',
+        series: '头条财经 · ' + TODAY,
+        items: [
+          { t: '银行理财净值波动', s: '固收+回撤解释。' },
+          { t: '黄金与利率相关性', s: '散户持仓结构。' },
+        ],
+      }),
+      board({
+        date: YDAY, kind: 'website', sourceName: '雪球',
+        series: '雪球热帖 · ' + YDAY,
+        items: [
+          { t: '新能源车价格战余波', s: '经销商库存与促销。' },
+          { t: '财报季关键词', s: '指引下调与回购。' },
+        ],
+      }),
+    ],
+  },
+  {
+    key: 'design', name: '设计灵感', group: '视觉', mark: 'p',
+    desc: '设计网站与公众号案例日更。',
+    boards: [
+      board({
+        date: TODAY, kind: 'website', sourceName: '站酷',
+        series: '站酷精选 · ' + TODAY,
+        items: [
+          { t: '资讯卡片规范', s: '标题两行、摘要两行、图 48 方。' },
+          { t: '低饱和仪表盘', s: '用灰度层级代替彩虹色。' },
+          { t: '中文排版网格', s: '移动端行高与字距。' },
+        ],
+      }),
+      board({
+        date: TODAY, kind: 'wechat', sourceName: '优设',
+        series: '优设 · ' + TODAY,
+        items: [
+          { t: '按钮层级只有三档', s: '主、次、幽灵。' },
+          { t: '无障碍色板检查', s: '对比度 4.5:1。' },
+        ],
+      }),
+    ],
+  },
+  {
+    key: 'portrait', name: '人像美学', group: '视觉', mark: 'p',
+    desc: '视觉源按日系列（对齐见她）。',
+    boards: [
+      board({
+        date: TODAY, kind: 'visual', sourceName: '煎蛋女装区',
+        series: '见她 · 煎蛋 · ' + TODAY,
+        items: [
+          { t: '窗光人像一组', s: '自然光侧逆，肤色克制。', img: 'https://picsum.photos/seed/p1/96/96' },
+          { t: '街头抓拍', s: '焦外干净，眼神有故事。', img: 'https://picsum.photos/seed/p2/96/96' },
+          { t: '雨天反光', s: '霓虹与水面层次。', img: 'https://picsum.photos/seed/p3/96/96' },
+          { t: '黄昏金时', s: '肤色与天空平衡。', img: 'https://picsum.photos/seed/p4/96/96' },
+        ],
+      }),
+      board({
+        date: TODAY, kind: 'visual', sourceName: '福利吧精选',
+        series: '见她 · 福利吧 · ' + TODAY,
+        items: [
+          { t: '胶片色调练习', s: '低对比颗粒可控。', img: 'https://picsum.photos/seed/p5/96/96' },
+          { t: '侧脸轮廓光', s: '硬光塑造颧骨。', img: 'https://picsum.photos/seed/p6/96/96' },
+        ],
+      }),
+      board({
+        date: YDAY, kind: 'visual', sourceName: '煎蛋女装区',
+        series: '见她 · 煎蛋 · ' + YDAY,
+        items: [
+          { t: '黑白高反差', s: '情绪强于细节。', img: 'https://picsum.photos/seed/p7/96/96' },
+          { t: '剪影叙事', s: '故事靠姿态。', img: 'https://picsum.photos/seed/p8/96/96' },
+        ],
+      }),
+    ],
+  },
+  {
+    key: 'movie', name: '电影音乐', group: '文化', mark: 'o',
+    desc: '豆瓣 / 网站榜 + 听乐看片封面系列。',
+    boards: [
+      board({
+        date: TODAY, kind: 'website', sourceName: '豆瓣电影',
+        series: '豆瓣新片榜 · ' + TODAY,
+        items: [
+          { t: '本周院线值得一看', s: '口碑与排片兼顾。', img: 'https://picsum.photos/seed/m1/96/96' },
+          { t: '冷门佳片回看', s: '十年前处女作。', img: 'https://picsum.photos/seed/m2/96/96' },
+          { t: '纪录片推荐', s: '工艺与匠人故事。', img: 'https://picsum.photos/seed/m3/96/96' },
+        ],
+      }),
+      board({
+        date: TODAY, kind: 'website', sourceName: '网易云音乐',
+        series: '听乐日榜 · ' + TODAY,
+        items: [
+          { t: '歌单：通勤不吵闹', s: '中速电子与器乐。', img: 'https://picsum.photos/seed/m4/96/96' },
+          { t: '华语新专速评', s: '编曲亮点与歌词。', img: 'https://picsum.photos/seed/m5/96/96' },
+        ],
+      }),
+      board({
+        date: TODAY, kind: 'bilibili', sourceName: '哔哩哔哩',
+        series: 'B站影视区日榜 · ' + TODAY,
+        items: [
+          { t: '配乐如何推情节', s: '无对白片段分析。' },
+          { t: '音乐纪录片', s: '录音棚幕后。' },
+        ],
+      }),
+    ],
+  },
+];
+
+const selected = new Set(['hot', 'ai', 'portrait']);
+let groupFilter = '全部';
+let kindFilter = 'all';
+let dateFilter = 'all';
+
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function allDates() {
+  const set = new Set();
+  PACKS.forEach((p) => p.boards.forEach((b) => set.add(b.date)));
+  return ['all', ...[...set].sort().reverse()];
+}
+
+function kindChip(kind) {
+  return '<span class="kind ' + esc(kind) + '">' + esc(KIND_LABEL[kind] || kind) + '</span>';
+}
+
+function filteredBoards(pack) {
+  return pack.boards.filter((b) => {
+    if (kindFilter !== 'all' && b.kind !== kindFilter) return false;
+    if (dateFilter !== 'all' && b.date !== dateFilter) return false;
+    return true;
+  });
+}
+
+function sourceStrip(pack) {
+  const map = new Map();
+  pack.boards.forEach((b) => {
+    const k = b.kind + '|' + b.sourceName;
+    if (!map.has(k)) map.set(k, b);
+  });
+  return [...map.values()];
+}
+
+function renderFilters() {
+  const gBox = document.getElementById('groupFilters');
+  gBox.querySelectorAll('.chip').forEach((n) => n.remove());
+  GROUPS.forEach((g) => {
+    const n = g === '全部' ? PACKS.length : PACKS.filter((p) => p.group === g).length;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'chip' + (groupFilter === g ? ' active' : '');
+    b.innerHTML = esc(g) + '<span class="n">' + n + '</span>';
+    b.addEventListener('click', () => { groupFilter = g; draw(); });
+    gBox.appendChild(b);
+  });
+
+  const kBox = document.getElementById('kindFilters');
+  kBox.querySelectorAll('.chip').forEach((n) => n.remove());
+  KINDS.forEach((k) => {
+    let n = 0;
+    if (k.key === 'all') {
+      n = PACKS.reduce((a, p) => a + p.boards.length, 0);
+    } else {
+      PACKS.forEach((p) => { n += p.boards.filter((b) => b.kind === k.key).length; });
+    }
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'chip' + (kindFilter === k.key ? ' active' : '');
+    b.innerHTML = esc(k.label) + '<span class="n">' + n + '</span>';
+    b.addEventListener('click', () => { kindFilter = k.key; draw(); });
+    kBox.appendChild(b);
+  });
+
+  const dBox = document.getElementById('dateFilters');
+  dBox.querySelectorAll('.chip').forEach((n) => n.remove());
+  allDates().forEach((d) => {
+    const label = d === 'all' ? '全部日期' : d;
+    let n = 0;
+    if (d === 'all') n = PACKS.reduce((a, p) => a + p.boards.length, 0);
+    else PACKS.forEach((p) => { n += p.boards.filter((b) => b.date === d).length; });
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'chip' + (dateFilter === d ? ' active' : '');
+    b.innerHTML = esc(label) + '<span class="n">' + n + '</span>';
+    b.addEventListener('click', () => { dateFilter = d; draw(); });
+    dBox.appendChild(b);
+  });
+}
+
+function mediaHtml(item, pack) {
+  if (item.img) return '<img class="thumb" src="' + esc(item.img) + '" alt="" loading="lazy">';
+  return '<span class="thumb ico mark ' + esc(pack.mark) + '">' + esc(pack.name.slice(0, 1)) + '</span>';
+}
+
+function renderBoard(b, pack) {
+  const el = document.createElement('div');
+  el.className = 'board';
+  el.innerHTML =
+    '<div class="board-h">' +
+    kindChip(b.kind) +
+    '<div class="board-title">' + esc(b.series) + '</div>' +
+    '<div class="board-date">' + esc(b.date) + '</div>' +
+    '</div>';
+  const meta = document.createElement('div');
+  meta.className = 'board-meta';
+  meta.style.padding = '0 10px 6px';
+  meta.style.background = '#fff';
+  meta.textContent = '来源 ' + b.sourceName + ' · ' + b.items.length + ' 条';
+  el.appendChild(meta);
+
+  b.items.forEach((item) => {
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = 'row';
+    row.innerHTML =
+      '<span class="rank' + (item.rank <= 3 ? ' top' : '') + '">' + item.rank + '</span>' +
+      mediaHtml(item, pack) +
+      '<span class="body">' +
+      '<span class="title">' + esc(item.title) + '</span>' +
+      (item.sum ? '<span class="sum">' + esc(item.sum) + '</span>' : '') +
+      '<span class="src-line">' + kindChip(b.kind) +
+      '<span class="src-name">' + esc(b.sourceName) + '</span>' +
+      '<span>' + esc(b.series) + '</span></span>' +
+      '</span>';
+    el.appendChild(row);
+  });
+  return el;
+}
+
+function renderCard(p) {
+  const on = selected.has(p.key);
+  const boards = filteredBoards(p);
+  const card = document.createElement('div');
+  card.className = 'card' + (on ? ' selected' : '');
+  if (groupFilter !== '全部' && p.group !== groupFilter) card.hidden = true;
+  if (!boards.length) card.hidden = true;
+
+  const pick = document.createElement('button');
+  pick.type = 'button';
+  pick.className = 'badge' + (on ? '' : ' soft');
+  pick.textContent = on ? '✓ 已订阅' : '+ 订阅';
+  pick.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (on) selected.delete(p.key); else selected.add(p.key);
+    draw();
+  });
+
+  const sources = sourceStrip(p);
+  const head = document.createElement('div');
+  head.className = 'head';
+  head.innerHTML =
+    '<div class="mark ' + esc(p.mark) + '">' + esc(p.name.slice(0, 1)) + '</div>' +
+    '<div><div class="name">' + esc(p.name) + '</div>' +
+    '<div class="sub">' + esc(p.group) + ' · ' + sources.length + ' 个具名来源 · ' +
+    p.boards.length + ' 个按日系列</div>' +
+    '<div class="pack-desc">' + esc(p.desc) + '</div></div>';
+  head.addEventListener('click', () => {
+    if (on) selected.delete(p.key); else selected.add(p.key);
+    draw();
+  });
+
+  const strip = document.createElement('div');
+  strip.className = 'source-strip';
+  sources.forEach((s) => {
+    const pill = document.createElement('span');
+    pill.className = 'source-pill';
+    pill.innerHTML = kindChip(s.kind) + '<span>' + esc(s.sourceName) + '</span>';
+    strip.appendChild(pill);
+  });
+
+  const list = document.createElement('div');
+  list.className = 'list';
+  if (!boards.length) {
+    list.innerHTML = '<div class="empty" style="padding:8px;color:var(--muted)">当前筛选下无系列</div>';
+  } else {
+    boards.forEach((b) => list.appendChild(renderBoard(b, p)));
+  }
+
+  const foot = document.createElement('div');
+  foot.className = 'foot';
+  foot.textContent = '系列标题格式：来源名 + 榜/栏目 + 日期';
+
+  card.appendChild(pick);
+  card.appendChild(head);
+  card.appendChild(strip);
+  card.appendChild(list);
+  card.appendChild(foot);
+  return card;
+}
+
+function drawLegend() {
+  const box = document.getElementById('legend');
+  box.innerHTML = '<span>来源类型：</span>' + KINDS.filter((k) => k.key !== 'all').map((k) =>
+    '<span>' + kindChip(k.key) + esc(k.label) + '</span>'
+  ).join('');
+}
+
+function draw() {
+  renderFilters();
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+  PACKS.forEach((p) => grid.appendChild(renderCard(p)));
+  document.getElementById('chosen').textContent = String(selected.size);
+}
+
+document.getElementById('goRead').addEventListener('click', () => {
+  alert('示意：已订阅 ' + selected.size + ' 个内容包。正式站按系列日期生成今日阅读。');
+});
+
+drawLegend();
+draw();
+</script>
+</body>
+</html>

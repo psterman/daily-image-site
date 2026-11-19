@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>我的头条 · 自建平台</title>
+<link rel="stylesheet" href="portal.css">
+</head>
+<body>
+<!-- 登录 / 注册：未登录时覆盖全屏，登录后隐藏 -->
+<div class="auth-overlay" id="authOverlay">
+  <div class="auth-brand">
+    <div class="auth-logo">头</div>
+    <h1>我的头条</h1>
+    <p>搭一个属于你自己的信息平台</p>
+  </div>
+  <div id="authRoot"></div>
+  <div class="auth-backend" id="authBackend">正在检查后端连接…</div>
+</div>
+
+<div class="app" id="appRoot" hidden>
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-logo">头</div>
+      <div>
+        <div class="brand-name">我的头条</div>
+        <div class="brand-sub">今日阅读</div>
+      </div>
+    </div>
+    <nav class="nav" id="mainNav">
+      <div class="nav-group">
+        <div class="nav-label">观看</div>
+        <button class="nav-item active" data-view="digest"><span class="nav-ico">读</span>今日阅读</button>
+      </div>
+      <div class="nav-group">
+        <div class="nav-label">管理</div>
+        <button class="nav-item" data-view="tags"><span class="nav-ico">包</span>选内容包</button>
+        <button class="nav-item" data-view="sources"><span class="nav-ico">源</span>全部源</button>
+        <button class="nav-item" data-view="review"><span class="nav-ico">转</span>今日转发<span class="nav-badge" id="navReviewBadge" hidden>0</span></button>
+        <button class="nav-item" data-view="platform"><span class="nav-ico">⌂</span>概览</button>
+      </div>
+    </nav>
+    <div class="side-foot">
+      <div class="side-auth" id="sideAuth"></div>
+      <div class="ai-box">
+        <div class="ai-title">今日摘要</div>
+        <div class="ai-line"><span>栏目</span><span id="sideCols">0</span></div>
+        <div class="ai-line"><span>阅读</span><span id="sideApproved">0</span></div>
+        <div class="ai-line"><span>候选</span><span id="sideCands">0</span></div>
+        <div class="ai-line"><span>待选</span><span id="sidePending">0</span></div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="top-left">
+        <div class="top-title" id="topTitle">首页</div>
+        <div class="top-welcome" id="topWelcome">欢迎回来</div>
+      </div>
+      <div class="top-meta">
+        <span class="pill" id="topDate">2026-11-18</span>
+        <span class="pill on" id="backendBadge">● 演示模式</span>
+        <span class="avatar" id="topAvatar">我</span>
+      </div>
+    </header>
+    <div class="wrap">
+
+      <section class="view" id="view-onboard">
+        <div class="onboard">
+          <ol class="onboard-steps" aria-label="搭建步骤">
+            <li class="on">① 预览并选择内容包</li>
+            <li>② 生成栏目</li>
+            <li>③ 今日阅读</li>
+          </ol>
+          <div class="page-head">
+            <div>
+              <h1>先选你想每天看的内容</h1>
+              <p class="desc">勾选内容包，再点选子来源（可多选，类似热榜节点订阅）。目录与来源可持续扩充。已选 <b id="onboardCount">0</b> 个包。<span id="onboardPoolHint" class="pool-hint"></span></p>
+            </div>
+            <button class="btn primary" id="onboardConfirm" disabled>搭好我的平台</button>
+          </div>
+          <div class="pack-b picker" id="onboardPicker">
+            <aside class="title-rail" id="onboardRail" aria-label="栏目目录"></aside>
+            <section class="main-pane">
+              <section class="sel-hero" id="onboardSelHero" aria-label="已选内容包"></section>
+              <div class="main-scroll" id="onboardGrid" aria-live="polite"></div>
+            </section>
+          </div>
+          <p class="onboard-note">版权说明：只索引「标题 + 短摘要 + 原文链接」；配图为源站热链，不转载全文、不转存图片。</p>
+        </div>
+      </section>
+
+      <section class="view" id="view-platform">
+        <div class="page-head home-head">
+          <div>
+            <h1>概览</h1>
+            <p class="desc" id="homeTodo">先打开今日阅读；需要改栏目或筛候选时再来这里。</p>
+          </div>
+        </div>
+        <div class="home-stats" id="homeStats">
+          <div class="stat-card card"><div class="stat-n" id="statCols">0</div><div class="stat-l">栏目</div></div>
+          <div class="stat-card card"><div class="stat-n" id="statApproved">0</div><div class="stat-l">阅读条数</div></div>
+          <div class="stat-card card"><div class="stat-n" id="statCands">0</div><div class="stat-l">候选</div></div>
+          <div class="stat-card card"><div class="stat-n" id="statPending">0</div><div class="stat-l">待选</div></div>
+        </div>
+        <h2 class="section">快捷入口</h2>
+        <div class="home-actions" id="homeActions">
+          <button type="button" class="home-action card" data-view="digest">
+            <span class="home-action-ico">读</span>
+            <span class="home-action-title">今日阅读</span>
+            <span class="home-action-desc">汇总已选源近两日内容</span>
+          </button>
+          <button type="button" class="home-action card" data-view="tags">
+            <span class="home-action-ico">包</span>
+            <span class="home-action-title">选内容包</span>
+            <span class="home-action-desc">预览样例并勾选类型</span>
+          </button>
+          <button type="button" class="home-action card" data-view="review" id="homeActionReview">
+            <span class="home-action-ico">转</span>
+            <span class="home-action-title">今日转发</span>
+            <span class="home-action-desc">调栏目顺序 · 挑选发出去的内容</span>
+            <span class="home-action-badge" id="homeReviewBadge" hidden>0</span>
+          </button>
+        </div>
+      </section>
+
+      <section class="view" id="view-tags">
+        <div class="page-head">
+          <div>
+            <h1>选内容包</h1>
+            <p class="desc">B 布局：左栏目 · 右已选 Hero + 内容包。包内默认精选；完整 RSS 见「全部源」。<span id="tagPoolHint" class="pool-hint"></span></p>
+          </div>
+          <div class="btn-row">
+            <button class="btn" data-view="sources">完整源列表</button>
+            <button class="btn primary" data-view="digest">去今日阅读 →</button>
+          </div>
+        </div>
+        <div class="filter-label">内容格式（可多选，不选=全部）</div>
+        <div class="src-chips format-chips" id="tagFormatChips" aria-label="内容格式"></div>
+        <div class="pack-b picker" id="tagPicker">
+          <aside class="title-rail" id="tagRail" aria-label="栏目目录"></aside>
+          <section class="main-pane">
+            <section class="sel-hero" id="tagSelHero" aria-label="已选内容包"></section>
+            <div class="main-scroll" id="tagGrid" aria-live="polite"></div>
+            <div class="pack-b-cta" id="tagCta"></div>
+          </section>
+        </div>
+        <b id="tagChosen" hidden>0</b>
+      </section>
+
+      <section class="view view-sources-folo" id="view-sources">
+        <div class="folo-reader" id="srcReader">
+          <aside class="folo-rail" aria-label="新闻源">
+            <div class="folo-rail-head">
+              <div class="folo-rail-title">新闻源 <b id="srcCatalogCount">0</b></div>
+              <input class="folo-search" id="srcCatalogSearch" type="search" placeholder="搜索源 / 标题" autocomplete="off">
+              <div class="folo-subtabs" id="srcCatSubtabs" role="tablist" aria-label="筛选维度">
+                <button type="button" class="folo-subtab" data-dim="media" role="tab">分类</button>
+                <button type="button" class="folo-subtab" data-dim="platform" role="tab">平台</button>
+                <button type="button" class="folo-subtab" data-dim="topic" role="tab">来源</button>
+              </div>
+              <div class="folo-chips" id="srcCatActiveChips" aria-label="子标签"></div>
+              <div class="folo-active-filters" id="srcCatActiveFilters" hidden></div>
+              <div class="folo-hint" id="srcCatalogHint"></div>
+            </div>
+            <div class="folo-src-list" id="srcCatalogList"></div>
+          </aside>
+          <section class="folo-feed" aria-label="源内容">
+            <header class="folo-feed-head" id="srcFeedHead"></header>
+            <div class="folo-feed-list" id="srcFeedList" aria-live="polite"></div>
+          </section>
+        </div>
+      </section>
+
+      <section class="view" id="view-review">
+        <div class="page-head">
+          <div>
+            <h1>今日转发</h1>
+            <p class="desc">左侧调栏目顺序并筛选；中间选用 / 跳过 / 置顶后「今日阅读」会跟着变。朋友圈与微信不能代发，发布后复制链接自行转发。</p>
+          </div>
+          <div class="btn-row">
+            <button class="btn" id="autoReview">智能挑选</button>
+            <button class="btn primary" data-view="digest">去今日阅读</button>
+          </div>
+        </div>
+        <div class="ai-hint">版权红线：标题 + 短摘要 + 原文链接；配图用源站热链，不转载全文。发出前建议再看一眼。</div>
+        <div class="review-layout">
+          <aside class="review-dirs card pad" id="reviewDirs"></aside>
+          <div class="review-main">
+            <div class="toolbar">
+              <button class="chip active" data-filter="all">全部</button>
+              <button class="chip" data-filter="pending">待选</button>
+              <button class="chip" data-filter="approved">已选用</button>
+              <button class="chip" data-filter="rejected">已跳过</button>
+              <input class="search" id="candSearch" placeholder="搜标题 / 来源">
+            </div>
+            <div class="cand-list" id="candList"></div>
+          </div>
+          <aside class="side-panel card pad">
+            <div class="cand-preview" id="candPreview"><div class="empty">点中间一条，查看摘要与原文</div></div>
+            <h3>本期概览</h3>
+            <div class="ai-line"><span>候选</span><span id="rvTotal">0</span></div>
+            <div class="ai-line"><span>已选用</span><span id="rvApproved">0</span></div>
+            <div class="ai-line"><span>已跳过</span><span id="rvRejected">0</span></div>
+            <div class="ai-line"><span>置顶</span><span id="rvPinned">0</span></div>
+            <div class="btn-row"><button class="btn sm accent" id="publishBtn">发布今日页</button><button class="btn sm ghost" id="resetReview">重置挑选</button></div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="view view-digest-ino active" id="view-digest">
+        <div class="reader-shell ino" id="readerRoot"></div>
+        <div class="reader-foot ino-foot"><span>本期：<b id="readerSummary">—</b></span><a href="#" id="reRender">刷新</a></div>
+      </section>
+
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script type="module" src="portal-app.mjs"></script>
+</body>
+</html>

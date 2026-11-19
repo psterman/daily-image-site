@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><title>LIVE_PLATFORM_PENDING</title></head>
+<body>
+<script type="module">
+import { createClient } from '../lib/sb-client.mjs';
+
+const URL = 'https://efqljinkeatzpobvuouj.supabase.co';
+const PUB = 'sb_publishable_IOwVQqr7oTB2mYYWJw9k0g_YksWTtKU';
+const R = [];
+const ok = (n, c, extra) => R.push((c ? 'OK' : 'FAIL') + ':' + n + (extra ? '(' + extra + ')' : ''));
+
+async function run() {
+  // 走 platform schema（客户端自动加 Accept-Profile）
+  const client = createClient({ url: URL, key: PUB, schema: 'platform', timeout: 20000 });
+
+  // 1) 共享池：8 个标签包
+  try {
+    const rows = await client.select('tag_packs', { columns: 'key,name' });
+    ok('tag_packs_8', rows.length === 8, 'rows=' + rows.length);
+  } catch (e) { ok('tag_packs_8', false, (e.message || '').slice(0, 60)); }
+
+  // 2) 私有表：匿名应为空（RLS 拦截）
+  try {
+    const rows = await client.select('platforms', { columns: 'id' });
+    ok('rls_blocks_platforms', rows.length === 0, 'rows=' + rows.length);
+  } catch (e) { ok('rls_blocks_platforms', true, 'err=' + (e.message || '').slice(0, 40)); }
+
+  // 3) 辅助函数确认存在（通过公共池间接验证 schema 可见）
+  try {
+    const rows = await client.select('sources', { columns: 'name' });
+    ok('sources_readable', rows.length === 1, 'rows=' + rows.length);
+  } catch (e) { ok('sources_readable', false, (e.message || '').slice(0, 60)); }
+
+  document.title = 'LIVEPLAT|' + R.join('|');
+}
+run().catch((e) => { document.title = 'LIVEPLAT_EXCEPTION:' + (e && e.message ? e.message : String(e)); });
+</script>
+</body>
+</html>

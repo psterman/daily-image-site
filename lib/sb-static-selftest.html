@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><title>SB_STATIC_PENDING</title></head>
+<body>
+<script type="module">
+const R = [];
+const ok = (n, c) => R.push((c ? 'OK' : 'FAIL') + ':' + n);
+const EXPECTED = ['users','platforms','tag_packs','platform_columns','sources','tag_pack_sources','content_items','content_bodies','content_tags','candidate_entries','issues','issue_items','follows','delivery_channels','issue_deliveries','ad_slots','ad_creatives','ad_placements','ad_events','reader_events','ai_runs','rights_complaints','audit_logs'];
+
+async function get(p){ const r = await fetch(p); return r.text(); }
+
+async function run(){
+  try {
+    const [mig, cli, repo, schema] = await Promise.all([
+      get('../supabase/migration.sql'),
+      get('../lib/sb-client.mjs'),
+      get('../lib/sb-repo.mjs'),
+      get('../db/schema.sql'),
+    ]);
+
+    // schema 23 表
+    let missing = EXPECTED.filter(t => !new RegExp('create table if not exists '+t+'\\s*\\(', 'i').test(schema));
+    ok('schema_23_tables', missing.length === 0);
+    if (missing.length) R.push('DIAG_missing_tables='+missing.join(','));
+
+    // migration RLS
+    ok('mig_auth_users', /auth\.users/.test(mig));
+    ok('mig_trigger', /create trigger[\s\S]*on_auth_user_created[\s\S]*auth\.users/i.test(mig));
+    ok('mig_security_definer', /security definer/i.test(mig));
+    ok('mig_auth_uid', /auth\.uid\(\)/.test(mig));
+    let rlsMissing = EXPECTED.filter(t => !new RegExp('alter table '+t+'\\s+enable row level security','i').test(mig));
+    ok('mig_all_23_rls', rlsMissing.length === 0);
+    if (rlsMissing.length) R.push('DIAG_rls_missing='+rlsMissing.join(','));
+
+    for (const p of ['users_select_self','platforms_owner_all','platforms_public_read','candidates_owner_all','issues_public_read','content_read']) {
+      ok('policy_'+p, mig.includes(p));
+    }
+
+    // client 契约
+    for (const t of ['createClient','signUp','signIn','refreshSession','recover','resend','updatePassword','upsert','select','Authorization','apikey']) {
+      ok('client_'+t, cli.includes(t));
+    }
+    ok('client_no_node', !/from\s+['"]node:/.test(cli));
+
+    // repo 契约
+    for (const t of ['loadDb','saveDb','runRemotePipeline','tag_packs','issue_items']) {
+      ok('repo_'+t, repo.includes(t));
+    }
+    ok('repo_no_node', !/from\s+['"]node:/.test(repo));
+    const saveBody = repo.slice(repo.indexOf('export async function saveDb'));
+    ok('repo_no_shared_write', !/upsert\(['"]content_items['"]/.test(saveBody));
+  } catch (e) {
+    R.push('EXCEPTION:'+(e && e.stack ? e.stack.split('\n')[0] : String(e)));
+  }
+  const pass = R.filter(x=>x.indexOf('OK:')===0).length;
+  const fail = R.filter(x=>x.indexOf('OK:')!==0);
+  document.title = 'STATIC|'+pass+'/'+R.length+'|'+(fail.length?fail.join(','):'ALLPASS');
+}
+run();
+</script>
+</body>
+</html>

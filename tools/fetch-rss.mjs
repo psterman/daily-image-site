@@ -22,6 +22,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolveFeedPolicy } from '../lib/pipeline-policy.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CONFIG_PATH = path.join(__dirname, 'rss.config.json');
@@ -278,6 +279,40 @@ export function extractImages(block, baseUrl) {
   return out.slice(0, 8);
 }
 
+/**
+ * 频道头像：RSS channel <image><url> / itunes:image / Atom logo|icon。
+ * 微信 wechat2rss 的公众号头像就在这里（wx.qlogo.cn/mmhead/...）。
+ */
+export function extractChannelAvatar(xml, baseUrl) {
+  if (typeof xml !== 'string' || !xml) return '';
+  const head = xml.split(/<(?:item|entry)\b/i)[0] || xml;
+  const abs = (raw) => {
+    let s = String(raw || '').trim().replace(/&amp;/g, '&').replace(/^["']|["']$/g, '');
+    if (!s) return '';
+    if (s.startsWith('//')) s = 'https:' + s;
+    else if (s.startsWith('/') && baseUrl) {
+      try { s = new URL(s, baseUrl).href; } catch { return ''; }
+    }
+    return /^https?:\/\//i.test(s) ? s : '';
+  };
+  const itunes = /itunes:image\b[^>]*\bhref\s*=\s*["']([^"']+)["']/i.exec(head);
+  if (itunes) {
+    const u = abs(itunes[1]);
+    if (u) return u;
+  }
+  const image = /<image\b[^>]*>[\s\S]*?<url>([\s\S]*?)<\/url>/i.exec(head);
+  if (image) {
+    const u = abs(htmlToText(unwrapCdata(image[1])));
+    if (u) return u;
+  }
+  const atom = /<(?:logo|icon)>([\s\S]*?)<\/(?:logo|icon)>/i.exec(head);
+  if (atom) {
+    const u = abs(htmlToText(unwrapCdata(atom[1])));
+    if (u) return u;
+  }
+  return '';
+}
+
 /* ──────────────────────────── 解析 ──────────────────────────── */
 
 /**
@@ -308,11 +343,14 @@ export function parseFeed(xml, baseUrl) {
       richTextOf(block, 'summary') ||
       richTextOf(block, 'content:encoded') ||
       richTextOf(block, 'content');
+    // 推文短帖放宽；文章仍截短导读（全文走按需抽取，不入库）
+    const twDesc =
+      /(?:twitter\.com|x\.com|api\.xgo\.ing|xgo\.ing)/i.test(link + ' ' + (baseUrl || ''));
     out.push({
       title,
       link,
       ts: parseDate(dateStr),
-      desc: desc.slice(0, 220),
+      desc: desc.slice(0, twDesc ? 2000 : 220),
       categories: categoriesOf(block),
       // 候选配图（按优先级排好）。**候选不等于能用** ——
       // 到底哪张合适由 tools/rss-images.mjs 下载后按尺寸/体积筛。
@@ -396,7 +434,12 @@ async function requestOnce(url, timeoutMs) {
     }
     // res.url 是**重定向后**的最终地址 —— 相对路径的 <img src> 要按它补全，
     // 用请求前那个 URL 补会指向错误的站点。
-    return { text, items: parseFeed(text, res.url) };
+    const items = parseFeed(text, res.url);
+    const channelAvatar = extractChannelAvatar(text, res.url);
+    if (channelAvatar) {
+      for (const it of items) it.channelAvatar = channelAvatar;
+    }
+    return { text, items, channelAvatar };
   } finally {
     clearTimeout(timer);
   }
@@ -547,12 +590,18 @@ export async function fetchHeadlines(cfg) {
   const concurrency = Math.max(1, Number(cfg.concurrency) || 20);
 
   const results = await mapPool(feeds, concurrency, async (feed) => {
+    const policy = resolveFeedPolicy(feed, { maxAgeDays, perFeed });
     try {
-      const r = await fetchOne(feed, timeoutMs, maxAgeDays);
-      return { feed, ...r, ok: true };
+      // 用 policy 算好的窗（已含源名/格式/feed 字段优先级），避免旧 feed.maxAgeDays=45 盖掉短窗
+      const r = await fetchOne(
+        { ...feed, maxAgeDays: policy.maxAgeDays },
+        timeoutMs,
+        policy.maxAgeDays || maxAgeDays,
+      );
+      return { feed, ...r, ok: true, policy };
     } catch (e) {
       const msg = e.name === 'AbortError' ? `超时 ${timeoutMs}ms` : e.message;
-      return { feed, items: [], ok: false, error: msg };
+      return { feed, items: [], ok: false, error: msg, policy };
     }
   });
 
@@ -560,12 +609,16 @@ export async function fetchHeadlines(cfg) {
   const stale = [];
   const seen = new Set();
   const items = [];
+  const policyBySource = new Map();
 
   for (const r of results) {
     if (!r.ok) {
       failures.push({ name: r.feed.name || r.feed.url, error: r.error });
       continue;
     }
+    const policy = r.policy || resolveFeedPolicy(r.feed, { maxAgeDays, perFeed });
+    const srcName = r.feed.name || '';
+    if (srcName) policyBySource.set(srcName, policy);
     // 过期条目被丢了 —— 记一笔，源停更时要看得见（否则就是「静悄悄地少了个源」）
     if (r.dropped > 0) {
       stale.push({
@@ -576,8 +629,11 @@ export async function fetchHeadlines(cfg) {
       });
     }
     let taken = 0;
+    const ct = r.feed.contentType || r.feed.content_type || '';
+    // dailyCap：第一类按白名单收满日窗；二/三类短窗小数；不再给播客地板 50
+    const feedCap = Math.max(1, Number(policy.dailyCap) || perFeed);
     for (const it of r.items) {
-      if (taken >= perFeed) break;
+      if (taken >= feedCap) break;
       const key = normalizeLink(it.link) || it.title.toLowerCase();
       if (seen.has(key)) continue;
       seen.add(key);
@@ -593,8 +649,10 @@ export async function fetchHeadlines(cfg) {
         // 候选配图地址 —— 跟上面那些字段一样是逐字段搬过来的，
         // 漏了这一行图片候选到不了构建那一步。
         imgs: it.imgs || [],
+        // 频道头像（微信公众号等）—— 写入 metadata.publisher_avatar
+        channelAvatar: it.channelAvatar || '',
         // 格式第二轴：rss.config 可写 contentType（article|podcast|video|note|link）
-        contentType: r.feed.contentType || r.feed.content_type || undefined,
+        contentType: ct || undefined,
       });
     }
   }
@@ -602,12 +660,18 @@ export async function fetchHeadlines(cfg) {
   // 新的在前；没有时间的排最后
   items.sort((a, b) => (b.ts || 0) - (a.ts || 0));
 
-  // 公平配额。两件事要同时做到：
-  //  1) 话痨源（IT之家 60 条、快科技 100 条）不能霸屏 —— 每个源最多 fairCap 条
-  //  2) 安静的源（一天只更 1 条的博客）也必须露脸 —— 每个源先保底 1 条
-  // 只做第 1 条会出问题：凑满 maxItems 就 break，后面那些源一条都轮不上。
+  // 公平配额：
+  //  1) 普通源 fairCap，防无名话痨霸屏
+  //  2) 安静源保底 1 条
+  //  3) 流水白名单（board/wire/media）按 dailyCap 豁免均分刀
   const srcCount = new Set(items.map((i) => i.source)).size;
   const fairCap = Math.max(2, Math.ceil(maxItems / Math.max(1, srcCount)));
+  const fairFor = (it) => {
+    const p = policyBySource.get(it.source);
+    if (p && p.pipeline) return Math.max(1, p.dailyCap);
+    if (p && p.dailyCap > 0) return Math.min(Math.max(fairCap, 1), p.dailyCap);
+    return fairCap;
+  };
 
   const kept = [];
   const used = new Map();
@@ -630,7 +694,7 @@ export async function fetchHeadlines(cfg) {
     if (kept.length >= maxItems) break;
     if (taken.has(it)) continue;
     const n = used.get(it.source) || 0;
-    if (n >= fairCap) continue;
+    if (n >= fairFor(it)) continue;
     taken.add(it);
     used.set(it.source, n + 1);
     kept.push(it);

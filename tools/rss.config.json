@@ -22,7 +22,7 @@
   "perFeed": 6,
   "maxItems": 2670,
   "timeoutMs": 15000,
-  "maxAgeDays": 21,
+  "maxAgeDays": 2,
   "feeds": [
     {
       "name": "@Lenciel",

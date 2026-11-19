@@ -38,7 +38,7 @@ check('能加载', !!tax);
 check('校验通过', validateTaxonomy(tax).length === 0, validateTaxonomy(tax));
 
 console.log('\n── 分类定义 ──');
-check('有 8 个分类', tax.categories.length === 8, tax.categories.map((c) => c.label));
+check('有 10 个分类', tax.categories.length === 10, tax.categories.map((c) => c.label));
 check('label 全是用户思维（不含平台名）', !tax.categories.some((c) => /微博|知乎|即刻|V2EX|虎扑/.test(c.label)), tax.categories.map((c) => c.label));
 check('第一个分类是「热议」', tax.categories[0]?.label === '热议', tax.categories[0]);
 check('key 唯一', new Set(tax.categories.map((c) => c.key)).size === tax.categories.length);
@@ -49,7 +49,13 @@ console.log('\n── 每个源都有映射 ──');
   const rssSources = rssCfg.feeds.map((f) => f.name);
   const py = readFileSync(SITE + '/tools/grab/daily_headlines.py', 'utf8');
   const topSources = [...py.matchAll(/^\s*\("([^"]+)",\s*fetch_/gm)].map((m) => m[1]);
-  const all = [...rssSources, ...topSources];
+  const nnCfg = JSON.parse(readFileSync(SITE + '/tools/newsnow.config.json', 'utf8'));
+  const nnSources = (nnCfg.sources || []).map((s) => s.name);
+  const dhCfg = JSON.parse(readFileSync(SITE + '/tools/dailyhot.config.json', 'utf8'));
+  const dhSources = (dhCfg.sources || []).map((s) => s.name);
+  const hxCfg = JSON.parse(readFileSync(SITE + '/tools/hot-extras.config.json', 'utf8'));
+  const hxSources = (hxCfg.sources || []).map((s) => s.name);
+  const all = [...rssSources, ...topSources, ...nnSources, ...dhSources, ...hxSources];
   // 同一个源可能有**两个渠道**：V2EX 热榜 = 头条（Python 抓 v2ex.com/?tab=hot）
   // + RSS（RSS屋 的镜像）。显示名一样，分类映射也只需要一条 —— 所以按「去重后的源名」比。
   const distinct = new Set(all);
@@ -171,6 +177,38 @@ console.log('\n── 坏配置要被拒 ──');
 
   const okMax = { categories: [{ key: 'a', label: 'A' }], sourceCategory: { s: 'a' }, maxExtraTags: 0 };
   check('maxExtraTags = 0 合法（只挂主分类）', validateTaxonomy(okMax).length === 0, validateTaxonomy(okMax));
+}
+
+console.log('\n── board-catalog（rebang / open2hub 目录）──');
+{
+  const cat = JSON.parse(readFileSync(SITE + '/tools/board-catalog.json', 'utf8'));
+  const o2h = Object.keys(cat.open2hub?.channels || {});
+  const rb = Object.keys(cat.rebang?.categories || {});
+  check('open2hub 12 个频道都在', o2h.length === 12, o2h);
+  check('rebang 8 个分类都在', rb.length === 8, rb);
+  check('含视频中文榜（爱奇艺热播榜）',
+    (cat.open2hub.channels['视频']?.boards || []).some((b) => b.label === '爱奇艺热播榜'));
+  check('含 rebang 综合·知乎热榜',
+    (cat.rebang.categories['综合']?.boards || []).some((b) => b.platform === '知乎'));
+  const ourKeys = new Set(tax.categories.map((c) => c.key));
+  const badMap = [];
+  for (const [name, ch] of Object.entries(cat.open2hub.channels)) {
+    if (ch.map?.our && !ourKeys.has(ch.map.our)) badMap.push(`open2hub:${name}->${ch.map.our}`);
+  }
+  for (const [name, ch] of Object.entries(cat.rebang.categories)) {
+    if (ch.map?.our && !ourKeys.has(ch.map.our)) badMap.push(`rebang:${name}->${ch.map.our}`);
+  }
+  check('频道 map.our 都指向见报 key（或 null）', badMap.length === 0, badMap);
+  const haveBroken = [];
+  for (const ch of [...Object.values(cat.open2hub.channels), ...Object.values(cat.rebang.categories)]) {
+    for (const b of ch.boards || []) {
+      if (b.ingest === 'have' && b.sourceName && !tax.sourceCategory[b.sourceName]) {
+        haveBroken.push(b.label);
+      }
+    }
+  }
+  check('ingest=have 的榜都能在 sourceCategory 找到', haveBroken.length === 0, haveBroken);
+  check('taxonomy._align 含 rebang/open2hub', !!(tax._align?.rebang && tax._align?.open2hub));
 }
 
 console.log(`\n═══ ${pass} 通过 / ${fail} 失败 ═══`);

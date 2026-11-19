@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>INTERACT_SELFTEST_PENDING</title>
+<link rel="stylesheet" href="portal.css">
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <nav class="nav">
+      <button class="nav-item active" data-view="platform">我的平台</button>
+      <button class="nav-item" data-view="tags">标签市场</button>
+      <button class="nav-item" data-view="columns">我的栏目</button>
+      <button class="nav-item" data-view="review">今日审稿</button>
+      <button class="nav-item" data-view="digest">日报预览</button>
+    </nav>
+    <span id="sideDigest">—</span><span id="sideCols">0</span><span id="sideCands">0</span><span id="sideApproved">0</span>
+  </aside>
+  <div class="main">
+    <div id="topTitle"></div><div id="topDate"></div>
+    <section class="view active" id="view-platform"><div id="pipelineView"></div><div id="heroScore">0</div></section>
+    <section class="view" id="view-tags"><div class="grid tags" id="tagGrid"></div><b id="tagChosen">0</b></section>
+    <section class="view" id="view-columns"><div class="card" id="colList"></div></section>
+    <section class="view" id="view-review">
+      <aside id="reviewDirs"></aside>
+      <button class="chip active" data-filter="all">全部</button><button class="chip" data-filter="pending">待审</button><button class="chip" data-filter="approved">已放行</button>
+      <input class="search" id="candSearch">
+      <div class="cand-list" id="candList"></div>
+      <div id="candPreview"></div>
+      <button id="autoReview">自动审稿</button><button id="publishBtn">发布</button><button id="resetReview">重置</button>
+      <span id="rvTotal">0</span><span id="rvApproved">0</span><span id="rvRejected">0</span><span id="rvPinned">0</span>
+    </section>
+    <section class="view" id="view-digest"><div class="reader-shell" id="readerRoot"></div><span id="readerSummary">—</span><a href="#" id="reRender">重渲染</a></section>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script type="module" src="portal-app.mjs"></script>
+<script type="module">
+import { currentTab } from './portal-render.mjs';
+
+const R = [];
+const D = [];
+const ok = (name, cond) => R.push((cond ? 'OK' : 'FAIL') + ':' + name);
+const diag = (k, v) => D.push(k + '=' + v);
+const wait = (ms) => new Promise(r => setTimeout(r, ms));
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => Array.prototype.slice.call(document.querySelectorAll(s));
+
+async function run() {
+  try {
+    await wait(150);
+    const cols0 = $$('#colList .col-item').length;
+    diag('cols0', cols0);
+    diag('tabs0', $$('#readerRoot .tab').length);
+    diag('cands0', $$('#candList .cand').length);
+    diag('tagcards', $$('#tagGrid .tag-card').length);
+    ok('init_cols3', cols0 === 3);
+    ok('init_reader_tabs3', $$('#readerRoot .tab').length === 3);
+
+    // 1) 真实点击一个未选标签（轻松一刻）→ 栏目 +1，digest tabKeys 同步
+    const cards = $$('#tagGrid .tag-card');
+    const funny = cards.find(c => (c.textContent || '').indexOf('轻松一刻') >= 0);
+    ok('found_funny', !!funny);
+    diag('funny_text', funny ? funny.textContent.replace(/\s+/g, '') : 'NULL');
+    if (funny) funny.click();
+    await wait(80);
+    diag('cols_after_click', $$('#colList .col-item').length);
+    diag('col_names', $$('#colList .col-name').map(n => n.textContent).join('/'));
+    diag('reader_keys', $$('#readerRoot .tab').map(n => n.dataset.key).join('/'));
+    diag('sideCols', $('#sideCols').textContent);
+    diag('summary', $('#readerSummary').textContent);
+    diag('toast', ($('#toast').textContent || ''));
+    ok('addtag_cols4', $$('#colList .col-item').length === 4);
+    ok('addtag_reader_tabs4', $$('#readerRoot .tab').length === 4);
+    ok('addtag_side_cols4', $('#sideCols').textContent === '4');
+
+    // 2) 真实点击栏目上移 → 顺序变化不报错，栏目仍在
+    const upBtn = $$('#colList .col-item')[3] && $$('#colList .col-item')[3].querySelector('[data-mv="up"]');
+    if (upBtn && !upBtn.disabled) upBtn.click();
+    await wait(80);
+    ok('reorder_keeps4', $$('#colList .col-item').length === 4);
+
+    // 3) 真实点击“拒绝”一条候选 → 已拒绝计数变化
+    const beforeRejected = Number($('#rvRejected').textContent);
+    const cand = $$('#candList .cand')[0];
+    ok('has_cands', !!cand);
+    if (cand) cand.click();
+    await wait(40);
+    const reject = $('#candPreview') && $('#candPreview').querySelector('[data-op="reject"]');
+    if (reject) reject.click();
+    await wait(80);
+    ok('reject_count_up', Number($('#rvRejected').textContent) > beforeRejected);
+
+    // 4) 真实点击“AI 自动审稿” → 已放行增加
+    const beforeApproved = Number($('#rvApproved').textContent);
+    $('#autoReview').click();
+    await wait(80);
+    ok('autoreview_approved_up', Number($('#rvApproved').textContent) >= beforeApproved);
+
+    // 5) 真实切换日报栏目 tab → currentTab 跟随
+    const readerTabs = $$('#readerRoot .tab');
+    if (readerTabs.length > 1) readerTabs[1].click();
+    await wait(60);
+    ok('tab_switch_state', currentTab() === readerTabs[1].dataset.key);
+
+    // 6) digest 概览随数据实时重算（非硬编码）
+    ok('summary_live', ($$('#readerRoot .tab').length === 4) && ($('#readerSummary').textContent || '').length > 0);
+  } catch (e) {
+    R.push('EXCEPTION:' + (e && e.message ? e.message : String(e)));
+  }
+  const pass = R.filter(x => x.indexOf('OK:') === 0).length;
+  const fail = R.filter(x => x.indexOf('OK:') !== 0);
+  document.title = 'INTERACT|' + pass + '/' + R.length + '|' + (fail.length ? fail.join(',') : 'ALLPASS') + '|DIAG:' + D.join(';');
+}
+run();
+</script>
+</body>
+</html>

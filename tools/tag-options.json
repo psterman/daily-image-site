@@ -2,28 +2,28 @@
   "_doc": "目录 + 标签选项的唯一真相源（与 lib/tag-options.mjs 对齐）。选内容包 / Discover 分组读这里的 directories + tags。见报 chip = newsChips。",
   "directories": [
     {
-      "key": "综合",
-      "label": "综合",
+      "key": "资讯",
+      "label": "资讯",
       "order": 1,
-      "desc": "社交与社区热榜"
-    },
-    {
-      "key": "科技",
-      "label": "科技",
-      "order": 2,
-      "desc": "AI、数码、新品"
-    },
-    {
-      "key": "娱乐",
-      "label": "娱乐",
-      "order": 3,
-      "desc": "轻松一刻配图"
+      "desc": "综合新闻与时政媒体"
     },
     {
       "key": "社区",
       "label": "社区",
+      "order": 2,
+      "desc": "社交热榜与开发者社区"
+    },
+    {
+      "key": "科技",
+      "label": "科技",
+      "order": 3,
+      "desc": "AI、数码、开发者热帖"
+    },
+    {
+      "key": "娱乐",
+      "label": "娱乐",
       "order": 4,
-      "desc": "开源与开发者"
+      "desc": "轻松一刻配图"
     },
     {
       "key": "财经",
@@ -46,13 +46,39 @@
   ],
   "tags": [
     {
+      "key": "news",
+      "label": "新闻速览",
+      "directory": "资讯",
+      "risk": "low",
+      "desc": "综合新闻与时政媒体：通讯社、党报、国际中文与思想评论",
+      "channels": [
+        "新闻"
+      ],
+      "sources": [
+        { "name": "澎湃新闻", "domain": "thepaper.cn" },
+        { "name": "新华网·新华社新闻", "domain": "xinhuanet.com" },
+        { "name": "央视新闻", "domain": "cctv.com" },
+        { "name": "人民日报", "domain": "people.com.cn" },
+        { "name": "参考消息", "domain": "cankaoxiaoxi.com" },
+        { "name": "联合早报", "domain": "zaobao.com" },
+        { "name": "路透中文", "domain": "reuters.com" },
+        { "name": "纽约时报中文", "domain": "nytimes.com" },
+        { "name": "凤凰网", "domain": "ifeng.com" },
+        { "name": "南方周末", "domain": "infzm.com" },
+        { "name": "中国新闻周刊", "domain": "inewsweek.cn" },
+        { "name": "侠客岛", "domain": "people.com.cn" },
+        { "name": "环球时报", "domain": "huanqiu.com" },
+        { "name": "德国之声中文", "domain": "dw.com" },
+        { "name": "法广中文", "domain": "rfi.fr" }
+      ]
+    },
+    {
       "key": "hot",
       "label": "热议",
-      "directory": "综合",
+      "directory": "社区",
       "risk": "medium",
       "desc": "微博 / 抖音 / 小红书 / 知乎等社交与社区热榜合集",
       "channels": [
-        "综合",
         "社区"
       ],
       "sources": [
@@ -93,8 +119,16 @@
           "domain": "tieba.baidu.com"
         },
         {
+          "name": "快手热榜",
+          "domain": "kuaishou.com"
+        },
+        {
           "name": "抽屉热榜",
           "domain": "dig.ichouti.cn"
+        },
+        {
+          "name": "NGA网事杂谈",
+          "domain": "nga.cn"
         }
       ]
     },
@@ -187,11 +221,19 @@
       "label": "科技新品",
       "directory": "科技",
       "risk": "low",
-      "desc": "数码与科技新品、效率工具",
+      "desc": "数码新品、效率工具与开发者热帖",
       "channels": [
         "科技"
       ],
       "sources": [
+        {
+          "name": "GitHub趋势",
+          "domain": "github.com"
+        },
+        {
+          "name": "V2EX",
+          "domain": "v2ex.com"
+        },
         {
           "name": "Readhub早报",
           "domain": "readhub.cn"
@@ -225,6 +267,14 @@
           "domain": "dgtle.com"
         },
         {
+          "name": "远景论坛",
+          "domain": "pcbeta.com"
+        },
+        {
+          "name": "酷安热榜",
+          "domain": "coolapk.com"
+        },
+        {
           "name": "半导体行业观察",
           "domain": "weixin.qq.com"
         },
@@ -247,7 +297,7 @@
       "label": "轻松一刻",
       "directory": "娱乐",
       "risk": "low",
-      "desc": "轻松一刻：梗图与趣味配图（见笑 / TG 图墙），不含社交热榜或生活文化稿",
+      "desc": "轻松一刻：站内见笑精选图（大佬请批阅已过滤），不含社交热榜或生活文化稿",
       "channels": [
         "娱乐",
         "游戏",
@@ -255,16 +305,12 @@
       ],
       "sources": [
         {
-          "name": "TG每日沙雕墙",
-          "domain": "t.me/woshadiao"
+          "name": "见笑",
+          "domain": "daily.onetone.app"
         },
         {
-          "name": "TG平壤卫视",
-          "domain": "t.me/pingrangTV"
-        },
-        {
-          "name": "TG煎蛋无聊图",
-          "domain": "t.me/jandan_pic"
+          "name": "大佬请批阅",
+          "domain": "daily.onetone.app"
         }
       ]
     },
@@ -273,7 +319,7 @@
       "label": "开源推荐",
       "directory": "社区",
       "risk": "low",
-      "desc": "开源项目与开发者工具",
+      "desc": "开源项目与独立开发社区",
       "channels": [
         "开发"
       ],
@@ -283,20 +329,20 @@
           "domain": "nodeseek.com"
         },
         {
-          "name": "V2EX",
-          "domain": "v2ex.com"
-        },
-        {
           "name": "掘金",
           "domain": "juejin.cn"
         },
         {
-          "name": "LINUX DO",
-          "domain": "linux.do"
+          "name": "吾爱破解",
+          "domain": "52pojie.cn"
         },
         {
-          "name": "GitHub趋势",
-          "domain": "github.com"
+          "name": "CSDN",
+          "domain": "csdn.net"
+        },
+        {
+          "name": "LINUX DO",
+          "domain": "linux.do"
         },
         {
           "name": "小众软件",
@@ -361,16 +407,34 @@
       "label": "人像美学",
       "directory": "视觉",
       "risk": "medium",
-      "desc": "人像与摄影配图（见她），只热链不转存",
+      "desc": "人像与摄影配图（站内见她精选），只索引站内图址",
       "channels": [],
       "sources": [
         {
-          "name": "煎蛋女装",
-          "domain": "jandan.net"
+          "name": "见她",
+          "domain": "daily.onetone.app"
         },
         {
-          "name": "福利吧",
-          "domain": "fuliba2023.net"
+          "name": "大佬请批阅",
+          "domain": "daily.onetone.app"
+        }
+      ]
+    },
+    {
+      "key": "sight",
+      "label": "见闻",
+      "directory": "视觉",
+      "risk": "low",
+      "desc": "站内见闻精选图（大佬请批阅已过滤）：街拍、旅行与日常视觉",
+      "channels": [],
+      "sources": [
+        {
+          "name": "见闻",
+          "domain": "daily.onetone.app"
+        },
+        {
+          "name": "大佬请批阅",
+          "domain": "daily.onetone.app"
         }
       ]
     },
@@ -505,7 +569,7 @@
     },
     {
       "key": "current",
-      "label": "时政要闻"
+      "label": "新闻"
     },
     {
       "key": "biz",

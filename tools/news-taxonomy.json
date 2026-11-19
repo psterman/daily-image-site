@@ -9,56 +9,65 @@
     },
     {
       "key": "current",
-      "label": "时政要闻"
+      "label": "新闻"
     },
     {
       "key": "biz",
-      "label": "财经商业"
+      "label": "财经"
     },
     {
       "key": "tech",
-      "label": "科技数码"
+      "label": "科技"
     },
     {
       "key": "ai",
-      "label": "AI"
+      "label": "智能"
     },
     {
       "key": "tools",
-      "label": "效率工具"
+      "label": "工具"
     },
     {
       "key": "dev",
-      "label": "技术社区"
+      "label": "开发"
     },
     {
       "key": "deep",
-      "label": "深度阅读"
+      "label": "深度"
     },
     {
       "key": "ent",
-      "label": "影视音乐"
+      "label": "文娱"
     },
     {
       "key": "fun",
-      "label": "生活文化"
+      "label": "生活"
     }
   ],
   "sourceCategory": {
     "微博热搜": "hot",
     "知乎热榜": "hot",
     "虎扑步行街": "hot",
+    "V2EX": "tech",
+    "掘金": "dev",
+    "远景论坛": "tech",
     "抽屉热榜": "hot",
     "百度热搜": "hot",
     "抖音热榜": "hot",
     "今日头条热榜": "hot",
     "B站热搜": "hot",
     "百度贴吧热议": "hot",
-    "GitHub趋势": "dev",
+    "GitHub趋势": "tech",
     "金十数据": "biz",
     "凤凰热榜": "current",
     "华尔街见闻热榜": "biz",
     "酷安热榜": "tech",
+    "快手热榜": "hot",
+    "小红书热榜": "hot",
+    "NGA网事杂谈": "hot",
+    "吾爱破解": "tools",
+    "米游社": "fun",
+    "AcFun": "ent",
     "联合早报": "current",
     "联合早报·国际": "current",
     "路透中文": "current",
@@ -868,8 +877,7 @@
     "闲人Life": "deep",
     "JaSpirit 的万事屋": "deep",
     "ShineKid": "deep",
-    "Seven's blog": "deep",
-    "小红书热榜": "hot"
+    "Seven's blog": "deep"
   },
   "keywordTags": [
     {

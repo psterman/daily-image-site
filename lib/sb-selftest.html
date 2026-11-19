@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>SB_SELFTEST_PENDING</title>
+</head>
+<body>
+<script type="module">
+import { createClient } from '../lib/sb-client.mjs';
+import { loadDb, saveDb, runRemotePipeline } from '../lib/sb-repo.mjs';
+import * as flow from '../lib/platform-flow.mjs';
+import { CORE_TAG_PACKS, seedTagPacks, ensureMainSource, emptyDb } from '../lib/platform-model.mjs';
+
+const R = [];
+const ok = (n, c) => R.push((c ? 'OK' : 'FAIL') + ':' + n);
+const DIAG = [];
+
+// ---- 内存 PostgREST / GoTrue mock ----
+function makeMockBackend() {
+  const tables = {
+    users: [], platforms: [], tag_packs: [], platform_columns: [],
+    sources: [], content_items: [], content_tags: [], candidate_entries: [],
+    issues: [], issue_items: [], audit_logs: [],
+  };
+  const calls = [];
+  const TAG_KEYS = ['funny', 'portrait', 'opensource', 'ai', 'design', 'finance', 'tech', 'movie'];
+
+  function matchRow(row, filters) {
+    return filters.every((f) => {
+      const [col, rest] = f.split('=');
+      const [op, raw] = rest.split('.');
+      const v = decodeURIComponent((raw || '').replace(/%2C/g, ','));
+      const rv = row[col];
+      if (op === 'eq') return String(rv) === v;
+      if (op === 'in') return v.split(',').some((x) => String(rv) === x);
+      return true;
+    });
+  }
+
+  function parseQuery(url) {
+    const u = new URL(url);
+    const table = decodeURIComponent(u.pathname.split('/').pop());
+    const filters = [];
+    for (const [k, v] of u.searchParams) {
+      if (k === 'select' || k === 'order' || k === 'limit' || k === 'head') continue;
+      filters.push(`${k}=${v}`);
+    }
+    return { table, filters, url: u };
+  }
+
+  const fetchImpl = async (url, init) => {
+    const method = (init.method || 'GET').toUpperCase();
+    const h = init.headers || {};
+    calls.push({ method, url: String(url), apikey: h.apikey, auth: h.Authorization, prefer: h.Prefer, body: init.body });
+
+    // GoTrue
+    if (String(url).includes('/auth/v1/')) {
+      if (String(url).includes('grant_type=refresh_token')) {
+        return new Response(JSON.stringify({ access_token: 'test-jwt-refreshed', refresh_token: 'rt2', expires_in: 3600, user: { id: 'auth-uid-1', email: 'u@e.com' } }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      if (String(url).includes('signup') || String(url).includes('token')) {
+        return new Response(JSON.stringify({ access_token: 'test-jwt', refresh_token: 'rt1', expires_in: 3600, user: { id: 'auth-uid-1', email: 'u@e.com' } }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      if (String(url).includes('recover') || String(url).includes('resend')) {
+        return new Response('{}', { status: 200 });
+      }
+      if (String(url).includes('logout')) return new Response('{}', { status: 204 });
+      if (String(url).includes('/user') && method === 'PUT') {
+        return new Response(JSON.stringify({ id: 'auth-uid-1', email: 'u@e.com' }), { status: 200 });
+      }
+      if (String(url).includes('/user')) return new Response(JSON.stringify({ id: 'auth-uid-1', email: 'u@e.com' }), { status: 200 });
+    }
+
+    if (!String(url).includes('/rest/v1/')) {
+      return new Response('not found', { status: 404 });
+    }
+
+    const { table, filters } = parseQuery(url);
+    const rows = tables[table] || [];
+
+    if (method === 'GET') {
+      const out = rows.filter((r) => matchRow(r, filters));
+      return new Response(JSON.stringify(out), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+    if (method === 'POST' || method === 'PATCH') {
+      const payload = JSON.parse(init.body || '[]');
+      const list = Array.isArray(payload) ? payload : [payload];
+      for (const row of list) {
+        // 用主键字段做 upsert（简化 mock：按 id 或复合键覆盖）
+        let idx = -1;
+        if (row.id) idx = rows.findIndex((r) => r.id === row.id);
+        else if (row.issue_id && row.content_item_id) idx = rows.findIndex((r) => r.issue_id === row.issue_id && r.content_item_id === row.content_item_id);
+        else if (row.content_item_id && row.tag_pack_id) idx = rows.findIndex((r) => r.content_item_id === row.content_item_id && r.tag_pack_id === row.tag_pack_id);
+        if (idx >= 0) rows[idx] = { ...rows[idx], ...row };
+        else rows.push({ ...row });
+      }
+      return new Response(JSON.stringify(list), { status: 201, headers: { 'Content-Type': 'application/json' } });
+    }
+    if (method === 'DELETE') {
+      const out = rows.filter((r) => !matchRow(r, filters));
+      tables[table] = out;
+      return new Response(null, { status: 204 });
+    }
+    return new Response('bad method', { status: 405 });
+  };
+
+  // 预置共享池：8 标签包 + 主源 + 若干内容（模拟管理端已灌入）
+  tables.tag_packs = TAG_KEYS.map((k, i) => ({
+    id: 'tag-' + i, key: k, name: CORE_TAG_PACKS.find((p) => p.key === k).name,
+    group_name: 'g', risk_level: 'low', status: 'active', description: '',
+  }));
+  tables.sources = [{
+    id: 'src-main', kind: 'manual', name: '主源编辑池', status: 'active',
+    trust_score: 100, rights_status: 'authorized', allow_snippet: true,
+    allow_image: false, allow_fulltext: false, allow_cache: false,
+  }];
+  tables.content_items = [
+    { id: 'c1', source_id: 'src-main', canonical_url: 'https://a.example.com/1', content_hash: 'h1', title: '开源项目甲', summary: '摘要甲', rights_status: 'authorized', created_at: new Date().toISOString() },
+    { id: 'c2', source_id: 'src-main', canonical_url: 'https://b.example.com/2', content_hash: 'h2', title: '模型发布乙', summary: '摘要乙', rights_status: 'authorized', created_at: new Date().toISOString() },
+    { id: 'c3', source_id: 'src-main', canonical_url: 'https://c.example.com/3', content_hash: 'h3', title: '设计灵感丙', summary: '摘要丙', rights_status: 'authorized', created_at: new Date().toISOString() },
+  ];
+  tables.content_tags = [
+    { content_item_id: 'c1', tag_pack_id: 'tag-2', confidence: 100 },
+    { content_item_id: 'c2', tag_pack_id: 'tag-3', confidence: 100 },
+    { content_item_id: 'c3', tag_pack_id: 'tag-4', confidence: 100 },
+  ];
+
+  return { tables, calls, fetchImpl };
+}
+
+async function run() {
+  try {
+    const mock = makeMockBackend();
+    const client = createClient({
+      url: 'https://test.supabase.co', key: 'anon-test-key', fetchImpl: mock.fetchImpl,
+      getToken: () => 'test-jwt',
+    });
+
+    // 1. 请求契约：Authorization / apikey
+    const h = await client._headers();
+    ok('hdr_apikey', h.apikey === 'anon-test-key');
+    ok('hdr_bearer', h.Authorization === 'Bearer test-jwt');
+
+    // 2. Auth 登录 + 续期 + 找回
+    const sess = await client.auth.signIn('u@e.com', 'pw');
+    ok('auth_token', sess.access_token === 'test-jwt');
+    const refreshed = await client.auth.refreshSession('rt1');
+    ok('auth_refresh', refreshed.access_token === 'test-jwt-refreshed');
+    await client.auth.recover('u@e.com');
+    ok('auth_recover_called', mock.calls.some((c) => String(c.url).includes('/auth/v1/recover')));
+
+    // 3. loadDb：共享池按 key 重索引
+    const db0 = await loadDb(client);
+    ok('load_tagpacks8', Object.keys(db0.tag_packs).length >= 8);
+    ok('load_tagpack_keyed', !!db0.tag_packs['opensource'] && db0.tag_packs['opensource'].id === 'tag-2');
+    ok('load_content3', Object.keys(db0.content_items).length === 3);
+    ok('load_contenttags_array', Array.isArray(db0.content_tags) && db0.content_tags.length === 3);
+
+    // 4. 完整远程闭环（用真 platform-flow）
+    const res = await runRemotePipeline(client, {
+      flow, email: 'u@e.com', name: '我的头条', authUid: 'auth-uid-1',
+      tagKeys: ['opensource', 'ai', 'design'], siteUrl: 'https://demo.pages.dev',
+      date: '2026-11-18', review: 'auto', perColumn: 2,
+    });
+    DIAG.push('platform=' + res.platform.slug, 'digestSchema=' + res.digest.schema, 'total=' + res.digest.total);
+    ok('remote_user_uid', res.user.id === 'auth-uid-1');
+    ok('remote_cols3', res.columns.length === 3);
+    ok('remote_digest2', res.digest.schema === 2);
+    ok('remote_total>0', res.digest.total > 0);
+
+    // 5. 落库：私有表真的写进 mock，共享池没被写
+    ok('saved_platforms', mock.tables.platforms.length >= 1);
+    ok('saved_candidates', mock.tables.candidate_entries.length > 0);
+    ok('saved_issues', mock.tables.issues.length >= 1 && mock.tables.issues[0].status === 'published');
+    ok('saved_digest_json', !!mock.tables.issues[0].digest_json && mock.tables.issues[0].digest_json.schema === 2);
+    ok('saved_issue_items', mock.tables.issue_items.length > 0);
+    const writesToShared = mock.calls.filter(
+      (c) => (c.method === 'POST' || c.method === 'PATCH') && /content_items|tag_packs/.test(c.url)
+    );
+    ok('no_write_shared_pool', writesToShared.length === 0);
+
+    // 6. 重新加载：数据一致（真后端的持久化验证）
+    const db1 = await loadDb(client);
+    ok('reload_platform', Object.values(db1.platforms).some((p) => p.name === '我的头条'));
+    ok('reload_issue_published', Object.values(db1.issues).some((i) => i.status === 'published'));
+
+    // 7. 错误语义：4xx 抛错
+    let threw = false;
+    try {
+      const bad = createClient({ url: 'https://test.supabase.co', key: 'k',
+        fetchImpl: async () => new Response(JSON.stringify({ message: 'row-level security' }), { status: 401 }) });
+      await bad.select('platforms');
+    } catch (e) { threw = /401/.test(e.message) && /row-level/.test(e.message); }
+    ok('error_semantics', threw);
+
+    // 8. RegisterUser 支持指定 uid（Auth 对齐）
+    const du = emptyDb();
+    const u = flow.registerUser(du, { id: 'auth-uid-1', email: 'a@b.com' });
+    ok('register_accepts_uid', u.id === 'auth-uid-1');
+
+    // 9. audit 必须带 actor；saveDb 丢弃无 actor 的行（避免 RLS 403）
+    ok('register_audit_has_actor', du.audit_logs.some((a) => a.action === 'user.register' && a.actor_user_id === 'auth-uid-1'));
+    ok('build_audit_has_actor', mock.tables.audit_logs.some((a) => a.action === 'candidates.build' && a.actor_user_id === 'auth-uid-1'));
+    const filterDb = emptyDb();
+    filterDb.users = { 'auth-uid-1': { id: 'auth-uid-1', email: 'u@e.com' } };
+    filterDb.audit_logs = [
+      { id: 'a-ok', actor_user_id: 'auth-uid-1', action: 'user.register', metadata: {} },
+      { id: 'a-bad', actor_user_id: null, action: 'content.ingest', metadata: {} },
+    ];
+    const beforeCalls = mock.calls.length;
+    await saveDb(client, filterDb);
+    const auditPosts = mock.calls.slice(beforeCalls).filter((c) => c.method === 'POST' && String(c.url).includes('audit_logs'));
+    let posted = [];
+    try { posted = JSON.parse(auditPosts[0] && auditPosts[0].body || '[]'); } catch { posted = []; }
+    ok('save_skips_null_actor', Array.isArray(posted) && posted.length === 1 && posted[0].id === 'a-ok');
+
+    // 9b. 已落库 audit 不再二次 upsert（避免无 UPDATE 策略时 403）
+    const againDb = emptyDb();
+    againDb._persistedAuditIds = new Set(['a-ok']);
+    againDb.audit_logs = [
+      { id: 'a-ok', actor_user_id: 'auth-uid-1', action: 'user.register', metadata: {} },
+      { id: 'a-new', actor_user_id: 'auth-uid-1', action: 'platform.create', metadata: {} },
+    ];
+    const beforeAgain = mock.calls.length;
+    await saveDb(client, againDb);
+    const againPosts = mock.calls.slice(beforeAgain).filter((c) => c.method === 'POST' && String(c.url).includes('audit_logs'));
+    let againBody = [];
+    try { againBody = JSON.parse(againPosts[0] && againPosts[0].body || '[]'); } catch { againBody = []; }
+    ok('save_skips_persisted_audit', Array.isArray(againBody) && againBody.length === 1 && againBody[0].id === 'a-new');
+    ok('save_marks_audit_persisted', againDb._persistedAuditIds.has('a-new'));
+
+    // 10. 假 content_item 的候选不写回（共享池快照过滤）
+    const fkDb = emptyDb();
+    fkDb._sharedContentIds = new Set(['real-1']);
+    fkDb.candidate_entries = {
+      'c-ok': { id: 'c-ok', content_item_id: 'real-1', platform_id: 'p1' },
+      'c-bad': { id: 'c-bad', content_item_id: 'fake-9', platform_id: 'p1' },
+    };
+    const beforeFk = mock.calls.length;
+    await saveDb(client, fkDb);
+    const candPosts = mock.calls.slice(beforeFk).filter((c) => c.method === 'POST' && String(c.url).includes('candidate_entries'));
+    let candBody = [];
+    try { candBody = JSON.parse(candPosts[0] && candPosts[0].body || '[]'); } catch { candBody = []; }
+    ok('save_skips_orphan_candidates', Array.isArray(candBody) && candBody.length === 1 && candBody[0].id === 'c-ok');
+  } catch (e) {
+    R.push('EXCEPTION:' + (e && e.stack ? e.stack.split('\n')[0] : String(e)));
+  }
+  const pass = R.filter((x) => x.indexOf('OK:') === 0).length;
+  const fail = R.filter((x) => x.indexOf('OK:') !== 0);
+  document.title = 'SB|' + pass + '/' + R.length + '|' + (fail.length ? fail.join(',') : 'ALLPASS') + '|' + DIAG.join(';');
+}
+run();
+</script>
+</body>
+</html>

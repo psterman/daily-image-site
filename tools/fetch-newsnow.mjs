@@ -28,19 +28,36 @@ function pickItems(payload) {
   return [];
 }
 
-function normalizeItem(raw, sourceName) {
+export function normalizeItem(raw, sourceName) {
   const title = String(raw.title || raw.name || raw.desc || '').trim();
   const link = String(raw.url || raw.link || raw.mobileUrl || '').trim();
   if (!title || !link) return null;
-  const desc = String(raw.desc || raw.extra?.info || raw.hover || '').trim().slice(0, 160);
+  const heat = String(raw.extra?.info || '').trim();
+  const hover = String(raw.extra?.hover || '').trim();
+  // 摘要：优先正文 desc，其次 hover 文案，再次热度数字
+  const desc = String(raw.desc || hover || (heat ? `热度 ${heat}` : '') || '').trim().slice(0, 160);
   const ts = Number(raw.timestamp || raw.extra?.date || Date.now());
+  // 缩略图：真封面才进 imgs。微博热搜 extra.icon 是「热/沸」角标，不当正文缩略图。
+  const imgs = [];
+  const pushImg = (u) => {
+    const s = String(u || '').trim();
+    if (!/^https?:\/\//i.test(s)) return;
+    if (imgs.some((x) => x.url === s)) return;
+    imgs.push({ url: s, kind: 'newsnow' });
+  };
+  pushImg(raw.image || raw.cover || raw.pic);
+  pushImg(raw.extra?.image || raw.extra?.cover || raw.extra?.pic);
+  const isWeibo = /微博/.test(String(sourceName || ''));
   return {
     title,
     link,
     desc,
+    heat,
     source: sourceName,
     ts: Number.isFinite(ts) ? ts : Date.now(),
-    imgs: [],
+    imgs,
+    // 平台头像：微博热搜无频道图，门户回退 weibo.com favicon；角标不进 publisher_avatar
+    channelAvatar: isWeibo ? 'https://www.google.com/s2/favicons?sz=64&domain=weibo.com' : '',
   };
 }
 
