@@ -2945,6 +2945,7 @@ git commit -m "test: 定时任务台护栏的变异体（解析层 + HTTP 层，
 - Modify: `CHANGELOG.md`（公开副本）
 - Modify: `README.md`（公开副本）
 - Modify: `.gitignore`（两仓）
+- Modify: `docs/superpowers/specs/2026-11-20-night-publish-gui-design.md`（两仓）
 - **本 Task 还要把 Task 1–8 的全部新增/改动文件一次性同步到公开副本**（见 Step 6）
 
 - [ ] **Step 1: `.gitignore` 补任务台的运行时文件**
@@ -3078,9 +3079,13 @@ git add -- 'tools/night-dashboard-state.mjs' 'tools/night-dashboard.mjs' 'tools/
           'tools/test-portability.mjs' `
           'tools/dashboard-ui' '起任务台.cmd' `
           'tools/daily.ps1' 'tools/daily-review.ps1' 'tools/publish.ps1' `
-          'AGENTS.md' '.gitignore' 'README.md' 'CHANGELOG.md'
+          'AGENTS.md' '.gitignore' 'README.md' 'CHANGELOG.md' `
+          'docs/superpowers/specs/2026-11-20-night-publish-gui-design.md'
 git commit -m "feat: 定时任务台（本地 GUI + 三个 helper 时间戳）"
 ```
+
+⚠️ **spec 也已经两边各自改好了**（母 agent 2026-11-21 已把 §7.2 / §8.1 / §9 三处边界写进两仓，
+两仓 SHA256 一致）→ **不要 Copy-Item spec**，只把它 add 进去提交。
 
 ⚠️ **不要 Copy-Item `AGENTS.md` / `README.md` / `CHANGELOG.md`** —— 两仓的 `AGENTS.md` 差 4KB（母本 149KB / 公开副本 153KB），
 覆盖会毁掉公开副本自己的内容。Step 1–4 已经让两个仓**各自**改好了同样的内容，这里只提交公开副本这一边。
