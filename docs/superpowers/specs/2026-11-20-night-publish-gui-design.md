@@ -68,7 +68,7 @@
 | 文件 | 职责 |
 |---|---|
 | `tools/night-dashboard.mjs` | 常驻 HTTP 服务：静态托管 + 4 个 API。Node 内置 `http`，**零新依赖** |
-| `tools/night-dashboard-state.mjs` | 解析层（I/O + 纯函数）：读 `.done`/`.log`、剥 BOM、解析阶段树、算状态与问题 |
+| `tools/night-dashboard-state.mjs` | 解析层（**纯函数**，零 I/O）：剥 BOM、解析阶段树、算状态与问题。文件读取由调用方（HTTP 层）负责 |
 | `tools/dashboard-ui/{index.html,app.js,app.css}` | 页面（原生 JS，零构建、零框架） |
 | `tools/start-dashboard.mjs` | 启动器：Windows 经 `explorer.exe` 脱 Job；macOS 直接 detached |
 | `起任务台.cmd` | 根目录双击入口（**纯 ASCII / LF / 无 BOM**） |
@@ -81,6 +81,10 @@
 
 ⚠️ `publish-state.mjs` 是**纯函数、零 I/O** —— 它不读文件、不剥 BOM、不解析 `.done`。
 那些是解析层（`night-dashboard-state.mjs`）的事。
+
+> **解析层为什么是纯函数**（2026-11-20 实施时定）：读文件放在 HTTP 层，
+> 解析层只吃「已经读进来的文本」→ 护栏能用**固定样本**喂它，测得又快又稳，
+> 不用在测试里造临时文件。`.done` / `.log` 的读取在 `tools/night-dashboard.mjs` 里。
 
 ### 4.2 数据流
 

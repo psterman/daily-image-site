@@ -51,6 +51,11 @@
 ### 功能约束
 
 - **零新依赖**：不 `npm install` 任何东西，不碰 `package.json`。
+- **不许硬编码 `powershell.exe`**：起子进程按平台分支 —— Windows 用 `powershell`（或 `powershell.exe`），
+  macOS 用 `pwsh`（工程正明确迁 macOS，母本要装 pwsh 跑同一份 `.ps1`）。
+  同仓既有惯例见 `tools/test-daily-review.mjs` 与 `tools/test-daily-rank-step.mjs` 的
+  `IS_WIN ? 'powershell' : 'pwsh'`；`tools/test-portability.mjs` 把这条列为五类陷阱之一。
+  护栏自己起 PowerShell 也不例外 —— 写死会让整块断言在 macOS 上变红。
 - 服务**只绑 `127.0.0.1`**，端口 8801；占用则顺延到 8810；实际端口写 `.night-dashboard-port`。
 - **Origin 白名单用动态端口**（服务实际监听的 `chosenPort`），**不许写死 8801**。
 - 路径一律 `path.join` + 正斜杠（macOS 迁移）。
@@ -310,121 +315,29 @@ process.exit(fail ? 1 : 0);
 import * as ST from './night-dashboard-state.mjs';
 
 {
-  check('stripBom 剥掉 U+FEFF', ST.stripBom('\uFEFF{"a":1}') === '{"a":1}');
-  check('stripBom 对没有 BOM 的原样返回', ST.stripBom('{"a":1}') === '{"a":1}');
-
-  const done = ST.parseDone('\uFEFF{\r\n  "date": "2026-11-20",\r\n  "at": "2026-11-20T00:41:39.4382066+08:00",\r\n  "exit": 0\r\n}');
-  check('.done 能剥 BOM 并解析', !!done && done.date === '2026-11-20' && done.exit === 0, { done });
-  check('.done 的 by 字段（手动跑才有）',
-    ST.parseDone('{"date":"2026-11-20","at":"x","exit":0,"by":"manual"}').by === 'manual');
-  check('.done JSON 坏了 → null，不抛', ST.parseDone('{ 坏掉的') === null);
-  check('.done 空 → null', ST.parseDone('') === null);
-
-  const steps = ST.parseSteps(
-    '=== 1/6 刷新 Cloudflare token ===  [00:12:03]\n=== 2/6 构建页面与图片 ===  [00:14:20]\n',
-    '2026-11-20');
-  check('新格式解析出 2 个步骤', steps.length === 2, { steps });
-  check('步骤 key 用编号不用文案', steps[0].key === 'publish/1-6' && steps[1].key === 'publish/2-6');
-  check('步骤文案取日志里的原话', steps[0].label === '刷新 Cloudflare token');
-  check('步骤分组正确', steps[0].group === 'publish');
-  check('新格式有时间戳', steps[0].clock === '00:12:03' && Number.isFinite(steps[0].atMs));
-
-  const old = ST.parseSteps('=== 1/6 刷新 Cloudflare token ===\n=== 2/6 构建页面与图片 ===\n', '2026-11-20');
-  check('老日志（无时间戳）也能解析', old.length === 2 && old[0].clock === null && old[0].atMs === null);
-  check('老日志的 key 一样对', old[0].key === 'publish/1-6');
-
-  const mixed = ST.parseSteps([
-    '=== 1/3 每日准备（抓图 → 头条 → 清洗 → 榜单/追更 → 构建） ===',
-    '=== 0/5 准备环境 ===',
-    '=== 5/5 构建（本地，不上传） ===',
-    '=== 2/3 校验构建产物 ===',
-    '=== 3/3 跳过审稿台（-SkipReview） ===',
-    '=== 6/6 部署 Cloudflare Pages（项目 daily-image-site） ===',
-  ].join('\n'), '2026-11-20');
-  check('1/3 与 N/5 归「准备」', mixed[0].group === 'prepare' && mixed[1].group === 'prepare');
-  check('2/3、3/3 归「校验与审稿」', mixed[3].group === 'verify' && mixed[4].group === 'verify');
-  check('N/6 归「发布」', mixed[5].group === 'publish');
-  check('样本里的 6 个标记都解析出来', mixed.length === 6);
-
-  const variants = ST.parseSteps([
-    '=== 2/6 跳过构建（复用 published/ 现有产物） ===',
-    '=== 4/6 跳过审稿闸门 ===',
-    '=== 5/6 暂存图片到静态产物（R2 兜底） ===',
-  ].join('\n'), '2026-11-20');
-  check('同一编号的不同变体都认得',
-    variants.length === 3 && variants[0].key === 'publish/2-6' && variants[0].label.indexOf('跳过构建') >= 0);
-
-  check('认 NIGHT_DONE', ST.parseLog('=== NIGHT_DONE exit=0 ===', '2026-11-20').source === 'night');
-  check('认 MANUAL_DONE', ST.parseLog('=== MANUAL_DONE exit=1 ===', '2026-11-20').source === 'manual');
-  check('认 PUBLISH_DONE', ST.parseLog('=== PUBLISH_DONE exit=0 ===', '2026-11-20').source === 'review');
-  check('DONE 的退出码取得到', ST.parseLog('=== NIGHT_DONE exit=1 ===', '2026-11-20').exitCode === 1);
-
-  const cross = ST.parseSteps('=== 1/6 a ===  [23:58:00]\n=== 2/6 b ===  [00:03:00]\n', '2026-11-20');
-  check('跨零点：后一步自动 +1 天', cross[1].atMs - cross[0].atMs === 5 * 60 * 1000, {
-    a: cross[0].atMs, b: cross[1].atMs });
-
-  const dur = ST.parseLog(
-    '=== 1/6 a ===  [00:00:00]\n=== 2/6 b ===  [00:02:30]\n',
-    '2026-11-20', Date.parse('2026-11-20T00:05:00+08:00'));
-  check('阶段耗时 = 下一步时刻 − 本步时刻', dur.steps[0].durationMs === 150000, { steps: dur.steps });
-  check('最后一步的耗时算到结束时刻', dur.steps[1].durationMs === 150000);
-  check('阶段耗时不会算出负数',
-    dur.steps.every((s) => s.durationMs === null || s.durationMs >= 0));
-
-  check('median 取奇数个的中位数', ST.median([3, 1, 2]) === 2);
-  check('median 用中位数不是平均数（一个异常值不能拉歪基准）', ST.median([1, 2, 3, 100]) === 3);
-  check('median 空数组 → null', ST.median([]) === null);
-
-  /* ── 连接断言：真实 helper 输出必须能被解析器认出来 ──────────
-     为什么必须有这一组：Task 1 的护栏只查**源码里有没有记号**，
-     查不出「时间戳被挪到 === 前面」或「=== 标记被改写」这两种改法。
-     而 Task 2 的护栏查的是**字面样本**能不能解析。
-     两头都不接 → 格式漂移了没人拦，线上任务台静默显示 0 个阶段。
-     这一组把两头接上：从 publish.ps1 里取出真实 helper 源码行，
-     真的跑一遍拿到输出行，再喂给 parseSteps。 */
-  const psSrc = read('tools/publish.ps1');
-  const stepLine = psSrc.split(/\r?\n/).find((l) => /function\s+Step\s*\(/.test(l));
-  check('publish.ps1 里找得到 Step helper 源码行（连接断言的前置）', !!stepLine);
-  if (stepLine) {
-    /* 只取函数体里 Write-Host 的那个表达式，替掉 $msg 变量后真跑一次。
-       用 powershell.exe -EncodedCommand 避开 PowerShell 层的引号地狱。 */
-    const exprMatch = /Write-Host\s*\((.*)\)\s*-ForegroundColor/.exec(stepLine);
-    check('Step 里的 Write-Host 是带括号的拼接形式（连接断言的前置）',
-      !!exprMatch, { stepLine });
-    if (exprMatch) {
-      const expr = exprMatch[1]
-        .replace(/"\$msg"/g, "'1/6 刷新 Cloudflare token'")
-        .replace(/"\$t"/g, "'1/6 刷新 Cloudflare token'");
-      const enc = Buffer.from(
-        "$ErrorActionPreference='Stop'; . '" + path.join(ROOT, 'tools', 'common.ps1') +
-        "'; Write-Output -NoNewline (" + expr + ")",
-        'utf16le').toString('base64');
-      const ps = spawnSync('powershell.exe',
-        ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', enc],
-        { cwd: ROOT, encoding: 'utf8', timeout: 30000 });
-      const outLine = String(ps.stdout || '').split(/\r?\n/).map((s) => s.trim())
-        .find((s) => /^===/.test(s));
-      check('真实 helper 输出行拿到了（连接断言的前置）',
-        !!outLine, { stdout: ps.stdout, stderr: ps.stderr, exit: ps.status });
-      if (outLine) {
-        const real = ST.parseSteps(outLine, '2026-11-20');
-        check('★ 真实 helper 输出能被解析器认出来（连接断言）',
-          real.length === 1 && real[0].key === 'publish/1-6', { outLine, real });
-        check('★ 真实 helper 输出的文案解析得对（连接断言）',
-          real.length === 1 && real[0].label === '1/6 刷新 Cloudflare token', { outLine });
-        check('★ 真实 helper 输出带出了时间戳（连接断言）',
-          real.length === 1 && /^\d{2}:\d{2}:\d{2}$/.test(String(real[0].clock || '')),
-          { outLine, clock: real[0] && real[0].clock });
-        check('★ 真实 helper 输出里 === 标记在时间戳前面（连接断言）',
-          outLine.indexOf('===') < outLine.indexOf('['), { outLine });
-      }
-    }
-  }
+  /* …解析层断言，见实现… */
 }
 
 console.log(`\n${pass} 通过 / ${fail} 失败`);
 process.exit(fail ? 1 : 0);
 ```
+
+> **本 Task 的断言组已在实施中落地 —— 实际代码见母本 `tools/test-night-dashboard.mjs`**，
+> 不要照抄本计划里的样例（样例已被后续修复淘汰，照抄会把已修掉的 bug 抄回来）。
+> 实施中确立的写法，**Task 3 起在同一个文件追加断言时必须沿用**：
+>
+> 1. **每条断言自带前置条件**，不要用 `if` 把断言圈起来跳过 ——
+>    前置不满足时要**报红**，不是不执行（否则 Task 8 按标签 grep 会误判成「没抓到」）。
+> 2. **detail 里的取值先落到安全变量** —— `{ a: cross[0].atMs }` 是无条件求值的，
+>    条件为假也会抛。
+> 3. **不直接下标** —— `steps[0].key` 在 `steps` 变短时抛 TypeError，
+>    要写成 `steps.length === 2 && steps[0].key === ...`。
+> 4. **`indexOf` 找不到返回 `-1`** —— `-1 < 3` 是**真**，
+>    「`===` 标记还在不在」这类断言要先判 `indexOf(...) !== -1`。
+> 5. **不硬编码 `powershell.exe`** —— 按平台分支（`process.platform === 'win32' ?
+>    'powershell' : 'pwsh'`），macOS 上没有 `powershell.exe`。
+> 6. **匹配源码前先剥注释** —— 工程里有 `tools/strip-comments.mjs`，
+>    断言锚点唯一性也要报命中数（0 次或 >1 次都要红）。
 
 - [ ] **Step 2: 跑测试，确认它红**
 
@@ -2527,7 +2440,7 @@ git commit -m "test: 定时任务台护栏的变异体（证明有牙齿）"
 护栏表加：
 
 ```
-| `test-night-dashboard.mjs` | 99 | 定时任务台：三个 helper 的时间戳格式 + 解析层（剥 BOM / 15 节点 / 老日志兼容 / 跨零点）+ 状态与问题判定（中位数只用成功的夜）+ HTTP 层（本机 / 动态端口 Origin / 目录穿越金丝雀）+ 启动器约定 + 服务端 toast |
+| `test-night-dashboard.mjs` | 108 | 定时任务台：三个 helper 的时间戳格式 + 解析层（剥 BOM / 15 节点 / 老日志兼容 / 跨零点）+ 状态与问题判定（中位数只用成功的夜）+ HTTP 层（本机 / 动态端口 Origin / 目录穿越金丝雀）+ 启动器约定 + 服务端 toast |
 | `test-night-dashboard-mutate.mjs` | 6 组变异 | 改坏解析器必须被抓住（剥 BOM / 时间戳正则 / 跨零点 / 负耗时 / 分组 / median） |
 ```
 
