@@ -65,6 +65,15 @@
 - **匹配源码前先剥注释**：逐行 `#` 注释 + `<# ... #>` 块注释都要剥掉再匹配（工程里已有 `tools/strip-comments.mjs`）。
 - **期望红 + 期望绿双向声明**：变异套件里每条变异都要写明「应该红的断言」和「应该仍然绿的断言」。
 - **统计按本次运行切分**：不要把上一轮的数字算进来。
+- **干净地红，不是崩着红**：护栏的失败必须是**断言变红**（`✗ <label>`），不能是**整个套件抛异常崩掉**。
+  崩掉的套件一条 `✗ <label>` 都不会有 → Task 8 按标签 grep 会误判成「没抓到」（假阴性）。
+  → **写断言时不要直接下标**：`steps[0].key` 在 `steps` 变短时会抛 TypeError，
+  要写成 `steps.length === 2 && steps[0].key === ...`。
+  → **detail 对象是无条件求值的**：`{ a: cross[0].atMs }` 即使条件为假也会抛，
+  下标取值要先落到安全变量上。
+- **缺失时不能意外成立**：`indexOf` 找不到返回 `-1`，所以 `-1 < 3` 是**真** →
+  「`===` 标记还在不在」这类断言必须先判 `indexOf(...) !== -1`。
+  同理 `!/Get-Date/.test('')` 在 body 为空串时**恒真** → 条件里要带 `body !== ''`。
 
 ### 不可逆动作
 
@@ -206,7 +215,7 @@ function Step($msg) { Write-Host ("`n=== $msg ===  [" + (Get-BjNow).ToString('HH
 function Rule($t)  { Write-Host ("`n=== $t ===  [" + (Get-BjNow).ToString('HH:mm:ss') + "]") -ForegroundColor Cyan }
 ```
 
-⚠️ 三个脚本都已经 dot-source `common.ps1`（`daily.ps1:74` / `daily-review.ps1:46` / `publish.ps1:49`），
+⚠️ 三个脚本都已经 dot-source `common.ps1`（`daily.ps1:74` / `daily-review.ps1:77` / `publish.ps1:49`），
 `Get-BjNow` 直接可用，**不要**在这里改用 `Get-Date`。
 
 改完立刻确认 BOM 还在：
@@ -242,7 +251,9 @@ Expected: 至少 4 行，形如 `=== 6/6 跳过 Pages 部署 ===  [09:2x:xx]`。
 - [ ] **Step 6: 跑全量护栏（母本）**
 
 Run: `node tools\run-all-tests.mjs`
-Expected: 结尾 `总计 45 套件：45 绿 / 0 红 / 0 崩 / 0 跳过`。
+Expected: 结尾 `总计 35 套件：35 绿 / 0 红 / 0 崩 / 0 跳过`。
+（`tools/test-*.mjs` 共 46 个文件 = 35 个常规 + 11 个 `-mutate`；跑批器**默认排除** `-mutate`，
+所以常规批次是 35 套。想连变异一起跑用 `node tools\run-all-tests.mjs --mutate` → 46 套。）
 `test-webp.mjs` 要跑 15 分钟左右。
 
 - [ ] **Step 7: 提交（母本）**
@@ -278,6 +289,12 @@ export function median(nums)                    // → number | null
 ```
 
 - [ ] **Step 1: 追加会失败的断言**
+
+⚠️ 连接断言要用 `spawnSync` 真跑一次 PowerShell，**先在护栏骨架的 import 区加上**：
+
+```js
+import { spawnSync } from 'node:child_process';
+```
 
 在 `tools/test-night-dashboard.mjs` 里，把结尾的
 
@@ -357,6 +374,52 @@ import * as ST from './night-dashboard-state.mjs';
   check('median 取奇数个的中位数', ST.median([3, 1, 2]) === 2);
   check('median 用中位数不是平均数（一个异常值不能拉歪基准）', ST.median([1, 2, 3, 100]) === 3);
   check('median 空数组 → null', ST.median([]) === null);
+
+  /* ── 连接断言：真实 helper 输出必须能被解析器认出来 ──────────
+     为什么必须有这一组：Task 1 的护栏只查**源码里有没有记号**，
+     查不出「时间戳被挪到 === 前面」或「=== 标记被改写」这两种改法。
+     而 Task 2 的护栏查的是**字面样本**能不能解析。
+     两头都不接 → 格式漂移了没人拦，线上任务台静默显示 0 个阶段。
+     这一组把两头接上：从 publish.ps1 里取出真实 helper 源码行，
+     真的跑一遍拿到输出行，再喂给 parseSteps。 */
+  const psSrc = read('tools/publish.ps1');
+  const stepLine = psSrc.split(/\r?\n/).find((l) => /function\s+Step\s*\(/.test(l));
+  check('publish.ps1 里找得到 Step helper 源码行（连接断言的前置）', !!stepLine);
+  if (stepLine) {
+    /* 只取函数体里 Write-Host 的那个表达式，替掉 $msg 变量后真跑一次。
+       用 powershell.exe -EncodedCommand 避开 PowerShell 层的引号地狱。 */
+    const exprMatch = /Write-Host\s*\((.*)\)\s*-ForegroundColor/.exec(stepLine);
+    check('Step 里的 Write-Host 是带括号的拼接形式（连接断言的前置）',
+      !!exprMatch, { stepLine });
+    if (exprMatch) {
+      const expr = exprMatch[1]
+        .replace(/"\$msg"/g, "'1/6 刷新 Cloudflare token'")
+        .replace(/"\$t"/g, "'1/6 刷新 Cloudflare token'");
+      const enc = Buffer.from(
+        "$ErrorActionPreference='Stop'; . '" + path.join(ROOT, 'tools', 'common.ps1') +
+        "'; Write-Output -NoNewline (" + expr + ")",
+        'utf16le').toString('base64');
+      const ps = spawnSync('powershell.exe',
+        ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', enc],
+        { cwd: ROOT, encoding: 'utf8', timeout: 30000 });
+      const outLine = String(ps.stdout || '').split(/\r?\n/).map((s) => s.trim())
+        .find((s) => /^===/.test(s));
+      check('真实 helper 输出行拿到了（连接断言的前置）',
+        !!outLine, { stdout: ps.stdout, stderr: ps.stderr, exit: ps.status });
+      if (outLine) {
+        const real = ST.parseSteps(outLine, '2026-11-20');
+        check('★ 真实 helper 输出能被解析器认出来（连接断言）',
+          real.length === 1 && real[0].key === 'publish/1-6', { outLine, real });
+        check('★ 真实 helper 输出的文案解析得对（连接断言）',
+          real.length === 1 && real[0].label === '1/6 刷新 Cloudflare token', { outLine });
+        check('★ 真实 helper 输出带出了时间戳（连接断言）',
+          real.length === 1 && /^\d{2}:\d{2}:\d{2}$/.test(String(real[0].clock || '')),
+          { outLine, clock: real[0] && real[0].clock });
+        check('★ 真实 helper 输出里 === 标记在时间戳前面（连接断言）',
+          outLine.indexOf('===') < outLine.indexOf('['), { outLine });
+      }
+    }
+  }
 }
 
 console.log(`\n${pass} 通过 / ${fail} 失败`);
@@ -574,7 +637,7 @@ export function median(nums) {
 - [ ] **Step 4: 跑测试，确认它绿**
 
 Run: `node tools\test-night-dashboard.mjs`
-Expected: PASS —— `41 通过 / 0 失败`。
+Expected: PASS —— `50 通过 / 0 失败`（41 条原断言 + 9 条连接断言）。
 
 - [ ] **Step 5: 确认编码**
 
@@ -908,7 +971,7 @@ import { computePublishState, describeDeadState } from './publish-state.mjs';
 - [ ] **Step 4: 跑测试，确认它绿**
 
 Run: `node tools\test-night-dashboard.mjs`
-Expected: PASS —— `59 通过 / 0 失败`。
+Expected: PASS —— `68 通过 / 0 失败`。
 
 - [ ] **Step 5: 提交（母本）**
 
@@ -1417,7 +1480,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
 - [ ] **Step 4: 跑测试，确认它绿**
 
 Run: `node tools\test-night-dashboard.mjs`
-Expected: PASS —— `69 通过 / 0 失败`。
+Expected: PASS —— `78 通过 / 0 失败`。
 
 - [ ] **Step 5: 手动起一下看看**
 
@@ -1873,7 +1936,7 @@ poll();
 - [ ] **Step 6: 跑测试，确认它绿**
 
 Run: `node tools\test-night-dashboard.mjs`
-Expected: PASS —— `86 通过 / 0 失败`。
+Expected: PASS —— `95 通过 / 0 失败`。
 
 - [ ] **Step 7: 起服务看一眼**
 
@@ -2089,7 +2152,7 @@ node tools\start-dashboard.mjs --direct
 - [ ] **Step 5: 跑测试，确认它绿**
 
 Run: `node tools\test-night-dashboard.mjs`
-Expected: PASS —— `93 通过 / 0 失败`。
+Expected: PASS —— `102 通过 / 0 失败`。
 
 - [ ] **Step 6: 双击路径验证（命令行等价）**
 
@@ -2240,7 +2303,7 @@ function notifyToast(title, body) {
 - [ ] **Step 5: 跑测试，确认它绿**
 
 Run: `node tools\test-night-dashboard.mjs`
-Expected: PASS —— `99 通过 / 0 失败`。
+Expected: PASS —— `108 通过 / 0 失败`。
 
 - [ ] **Step 6: 补 BOM + 验证**
 
@@ -2380,7 +2443,7 @@ for (const m of MUTANTS) {
   const out = `${r.stdout || ''}${r.stderr || ''}`;
   fs.writeFileSync(TARGET, src, 'utf8');   // 还原
 
-  if (/SyntaxError|Cannot find module/.test(out)) {
+  if (/SyntaxError|Cannot find module|ReferenceError|TypeError/.test(out)) {
     console.log(`  ✗ ${m.id} ${m.name} —— 变异把护栏自己搞崩了（假红）`);
     broken++;
     continue;
@@ -2420,7 +2483,7 @@ Expected: `变异测试：6/6 被抓到`。
 ```powershell
 node tools\test-night-dashboard.mjs
 ```
-Expected: PASS —— `99 通过 / 0 失败`（变异脚本会还原源码）。
+Expected: PASS —— `108 通过 / 0 失败`（变异脚本会还原源码）。
 
 - [ ] **Step 4: 提交（母本）**
 
@@ -2501,9 +2564,9 @@ git commit -m "test: 定时任务台护栏的变异体（证明有牙齿）"
 Set-Location 'E:\voice-pilot\daily-image-site'
 node tools\run-all-tests.mjs
 ```
-Expected: `总计 46 套件：46 绿 / 0 红 / 0 崩 / 0 跳过`（45 原有 + 新增 `test-night-dashboard`）。
+Expected: `总计 35 套件：35 绿 / 0 红 / 0 崩 / 0 跳过`（34 原有常规 + 新增 `test-night-dashboard`）。
 跑批器默认**不含**变异套件 —— 变异那套要单独跑：
-`node tools\run-all-tests.mjs --mutate` → 47 套（含 `test-night-dashboard-mutate`）。
+`node tools\run-all-tests.mjs --mutate` → 46 套（35 常规 + 11 个 `-mutate`，含新增的 `test-night-dashboard-mutate`）。
 
 ```powershell
 Set-Location 'E:\voice-pilot\daily-image-site-open'
