@@ -1451,8 +1451,21 @@ PowerShell 5.1 启动即罢工。node / cmd 不挑这个，**只有 PowerShell �
 （真的起一个脱离的 PowerShell，看它是不是还在跑 —— 只查形状不够，形状对了照样秒退）。
 → 护栏 142 → **144**。
 
+**母 agent 派活前的预检订正**（brief 已按这个改好，实施者照 brief 做）：
+
+| 项 | 原 brief 的写法 | 预检后的结论 |
+|---|---|---|
+| Windows 形状 | `cmd /c start '' /b <exe> ...`（空标题） | ✅ **实测通过**，可以用。探针 `probe-fix2-shapes.mjs` / `probe-fix2-filepath.mjs` 亲测：空标题 + `-Command` ✅、空标题 + `-File "<带空格路径>"` ✅、无标题也 ✅，标记文件都写了、5.5 秒后进程都还活着 |
+| 动态 import 的变量名 | `dash4` | ❌ 护栏里没有 `dash4`。第 4 组叫 `dash`、4b 组叫 `dash4b`、第 5 组叫 `dash5`。→ 新断言**另起一个块**自己 import（`dashFix2`），照本文件既有惯例 |
+| `os` 模块 | 「可能要 import」 | ✅ **已经在文件头**（第 8 行）→ 不要再加（重复 import 同名 → SyntaxError → 整个套件崩，不是干净地红） |
+| `spawn` | 「要补 import」 | ✅ 确实**还没** import。文件头第 11 行 `import { spawnSync } from 'node:child_process';` → **改成** `{ spawnSync, spawn }`（改那一行，别新加一行） |
+| 行为断言的判据 | 只查「标记文件写了没」 | 加查**第二次（+3 秒）进程还在不在** —— 起一下就退的进程，第一次可能已经写完标记了 |
+
 ⚠️ **教训**：「detached + unref ≡ cmd start」这种推断**必须实测**。
 凡是「子进程会不会活着 / 会不会真的跑起来」的问题，一律**真的起一个进程看它活不活**。
+
+⚠️ **顺带记一条**：`Get-CimInstance` 那条「按命令行找进程」的探测命令**自己也会命中**
+（它的命令行里就含探针标记）→ 查到 2 个 PID 不代表起了 2 个进程。
 
 ### 修复轮 1（verifier 评审结论「需要修」）
 
