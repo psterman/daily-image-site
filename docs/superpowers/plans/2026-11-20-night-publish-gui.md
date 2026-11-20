@@ -2464,7 +2464,7 @@ git commit -m "test: 定时任务台护栏的变异体（证明有牙齿）"
 护栏表加：
 
 ```
-| `test-night-dashboard.mjs` | 87 | 定时任务台：三个 helper 的时间戳格式 + 解析层（剥 BOM / 15 节点 / 老日志兼容 / 跨零点）+ 状态与问题判定（中位数只用成功的夜）+ HTTP 层（本机 / 动态端口 Origin / 目录穿越金丝雀）+ 启动器约定 |
+| `test-night-dashboard.mjs` | 99 | 定时任务台：三个 helper 的时间戳格式 + 解析层（剥 BOM / 15 节点 / 老日志兼容 / 跨零点）+ 状态与问题判定（中位数只用成功的夜）+ HTTP 层（本机 / 动态端口 Origin / 目录穿越金丝雀）+ 启动器约定 + 服务端 toast |
 | `test-night-dashboard-mutate.mjs` | 6 组变异 | 改坏解析器必须被抓住（剥 BOM / 时间戳正则 / 跨零点 / 负耗时 / 分组 / median） |
 ```
 
