@@ -884,7 +884,7 @@ import { computePublishState, describeDeadState } from './publish-state.mjs';
 - [ ] **Step 4: 跑测试，确认它绿**
 
 Run: `node tools\test-night-dashboard.mjs`
-Expected: PASS —— `96 通过 / 0 失败`。
+Expected: PASS —— `102 通过 / 0 失败`。
 
 > **实施修订（2026-11-20，Task 3 两轮修复）**：
 >
@@ -899,7 +899,13 @@ Expected: PASS —— `96 通过 / 0 失败`。
 > 「现在 > 06:00 且今天没有 `.done` → info」（每天 00:00–00:10 都会假报「今天凌晨还没跑」）。
 > 修复后断言 87 → **96**。
 >
-> 下游 Task 4–8 的期望值同步顺延（**96 → 106 → 123 → 130 → 136**）。
+> **修复轮 3**（复评通过，仅 3 条 Minor，母会话直接收尾）——
+> ① 阶段级慢**只比闭合区间**（`running`/`dead` 的夜，最后一段耗时「还在涨」，
+> 不能拿去和历史基线比）；② `current.doneExists` → 完成记录**存在但 exit 读不出来**
+> 与「没有完成记录」两种文案分开；③ 补 3 处护栏覆盖缺口。
+> 修复后断言 96 → **102**。
+>
+> 下游 Task 4–8 的期望值同步顺延（**102 → 112 → 129 → 136 → 142**）。
 > 详见 `.superpowers/sdd/2026-11-20-night-publish-gui/task-3-fix-brief.md`、
 > `task-3-fix-report.md`、`task-3-fix2-brief.md`、`task-3-fix2-report.md`。
 
@@ -1410,7 +1416,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
 - [ ] **Step 4: 跑测试，确认它绿**
 
 Run: `node tools\test-night-dashboard.mjs`
-Expected: PASS —— `106 通过 / 0 失败`。
+Expected: PASS —— `112 通过 / 0 失败`。
 
 - [ ] **Step 5: 手动起一下看看**
 
@@ -1866,7 +1872,7 @@ poll();
 - [ ] **Step 6: 跑测试，确认它绿**
 
 Run: `node tools\test-night-dashboard.mjs`
-Expected: PASS —— `123 通过 / 0 失败`。
+Expected: PASS —— `129 通过 / 0 失败`。
 
 - [ ] **Step 7: 起服务看一眼**
 
@@ -2082,7 +2088,7 @@ node tools\start-dashboard.mjs --direct
 - [ ] **Step 5: 跑测试，确认它绿**
 
 Run: `node tools\test-night-dashboard.mjs`
-Expected: PASS —— `130 通过 / 0 失败`。
+Expected: PASS —— `136 通过 / 0 失败`。
 
 - [ ] **Step 6: 双击路径验证（命令行等价）**
 
@@ -2233,7 +2239,7 @@ function notifyToast(title, body) {
 - [ ] **Step 5: 跑测试，确认它绿**
 
 Run: `node tools\test-night-dashboard.mjs`
-Expected: PASS —— `136 通过 / 0 失败`。
+Expected: PASS —— `142 通过 / 0 失败`。
 
 - [ ] **Step 6: 补 BOM + 验证**
 
@@ -2413,7 +2419,7 @@ Expected: `变异测试：6/6 被抓到`。
 ```powershell
 node tools\test-night-dashboard.mjs
 ```
-Expected: PASS —— `136 通过 / 0 失败`（变异脚本会还原源码）。
+Expected: PASS —— `142 通过 / 0 失败`（变异脚本会还原源码）。
 
 - [ ] **Step 4: 提交（母本）**
 
@@ -2457,7 +2463,7 @@ git commit -m "test: 定时任务台护栏的变异体（证明有牙齿）"
 护栏表加：
 
 ```
-| `test-night-dashboard.mjs` | 136 | 定时任务台：三个 helper 的时间戳格式 + 解析层（剥 BOM / 15 节点 / 老日志兼容 / 跨零点）+ 状态与问题判定（中位数只用成功的夜 / **`.done` 优先于日志标记 / dead 点名步骤 / 格式变了退化为 unknown 并按完成记录分级 / 阶段级慢 > 中位数 × 3 / 06:00 闸门**）+ HTTP 层（本机 / 动态端口 Origin / 目录穿越金丝雀）+ 启动器约定 + 服务端 toast |
+| `test-night-dashboard.mjs` | 142 | 定时任务台：三个 helper 的时间戳格式 + 解析层（剥 BOM / 15 节点 / 老日志兼容 / 跨零点）+ 状态与问题判定（中位数只用成功的夜 / **`.done` 优先于日志标记 / dead 点名步骤 / 格式变了退化为 unknown 并按完成记录分级 / 阶段级慢 > 中位数 × 3（只比闭合区间）/ 06:00 闸门**）+ HTTP 层（本机 / 动态端口 Origin / 目录穿越金丝雀）+ 启动器约定 + 服务端 toast |
 | `test-night-dashboard-mutate.mjs` | 6 组变异 | 改坏解析器必须被抓住（剥 BOM / 时间戳正则 / 跨零点 / 负耗时 / 分组 / median） |
 ```
 
