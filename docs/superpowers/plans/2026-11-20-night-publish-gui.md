@@ -912,7 +912,7 @@ Expected: PASS —— `105 通过 / 0 失败`。
 > 把「合并后数组最后一个元素 ≠ 最后一个观察到的步骤」这个坑钉死。
 > 修复后断言 102 → **105**。
 >
-> 下游 Task 4–8 的期望值同步顺延（**105 → 115 → 120 → 142 → 149 → 156**）。
+> 下游 Task 4–8 的期望值同步顺延（**105 → 115 → 120 → 142 → 144 → 151 → 158**）。
 > 详见 `.superpowers/sdd/2026-11-20-night-publish-gui/task-3-fix-brief.md`、
 > `task-3-fix-report.md`、`task-3-fix2-brief.md`、`task-3-fix2-report.md`。
 
@@ -1424,6 +1424,35 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
 
 Run: `node tools\test-night-dashboard.mjs`
 Expected: PASS —— `120 通过 / 0 失败`（115 + verifier 评审要求补的 5 条护栏）。
+
+### 修复轮 2（母 agent 实测发现的真 bug：`spawnDetached` 在 Windows 上**起不来**发布进程）
+
+⚠️ **2026-11-20 母 agent 实测**（不是推理）：
+**Windows 上 Node 的 `spawn('powershell', [...], { detached: true })` 起的 PowerShell
+会「立刻退出（exit 0）」，脚本根本没跑**（标记文件都没生成）。
+所以「立即跑一次」/「补发某一天」会返回 **202 `{ok:true,pid}`** 看起来受理了，
+**实际什么都没发生** —— 对不可逆的发布动作，这是最坏的失败模式。
+
+| 形状 | 实测 |
+|---|---|
+| `node` + `detached` | ✅ 活着 |
+| `cmd` + `detached` | ✅ 活着 |
+| **`powershell` + `detached`** | ❌ **exit 0、脚本没跑** |
+| `powershell` + **不** detached | ✅ 活着 |
+| **`cmd /c start /b powershell -File x.ps1`** | ✅ **脚本真跑，父进程退出后还活着** |
+
+**根因（推测）**：`detached` 在 Windows 上给子进程 `DETACHED_PROCESS` → 没有控制台 →
+PowerShell 5.1 启动即罢工。node / cmd 不挑这个，**只有 PowerShell 有这个毛病**。
+
+⚠️ **spec §4.3 原本写的就是 `cmd /c start /b`** —— 实现偏离了它，
+评审把这条偏离判成「Minor / 功能等价」**但没实测**。现在有实测了：**不等价，而且坏**。
+→ 修法：`spawnDetached` 在 Windows 走 `cmd /c start /b`，POSIX 保持直连。
+→ 护栏 +2 条：**形状断言**（Windows 走 `cmd /c start /b`）+ **行为断言**
+（真的起一个脱离的 PowerShell，看它是不是还在跑 —— 只查形状不够，形状对了照样秒退）。
+→ 护栏 142 → **144**。
+
+⚠️ **教训**：「detached + unref ≡ cmd start」这种推断**必须实测**。
+凡是「子进程会不会活着 / 会不会真的跑起来」的问题，一律**真的起一个进程看它活不活**。
 
 ### 修复轮 1（verifier 评审结论「需要修」）
 
@@ -2116,7 +2145,7 @@ poll();
 - [ ] **Step 6: 跑测试，确认它绿**
 
 Run: `node tools\test-night-dashboard.mjs`
-Expected: PASS —— `142 通过 / 0 失败`（120 + 本组 22 条）。
+Expected: PASS —— `144 通过 / 0 失败`（142 + 本组 22 条；142 = 120 + Task 5 的 22）。
 
 ⚠️ 既有 120 条断言的**标签、条件、顺序一个字都不许动**。
 新增的 22 条各自用**独立新标签**（Task 8 按标签 grep 变异点，重复标签会串）。
@@ -2348,7 +2377,7 @@ node tools\start-dashboard.mjs --direct
 - [ ] **Step 5: 跑测试，确认它绿**
 
 Run: `node tools\test-night-dashboard.mjs`
-Expected: PASS —— `149 通过 / 0 失败`。
+Expected: PASS —— `151 通过 / 0 失败`。
 
 - [ ] **Step 6: 双击路径验证（命令行等价）**
 
@@ -2516,7 +2545,7 @@ function notifyToast(title, body) {
 - [ ] **Step 5: 跑测试，确认它绿**
 
 Run: `node tools\test-night-dashboard.mjs`
-Expected: PASS —— `156 通过 / 0 失败`。
+Expected: PASS —— `158 通过 / 0 失败`。
 
 - [ ] **Step 6: 补 BOM + 验证**
 
@@ -2823,7 +2852,7 @@ Expected: `变异测试：12/12 被抓到`。
 ```powershell
 node tools\test-night-dashboard.mjs
 ```
-Expected: PASS —— `156 通过 / 0 失败`（变异脚本会还原源码）。
+Expected: PASS —— `158 通过 / 0 失败`（变异脚本会还原源码）。
 
 再确认工作区干净：
 ```powershell
@@ -2888,7 +2917,7 @@ if (-not $txt.Contains('.night-dashboard-port')) {
 护栏表加：
 
 ```
-| `test-night-dashboard.mjs` | 156 | 定时任务台：三个 helper 的时间戳格式 + 解析层（剥 BOM / 15 节点 / 老日志兼容 / 跨零点）+ 状态与问题判定（中位数只用成功的夜 / **`.done` 优先于日志标记 / dead 点名步骤 / 格式变了退化为 unknown 并按完成记录分级 / 阶段级慢 > 中位数 × 3（只比闭合区间）/ 06:00 闸门 / 阶段级只比闭合区间**）+ HTTP 层（本机 / 动态端口 Origin / 目录穿越金丝雀 / **写路径零副作用** / **by:manual 取 manual 日志** / **只绑 127.0.0.1** / **`/api/log` 只读尾部 64KB**）+ 启动器约定 + 服务端 toast |
+| `test-night-dashboard.mjs` | 158 | 定时任务台：三个 helper 的时间戳格式 + 解析层（剥 BOM / 15 节点 / 老日志兼容 / 跨零点）+ 状态与问题判定（中位数只用成功的夜 / **`.done` 优先于日志标记 / dead 点名步骤 / 格式变了退化为 unknown 并按完成记录分级 / 阶段级慢 > 中位数 × 3（只比闭合区间）/ 06:00 闸门 / 阶段级只比闭合区间**）+ HTTP 层（本机 / 动态端口 Origin / 目录穿越金丝雀 / **写路径零副作用** / **by:manual 取 manual 日志** / **只绑 127.0.0.1** / **`/api/log` 只读尾部 64KB**）+ 启动器约定 + 服务端 toast |
 | `test-portability.mjs` | 45 | 平台可移植性（**含任务台：PowerShell 可执行名按平台分，不许硬编码 `powershell.exe`**） |
 | `test-night-dashboard-mutate.mjs` | 12 组变异 | 改坏**解析层和 HTTP 层**都必须被抓住（剥 BOM / 时间戳正则 / 跨零点 / 负耗时 / 分组 / median / allowWrite 顺序 / by:manual / 绑 0.0.0.0 / 读整份日志） |
 ```
