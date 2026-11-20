@@ -2196,6 +2196,27 @@ git commit -m "feat: 定时任务台页面（素白文档风 · 今日焦点 · 
 - Consumes: Task 4 的 `tools/night-dashboard.mjs`
 - Produces: `起任务台.cmd`（双击入口）、`tools/start-dashboard.mjs`（脱 Job 起服务）
 
+**⚠️ 母 agent 预检后的订正（照这个做，别照抄旧版本）：**
+
+1. **浏览器必须开，而且只开一次。**
+   旧版里 `.cmd` 走的是 `node tools\start-dashboard.mjs --direct`，而 `--direct` 分支
+   **只起服务、不开浏览器** → **双击 `起任务台.cmd` 会「服务起来了，但没页面」** ——
+   而「双击入口」的全部意义就是双击就有页面。
+   → 现在的规则：**谁直接起服务，谁开浏览器。**
+   `--direct`（.cmd 调的那条）→ 起服务 + 等端口 + **开浏览器**；
+   Windows 默认路径 → 内层 `--direct` 开，**外层只打印 URL、不再开**（否则开两个标签页）；
+   macOS / Linux 默认路径 → 没有内层 → 外层自己开。
+2. **`ROOT` 用 `tools/paths.mjs` 导出的**，别自己 `path.resolve(__dirname, '..')` ——
+   仓库惯例（`tools/start-review.mjs` 就是 `import { ROOT } from './paths.mjs';`），
+   而且 `paths.mjs` 会 `loadEnv()`。
+3. 端口**必须用实际值**（`.night-dashboard-port`），不能写死 8801 ——
+   端口被占用时服务会顺延（8801→8810）。
+4. 「已经在跑」要**只开页面、不起第二个服务**。
+5. Step 1 的 8 条断言与 Step 3 的实现**已经对齐**（变量名、函数名逐字对应），
+   照抄即可 —— 但 Step 1 的断言**一个字都不许改**。
+
+---
+
 - [ ] **Step 1: 追加会失败的断言**
 
 ```js
@@ -2246,23 +2267,30 @@ Expected: FAIL —— Step 1 已经把读文件包了 `try/catch` → 读不到�
 /**
  * 起定时任务台（独立进程、无控制台、**不在父进程的 Job Object 里**）。
  *
- * 跟 .exp/start-preview.mjs 同一个套路：
- *   进程监督器给会话建了带 KILL_ON_JOB_CLOSE 的 Job，Job 一关里面的进程被强杀。
+ * 跟 tools/start-review.mjs 同一个套路（**照抄它的结构**）：
+ *   进程监督器给会话建了带 KILL_ON_JOB_CLOSE 的 Job，Job 一关里面的进程被强杀
+ *   （无 stderr、无退出码 —— 症状跟「程序自己崩了」一模一样）。
  *   detached 挡不住（Node 的 spawn 没有 CREATE_BREAKAWAY_FROM_JOB），
  *   只有让 **explorer.exe 去起**（Explorer 本身不在任何 Job 里）才躲得开。
  *
+ * ⚠️ **浏览器由「直接起服务的那个进程」来开**（规则就这一句，别搞出两个进程各开一次）：
+ *   - `--direct`（根目录 .cmd 调的就是它）→ 起服务 + 等端口 + **开浏览器**
+ *   - Windows 默认路径 → 经 explorer.exe → .cmd → `--direct` → **内层开浏览器**
+ *     （外层只等端口、打印 URL，**不再开**，否则开两个标签页）
+ *   - macOS / Linux 默认路径 → 没有内层 → 外层自己起 + 自己开
+ *
  * 用法：
- *   node tools\start-dashboard.mjs            # 经 explorer.exe 脱身
- *   node tools\start-dashboard.mjs --direct   # 直接起（由 .cmd 调用）
+ *   node tools\start-dashboard.mjs            # 经 explorer.exe 脱身（推荐）
+ *   node tools\start-dashboard.mjs --direct   # 直接起（由 起任务台.cmd 调用）
  */
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { ROOT } from './paths.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.resolve(__dirname, '..');
 const DIRECT = process.argv.includes('--direct');
 const PORT_FILE = path.join(ROOT, '.night-dashboard-port');
 const PID_FILE = path.join(ROOT, '.night-dashboard.pid');
@@ -2290,16 +2318,19 @@ function readPort() {
 }
 
 /**
- * 打开页面。**照抄仓库既有惯例**（tools/review.mjs:1701-1708）：
+ * 打开页面。**照抄仓库既有惯例**（tools/review.mjs:1700-1709）：
  * Windows 用 `cmd /c start`，macOS 用 `open`，其他用 `xdg-open`。
  * ⚠️ 端口可能顺延 → 一定要用**实际端口**的 URL，不能写死 8801。
+ * ⚠️ `start` 的第一个带引号参数会被当成标题 → 标题位置传空串 `''`（跟 review.mjs 一样）。
  */
 function openBrowser(url) {
   const cmd = process.platform === 'win32' ? 'cmd' : (process.platform === 'darwin' ? 'open' : 'xdg-open');
   const args = process.platform === 'win32' ? ['/c', 'start', '', url] : [url];
   try {
     spawn(cmd, args, { detached: true, stdio: 'ignore' }).unref();
-  } catch { /* 打开不了就算了，用户可以自己复制链接 */ }
+  } catch (e) {
+    console.log('  （自动打开浏览器失败，手动打开 ' + url + '）');
+  }
 }
 
 function startDirect() {
@@ -2313,53 +2344,77 @@ function startDirect() {
   return child.pid;
 }
 
-async function main() {
-  /* 已经在跑就别起第二个 —— 直接把页面打开。 */
-  const existing = readPort();
-  if (existing && await portAlive(existing)) {
-    console.log('http://127.0.0.1:' + existing + '/');
-    openBrowser('http://127.0.0.1:' + existing + '/');
-    return;
-  }
-
-  /* macOS / Linux：没有 Job Object 这回事，直接 detached 起。 */
-  if (process.platform !== 'win32') {
-    startDirect();
-    return;
-  }
-
-  /* Windows：交给 explorer.exe 起，躲开调用方的 Job Object。 */
-  const launcher = path.join(ROOT, '起任务台.cmd');
-  try {
-    spawn('explorer.exe', [launcher], { detached: true, stdio: 'ignore' }).unref();
-  } catch (e) {
-    console.error('调用 explorer.exe 失败：' + e.message + ' —— 退回直接启动。');
-    startDirect();
-    return;
-  }
-
-  const deadline = Date.now() + 20000;
+/** 等端口真的应答了才返回（端口文件是服务自己写的）。 */
+async function waitForPort(timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, 300));
     const p = readPort();
-    if (p && await portAlive(p)) {
-      console.log('http://127.0.0.1:' + p + '/');
-      openBrowser('http://127.0.0.1:' + p + '/');
-      return;
-    }
+    if (p && await portAlive(p)) return p;
   }
-  console.error('任务台没能在 20 秒内起来（看 .night-dashboard.err.log）。');
-  process.exit(1);
+  return null;
+}
+
+/** 已经有一个在跑就别起第二个 —— 直接把页面打开。 */
+async function openExisting() {
+  const existing = readPort();
+  if (existing && await portAlive(existing)) {
+    const url = 'http://127.0.0.1:' + existing + '/';
+    console.log(url);
+    openBrowser(url);
+    return true;
+  }
+  return false;
+}
+
+async function startAndOpen() {
+  startDirect();
+  const p = await waitForPort(20000);
+  if (!p) {
+    console.error('任务台没能在 20 秒内起来（看 .night-dashboard.err.log）。');
+    process.exit(1);
+  }
+  const url = 'http://127.0.0.1:' + p + '/';
+  console.log(url);
+  openBrowser(url);
 }
 
 if (DIRECT) {
-  startDirect();
-} else {
-  main().catch((e) => {
-    console.error('任务台启动失败：' + String((e && e.message) || e));
-    process.exit(1);
-  });
+  /* 根目录 .cmd 调的就是这条路径 → **双击入口必须能打开页面**。 */
+  if (await openExisting()) process.exit(0);
+  await startAndOpen();
+  process.exit(0);
 }
+
+/* ---------- 默认路径 ---------- */
+
+/* macOS / Linux：没有 Job Object 这回事，直接 detached 起。 */
+if (process.platform !== 'win32') {
+  if (await openExisting()) process.exit(0);
+  await startAndOpen();
+  process.exit(0);
+}
+
+/* ---------- Windows 默认路径：经 explorer.exe 脱身 Job Object ---------- */
+
+const launcher = path.join(ROOT, '起任务台.cmd');
+try {
+  spawn('explorer.exe', [launcher], { detached: true, stdio: 'ignore' }).unref();
+} catch (e) {
+  console.error('调用 explorer.exe 失败：' + e.message + ' —— 退回直接启动。');
+  if (await openExisting()) process.exit(0);
+  await startAndOpen();   /* 退化路径：没有内层 --direct，浏览器得外层来开 */
+  process.exit(0);
+}
+
+/* 外层只等端口、打印 URL —— **浏览器由内层的 --direct 进程开**，避免开两个标签页。 */
+const p = await waitForPort(20000);
+if (!p) {
+  console.error('任务台没能在 20 秒内起来（看 .night-dashboard.err.log）。');
+  process.exit(1);
+}
+console.log('http://127.0.0.1:' + p + '/');
+process.exit(0);
 ```
 
 - [ ] **Step 4: 写 `起任务台.cmd`**
@@ -2412,7 +2467,6 @@ git commit -m "feat: 定时任务台启动器（explorer.exe 脱 Job + 纯 ASCII
 公开副本的同步在 Task 9 一次性做，这一轮**不碰公开副本**。
 
 ---
-
 ## Task 7: 服务端 toast `tools/notify.ps1`
 
 **Files:**
