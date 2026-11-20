@@ -2535,8 +2535,19 @@ git commit -m "feat: 定时任务台服务端 toast（页面关着也能收到�
 - Create: `tools/test-night-dashboard-mutate.mjs`
 
 **Interfaces:**
-- Consumes: Task 2/3 的解析层与状态层
-- Produces: 证明护栏有牙齿 —— 改坏解析器必须被抓住。
+- Consumes: `tools/test-night-dashboard.mjs`（被验的护栏）、`tools/night-dashboard-state.mjs`、`tools/night-dashboard.mjs`（被变异的目标）
+- Produces: 证明护栏有牙齿 —— 改坏解析层**和 HTTP 层**都必须被抓住。
+
+**本轮订正（母 agent 独立核实）**：
+
+1. **旧版只变异解析层**（6 组全在 `night-dashboard-state.mjs`）。
+   但 verifier 评审实测**评审自己发现的 4 个存活变异体全在 HTTP 层**
+   （`allowWrite` 顺序 / `allowWrite` 硬编码 / `findLogFor` 固定顺序 / `listen 0.0.0.0` / `/api/log` 读整份）
+   —— 旧版这套脚本**一个都覆盖不到**。→ 本轮加 HTTP 层变异。
+2. **旧版的「变异在副本上做，源码不动」是假的** —— 代码其实**原地改写源文件**再还原。
+   中途被 Ctrl+C / 崩了 / 超时 → **源文件留在变异状态**，仓库就坏了。
+   → 本轮加 `try/finally` + 退出兜底 + **还原后 sha256 校验**。
+3. **期望红/绿改成子串匹配** —— 标签改了不必重写脚本（护栏的标签由实现者定，脚本不该因此报废）。
 
 - [ ] **Step 1: 写变异脚本**
 
@@ -2547,130 +2558,246 @@ git commit -m "feat: 定时任务台服务端 toast（页面关着也能收到�
  *
  * 规矩：
  *   ① 每条变异都要写明「应该红的断言」和「应该仍然绿的断言」；
- *   ② 变异在**副本**上做，源码不动；
- *   ③ 变异点必须**恰好命中一次** —— 命中 0 次说明脚本过期了（源码改了），
- *      命中 2 次说明锚点不唯一 —— 直接 exit 1，别把「脚本坏了」混进「没抓到」。
+ *   ② 变异点必须**恰好命中一次** —— 命中 0 次说明脚本过期了（源码改了），
+ *      命中 2 次说明锚点不唯一 —— 直接 exit 1，别把「脚本坏了」混进「没抓到」；
+ *   ③ **必须还原**：改的是**源文件本身**（护栏要 import 它），
+ *      所以跑完必须逐字节还原，并校验 sha256。
+ *      中途被打断（Ctrl+C / 崩了 / 超时）也要还原 → finally + exit 兜底。
+ *   ④ **期望红 / 期望绿都用子串匹配** —— 护栏的标签以后可能会改，
+ *      不该因为改了措辞就把这套脚本报废。
+ *
+ * ⚠️ HTTP 层的变异**绝不许真的发起一次发布**：
+ *    护栏的主测试实例挂了**假的 spawn 钩子**（Task 4 修复轮加的 `opts.spawnFn`），
+ *    所以即使 `allowWrite` 被改坏，也只是钩子被调用 → 不会真的 spawn。
+ *    ⚠️ 别把护栏里那个 spawnFn 钩子删了 —— 删了之后这套脚本就可能真发一次。
  */
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import crypto from 'node:crypto';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
-const TARGET = path.join(ROOT, 'tools', 'night-dashboard-state.mjs');
 const GUARD = path.join(ROOT, 'tools', 'test-night-dashboard.mjs');
+const TARGETS = {
+  state: path.join(ROOT, 'tools', 'night-dashboard-state.mjs'),
+  http: path.join(ROOT, 'tools', 'night-dashboard.mjs'),
+};
 
 const MUTANTS = [
+  /* ── 解析层 ─────────────────────────────────────────────── */
   {
-    id: 'M1', name: '不再剥 BOM（JSON.parse 遇到 \\uFEFF 直接抛）',
-    from: "s.charCodeAt(0) === 0xFEFF ? s.slice(1) : s",
-    to: "s",
+    id: 'M1', file: 'state', name: '不再剥 BOM（JSON.parse 遇到 \\uFEFF 直接抛）',
+    from: 's.charCodeAt(0) === 0xFEFF ? s.slice(1) : s',
+    to: 's',
     expectFail: ['stripBom 剥掉 U+FEFF', '.done 能剥 BOM 并解析'],
     expectGreen: ['stripBom 对没有 BOM 的原样返回'],
   },
   {
-    id: 'M2', name: '时间戳正则不再允许缺省（老日志全解析不了）',
+    id: 'M2', file: 'state', name: '时间戳正则不再允许缺省（老日志全解析不了）',
     from: "const STEP_RE = /^===\\s+(\\d+)\\/(\\d+)\\s+(.+?)\\s+===\\s*(?:\\[(\\d{2}:\\d{2}:\\d{2})\\])?\\s*$/;",
     to: "const STEP_RE = /^===\\s+(\\d+)\\/(\\d+)\\s+(.+?)\\s+===\\s+\\[(\\d{2}:\\d{2}:\\d{2})\\]\\s*$/;",
     expectFail: ['老日志（无时间戳）也能解析'],
     expectGreen: ['新格式解析出 2 个步骤'],
   },
   {
-    id: 'M3', name: '跨零点不再 +1 天（时长会算成负数）',
+    id: 'M3', file: 'state', name: '跨零点不再 +1 天（时长会算成负数）',
     from: 'if (Number.isFinite(prevMs) && atMs < prevMs) atMs += 24 * 60 * 60 * 1000;',
     to: '/* 变异：去掉跨零点处理 */',
     expectFail: ['跨零点：后一步自动 +1 天'],
     expectGreen: ['新格式有时间戳'],
   },
   {
-    id: 'M4', name: '阶段耗时算反了（会变成负数）',
+    id: 'M4', file: 'state', name: '阶段耗时算反了（会变成负数）',
     from: 'Math.max(0, to - steps[i].atMs)',
     to: 'steps[i].atMs - to',
     expectFail: ['阶段耗时 = 下一步时刻 − 本步时刻', '阶段耗时不会算出负数'],
     expectGreen: ['新格式解析出 2 个步骤'],
   },
   {
-    id: 'M5', name: '分组规则把 2/3、3/3 也算进「准备」',
+    id: 'M5', file: 'state', name: '分组规则把 2/3、3/3 也算进「准备」',
     from: "if (den === 3) return num === 1 ? 'prepare' : 'verify';",
     to: "if (den === 3) return 'prepare';",
     expectFail: ['2/3、3/3 归「校验与审稿」'],
     expectGreen: ['1/3 与 N/5 归「准备」'],
   },
   {
-    id: 'M6', name: 'median 用了平均数（一个异常值就能把基准拉歪）',
+    id: 'M6', file: 'state', name: 'median 用了平均数（一个异常值就能把基准拉歪）',
     from: 'return a.length % 2 ? a[mid] : Math.round((a[mid - 1] + a[mid]) / 2);',
     to: 'return Math.round(a.reduce((x, y) => x + y, 0) / a.length);',
     expectFail: ['median 用中位数不是平均数（一个异常值不能拉歪基准）'],
     expectGreen: ['median 取奇数个的中位数'],
   },
+
+  /* ── HTTP 层（评审实测这 5 个以前全绿存活） ─────────────── */
+  {
+    id: 'M7', file: 'http', name: 'allowWrite 的闸门失效（写路径不再被拦）',
+    from: 'if (!allowWrite)',
+    to: 'if (false)',
+    expectFail: ['不产生任何发布副作用'],
+    expectGreen: ['/api/state → 200', '跨站 Origin → 403'],
+  },
+  {
+    id: 'M8', file: 'http', name: 'allowWrite 被硬编码成 true（测试也会真发）',
+    from: 'const allowWrite = opts.allowWrite === true;',
+    to: 'const allowWrite = true;',
+    expectFail: ['不产生任何发布副作用'],
+    expectGreen: ['/api/state → 200', '跨站 Origin → 403'],
+  },
+  {
+    id: 'M9', file: 'http', name: 'findLogFor 改回固定顺序（by:manual 那一夜取错日志）',
+    from: "const want = done && done.by === 'manual' ? 'manual' : 'night';",
+    to: "const want = 'night';",
+    expectFail: ['manual 日志'],
+    expectGreen: ['/api/state → 200'],
+  },
+  {
+    id: 'M10', file: 'http', name: '服务绑到 0.0.0.0（不再只对本机）',
+    from: "server.listen(chosenPort, '127.0.0.1');",
+    to: "server.listen(chosenPort, '0.0.0.0');",
+    expectFail: ['只绑 127.0.0.1'],
+    expectGreen: ['/api/state → 200'],
+  },
+  {
+    id: 'M11', file: 'http', name: '/api/log 读整份日志（不再只读尾部 64KB）',
+    from: "const text = log ? readTail(log.file, 64 * 1024) : '';",
+    to: "const text = log ? readText(log.file) : '';",
+    expectFail: ['只读尾部 64KB'],
+    expectGreen: ['/api/state → 200'],
+  },
+  {
+    id: 'M12', file: 'http', name: '去掉目录穿越防护（金丝雀会漏出来）',
+    from: 'if (target !== UI_DIR && !target.startsWith(UI_DIR + path.sep)) {',
+    to: 'if (false) {',
+    expectFail: ['目录穿越（%2f 形式）拿不到金丝雀'],
+    expectGreen: ['/api/state → 200'],
+  },
 ];
 
-function selfCheck(mutated, original, to) {
-  if (mutated === original) return { ok: false, note: '变异没落地（副本跟原文一样）' };
-  if (!mutated.includes(to)) return { ok: false, note: '变异片段没出现在副本里' };
-  return { ok: true };
+/** 护栏输出里所有「红了的断言」标签（子串匹配用）。 */
+function redLabels(out) {
+  return out.split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.startsWith('✗ '))
+    .map((l) => l.slice(2));
+}
+function isRed(out, needle) {
+  return redLabels(out).some((l) => l.includes(needle));
+}
+function sha256(s) {
+  return crypto.createHash('sha256').update(s, 'utf8').digest('hex');
 }
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-mutate-'));
+/* ── 还原保险 ─────────────────────────────────────────────── */
+const original = new Map();
+for (const [k, f] of Object.entries(TARGETS)) original.set(k, fs.readFileSync(f, 'utf8'));
+
+let restored = false;
+function restoreAll() {
+  if (restored) return;
+  restored = true;
+  for (const [k, f] of Object.entries(TARGETS)) {
+    try { fs.writeFileSync(f, original.get(k), 'utf8'); } catch { /* 还原不了就靠下面的校验报错 */ }
+  }
+}
+/* 进程被 Ctrl+C / 崩了 / 超时 → 也要还原。 */
+process.on('exit', restoreAll);
+for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
+  process.on(sig, () => { restoreAll(); process.exit(1); });
+}
+
 let caught = 0;
 let broken = 0;
+const failed = [];
 
-for (const m of MUTANTS) {
-  const src = fs.readFileSync(TARGET, 'utf8');
-  const hits = src.split(m.from).length - 1;
-  if (hits !== 1) {
-    console.log(`  ✗ ${m.id} ${m.name} —— 锚点命中 ${hits} 次（应该恰好 1 次；源码改了？）`);
-    broken++;
-    continue;
-  }
-  const mutated = src.replace(m.from, m.to);
-  const self = selfCheck(mutated, src, m.to);
-  if (!self.ok) {
-    console.log(`  ✗ ${m.id} ${m.name} —— ${self.note}`);
-    broken++;
-    continue;
-  }
-  fs.writeFileSync(TARGET, mutated, 'utf8');
-  const r = spawnSync(process.execPath, [GUARD], { cwd: ROOT, encoding: 'utf8', timeout: 120000 });
-  const out = `${r.stdout || ''}${r.stderr || ''}`;
-  fs.writeFileSync(TARGET, src, 'utf8');   // 还原
+try {
+  for (const m of MUTANTS) {
+    const file = TARGETS[m.file];
+    const src = original.get(m.file);
 
-  if (/SyntaxError|Cannot find module|ReferenceError|TypeError/.test(out)) {
-    console.log(`  ✗ ${m.id} ${m.name} —— 变异把护栏自己搞崩了（假红）`);
-    broken++;
-    continue;
+    /* 锚点自检：必须恰好命中一次。 */
+    const hits = src.split(m.from).length - 1;
+    if (hits !== 1) {
+      console.log(`  ✗ ${m.id} ${m.name} —— 锚点命中 ${hits} 次（应该恰好 1 次；源码改了？）`);
+      broken++;
+      failed.push(m.id);
+      continue;
+    }
+    const mutated = src.replace(m.from, m.to);
+    if (mutated === src) {
+      console.log(`  ✗ ${m.id} ${m.name} —— 变异没落地`);
+      broken++;
+      failed.push(m.id);
+      continue;
+    }
+
+    fs.writeFileSync(file, mutated, 'utf8');
+    let r;
+    try {
+      r = spawnSync(process.execPath, [GUARD], { cwd: ROOT, encoding: 'utf8', timeout: 180000 });
+    } finally {
+      /* 每条变异跑完立刻还原 —— 别攒到最后。 */
+      fs.writeFileSync(file, src, 'utf8');
+    }
+    const out = `${r.stdout || ''}${r.stderr || ''}`;
+
+    /* 护栏自己崩了 = 假红，不算「抓到」。 */
+    if (/SyntaxError|Cannot find module|ReferenceError|TypeError/.test(out)) {
+      console.log(`  ✗ ${m.id} ${m.name} —— 变异把护栏自己搞崩了（假红，不算抓到）`);
+      broken++;
+      failed.push(m.id);
+      continue;
+    }
+
+    const missed = m.expectFail.filter((label) => !isRed(out, label));
+    /* 期望绿的那几条**不能**跟着变红 —— 否则说明这条变异把护栏整体掀翻了，
+       那是「脚本坏了」，不是「有牙齿」。 */
+    const broke = m.expectGreen.filter((label) => isRed(out, label));
+
+    if (missed.length === 0 && broke.length === 0) {
+      caught++;
+      console.log(`  ✓ ${m.id} ${m.name} —— 被抓住`);
+    } else if (missed.length === 0) {
+      console.log(`  ✗ ${m.id} ${m.name} —— 抓到了，但把不该红的弄红了：${broke.join('、')}`);
+      failed.push(m.id);
+    } else {
+      console.log(`  ✗ ${m.id} ${m.name} —— 没抓到（应该红的没红：${missed.join('、')}）`);
+      failed.push(m.id);
+    }
   }
-  const missed = m.expectFail.filter((label) => !out.includes('✗ ' + label));
-  /* 期望绿的那几条**不能**跟着变红 —— 否则说明这条变异把护栏整体掀翻了，
-     那是「脚本坏了」，不是「有牙齿」。 */
-  const broke = m.expectGreen.filter((label) => out.includes('✗ ' + label));
-  if (missed.length === 0 && broke.length === 0) {
-    caught++;
-    console.log(`  ✓ ${m.id} ${m.name} —— 被抓住`);
-  } else if (missed.length === 0) {
-    console.log(`  ✗ ${m.id} ${m.name} —— 抓到了，但把不该红的弄红了：${broke.join('、')}`);
-  } else {
-    console.log(`  ✗ ${m.id} ${m.name} —— 没抓到（应该红的没红：${missed.join('、')}）`);
-  }
+} finally {
+  restoreAll();
 }
 
-try { fs.rmSync(tmp, { recursive: true, force: true }); } catch { /* 临时目录 */ }
+/* ── 还原校验：源文件必须跟跑之前**逐字节**一样 ── */
+const bad = [];
+for (const [k, f] of Object.entries(TARGETS)) {
+  const now = fs.readFileSync(f, 'utf8');
+  if (sha256(now) !== sha256(original.get(k))) bad.push(k);
+}
+if (bad.length) {
+  console.log(`  ✗ 源文件没还原干净：${bad.join('、')} —— 手动 git checkout 一下`);
+  process.exit(1);
+}
 
 console.log(`\n变异测试：${caught}/${MUTANTS.length} 被抓到` + (broken ? `，${broken} 条脚本坏了` : ''));
+if (failed.length) console.log('没过的：' + failed.join('、'));
 process.exit(caught === MUTANTS.length && broken === 0 ? 0 : 1);
 ```
 
 - [ ] **Step 2: 跑它，确认全抓**
 
 Run: `node tools\test-night-dashboard-mutate.mjs`
-Expected: `变异测试：6/6 被抓到`。
+Expected: `变异测试：12/12 被抓到`。
 
 **如果某条没抓到**：先看是「护栏缺口」还是「锚点旧了」——
 打开 `tools/test-night-dashboard.mjs` 看那条断言期望的是新结构还是旧结构：
 期望**新**结构 → 锚点旧了，改 `MUTANTS` 里的 `from`；
 期望**旧**结构 → 护栏真的缺这条断言，补断言。
+
+⚠️ **锚点自检报了「命中 0 次」** → 那是**脚本过期了**（源码改了），**不是**护栏有缺口。
+   别去改护栏。先看源码现在那行长什么样，把 `from` 改成新的**唯一**片段。
 
 - [ ] **Step 3: 确认源码没被改坏**
 
@@ -2679,17 +2806,22 @@ node tools\test-night-dashboard.mjs
 ```
 Expected: PASS —— `156 通过 / 0 失败`（变异脚本会还原源码）。
 
+再确认工作区干净：
+```powershell
+git -C 'E:\voice-pilot\daily-image-site' status --short
+```
+Expected: **空**（只有 Task 8 自己新建的那个文件是未跟踪的）。
+
 - [ ] **Step 4: 提交（母本）**
 
 ```powershell
 Set-Location 'E:\voice-pilot\daily-image-site'
-git add -- 'tools/test-night-dashboard-mutate.mjs' 'tools/test-night-dashboard.mjs'
-git commit -m "test: 定时任务台护栏的变异体（证明有牙齿）"
+git add -- 'tools/test-night-dashboard-mutate.mjs'
+git commit -m "test: 定时任务台护栏的变异体（解析层 + HTTP 层，证明有牙齿）"
 ```
 公开副本的同步在 Task 9 一次性做，这一轮**不碰公开副本**。
 
 ---
-
 ## Task 9: 文档 + 两仓收尾
 
 **Files:**
@@ -2739,7 +2871,7 @@ if (-not $txt.Contains('.night-dashboard-port')) {
 ```
 | `test-night-dashboard.mjs` | 156 | 定时任务台：三个 helper 的时间戳格式 + 解析层（剥 BOM / 15 节点 / 老日志兼容 / 跨零点）+ 状态与问题判定（中位数只用成功的夜 / **`.done` 优先于日志标记 / dead 点名步骤 / 格式变了退化为 unknown 并按完成记录分级 / 阶段级慢 > 中位数 × 3（只比闭合区间）/ 06:00 闸门 / 阶段级只比闭合区间**）+ HTTP 层（本机 / 动态端口 Origin / 目录穿越金丝雀 / **写路径零副作用** / **by:manual 取 manual 日志** / **只绑 127.0.0.1** / **`/api/log` 只读尾部 64KB**）+ 启动器约定 + 服务端 toast |
 | `test-portability.mjs` | 45 | 平台可移植性（**含任务台：PowerShell 可执行名按平台分，不许硬编码 `powershell.exe`**） |
-| `test-night-dashboard-mutate.mjs` | 变异组数见 Task 8 | 改坏**解析层和 HTTP 层**都必须被抓住（剥 BOM / 时间戳正则 / 跨零点 / 负耗时 / 分组 / median / allowWrite 顺序 / by:manual / 绑 0.0.0.0 / 读整份日志） |
+| `test-night-dashboard-mutate.mjs` | 12 组变异 | 改坏**解析层和 HTTP 层**都必须被抓住（剥 BOM / 时间戳正则 / 跨零点 / 负耗时 / 分组 / median / allowWrite 顺序 / by:manual / 绑 0.0.0.0 / 读整份日志） |
 ```
 
 - [ ] **Step 3: 母本 `CHECKPOINT.md` + 公开副本 `CHANGELOG.md`**
