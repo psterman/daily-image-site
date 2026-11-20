@@ -884,7 +884,14 @@ import { computePublishState, describeDeadState } from './publish-state.mjs';
 - [ ] **Step 4: 跑测试，确认它绿**
 
 Run: `node tools\test-night-dashboard.mjs`
-Expected: PASS —— `68 通过 / 0 失败`。
+Expected: PASS —— `87 通过 / 0 失败`。
+
+> **实施修订（2026-11-20，Task 3 修复轮 1）**：本 Task 评审裁决「需要修」
+> （1 Critical + 4 Important）—— `.done` 与日志结束标记的权威性搞反了，
+> 导致一次**真实成功**的发布被判成「卡住了」、一次失败夜被判成「还没跑」。
+> 修复后断言从 68 涨到 **87**（新增 19 条独立标签），
+> 下游 Task 4–8 的期望值同步顺延（78→97 · 95→114 · 102→121 · 108→127）。
+> 详见 `.superpowers/sdd/2026-11-20-night-publish-gui/task-3-fix-brief.md` 与 `task-3-fix-report.md`。
 
 - [ ] **Step 5: 提交（母本）**
 
@@ -1393,7 +1400,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
 - [ ] **Step 4: 跑测试，确认它绿**
 
 Run: `node tools\test-night-dashboard.mjs`
-Expected: PASS —— `78 通过 / 0 失败`。
+Expected: PASS —— `97 通过 / 0 失败`。
 
 - [ ] **Step 5: 手动起一下看看**
 
@@ -1849,7 +1856,7 @@ poll();
 - [ ] **Step 6: 跑测试，确认它绿**
 
 Run: `node tools\test-night-dashboard.mjs`
-Expected: PASS —— `95 通过 / 0 失败`。
+Expected: PASS —— `114 通过 / 0 失败`。
 
 - [ ] **Step 7: 起服务看一眼**
 
@@ -2065,7 +2072,7 @@ node tools\start-dashboard.mjs --direct
 - [ ] **Step 5: 跑测试，确认它绿**
 
 Run: `node tools\test-night-dashboard.mjs`
-Expected: PASS —— `102 通过 / 0 失败`。
+Expected: PASS —— `121 通过 / 0 失败`。
 
 - [ ] **Step 6: 双击路径验证（命令行等价）**
 
@@ -2216,7 +2223,7 @@ function notifyToast(title, body) {
 - [ ] **Step 5: 跑测试，确认它绿**
 
 Run: `node tools\test-night-dashboard.mjs`
-Expected: PASS —— `108 通过 / 0 失败`。
+Expected: PASS —— `127 通过 / 0 失败`。
 
 - [ ] **Step 6: 补 BOM + 验证**
 
@@ -2396,7 +2403,7 @@ Expected: `变异测试：6/6 被抓到`。
 ```powershell
 node tools\test-night-dashboard.mjs
 ```
-Expected: PASS —— `108 通过 / 0 失败`（变异脚本会还原源码）。
+Expected: PASS —— `127 通过 / 0 失败`（变异脚本会还原源码）。
 
 - [ ] **Step 4: 提交（母本）**
 
@@ -2440,7 +2447,7 @@ git commit -m "test: 定时任务台护栏的变异体（证明有牙齿）"
 护栏表加：
 
 ```
-| `test-night-dashboard.mjs` | 108 | 定时任务台：三个 helper 的时间戳格式 + 解析层（剥 BOM / 15 节点 / 老日志兼容 / 跨零点）+ 状态与问题判定（中位数只用成功的夜）+ HTTP 层（本机 / 动态端口 Origin / 目录穿越金丝雀）+ 启动器约定 + 服务端 toast |
+| `test-night-dashboard.mjs` | 127 | 定时任务台：三个 helper 的时间戳格式 + 解析层（剥 BOM / 15 节点 / 老日志兼容 / 跨零点）+ 状态与问题判定（中位数只用成功的夜 / **`.done` 优先于日志标记 / dead 点名步骤 / 格式变了退化为 unknown**）+ HTTP 层（本机 / 动态端口 Origin / 目录穿越金丝雀）+ 启动器约定 + 服务端 toast |
 | `test-night-dashboard-mutate.mjs` | 6 组变异 | 改坏解析器必须被抓住（剥 BOM / 时间戳正则 / 跨零点 / 负耗时 / 分组 / median） |
 ```
 
