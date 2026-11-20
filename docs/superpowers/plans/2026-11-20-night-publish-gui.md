@@ -2478,45 +2478,87 @@ git commit -m "feat: 定时任务台启动器（explorer.exe 脱 Job + 纯 ASCII
 - Consumes: `tools/night-dashboard.mjs` 的 `buildState()`
 - Produces: `tools/notify.ps1 -Title <标题> -Body <正文>` —— 发一条 Windows toast，失败就静默退出 0。
 
+**护栏数**：Task 6 落地后是 **151** 条 → 本轮 +8 = **159 通过 / 0 失败**。
+
+**⚠️ 母 agent 预检后的订正（照这个做，别照抄旧版本 —— 旧版本有 5 处会让「正确的实现」被判红）：**
+
+1. **断言「失败时静默退出」的正则跟实现对不上。**
+   旧写法 `/-ErrorAction\s+SilentlyContinue/` —— 实现里写的是 `$ErrorActionPreference = 'SilentlyContinue'`
+   （`-ErrorAction` 后面跟的是 `Preference`，**没有空格**）→ **那条正则永远匹配不上**，
+   也就是说**正确的实现也会被判红**。→ 改成判「静默」这三件事：偏好 + `catch` + `exit 0`。
+2. **字节断言必须兜住读取 + 带长度前置。**
+   ① 直接 `fs.readFileSync` 一个还不存在的文件 → 抛 ENOENT → **整个套件崩掉**
+   （崩掉的套件一条 `✗` 都没有 → Task 8 按标签 grep 会误判「没抓到」）；
+   ② 空 Buffer 的 `!b.includes(0x0d)` **恒为 true** → 「文件不存在」却空过。
+3. **🔴 toast 必须走 `detachedPowerShell()`，不能直接 `spawn(PS_EXE, …, { detached: true })`。**
+   这是 Task 4 修复轮 2 **实测**出来的：Windows 上这样起的 PowerShell **立刻退出（exit 0）**
+   → **toast 根本发不出去，而且不报错**（静默失败，最难查的那种）。
+   → 本轮加一条断言**钉死**这一点（见 Step 1 的第 8 条）。
+4. **BOM 必须在「跑测试」之前补。** 旧 brief 把补 BOM 排在 Step 6、跑测试排在 Step 5
+   → Step 5 的 BOM 断言必红（`write` 工具默认不带 BOM，而 `param()` 默认值里有中文「任务台」）。
+   → 现在补 BOM 紧跟在写文件之后（Step 3b）。
+5. 护栏里的变量叫 `dash7`（不要叫 `dash`，第 4 组已经有一个 `dash` 了，会遮蔽）。
+
+---
+
 - [ ] **Step 1: 追加会失败的断言**
 
 ```js
 /* ── 7. 服务端 toast ───────────────────────────────────── */
 {
   const notify = read('tools/notify.ps1');
-  check('notify.ps1 存在且非空', notify.length > 200);
+  check('notify.ps1 存在且非空', notify.length > 200, { len: notify.length });
   check('notify.ps1 用 WinRT 发 toast', /ToastNotificationManager/.test(notify));
-  check('notify.ps1 失败时静默退出（不让它掀翻主流程）', /-ErrorAction\s+SilentlyContinue/.test(notify));
+  /* ⚠️ 这里**不能**用 `/-ErrorAction\s+SilentlyContinue/`：
+       实现里是 `$ErrorActionPreference = 'SilentlyContinue'`（中间没有空格）
+       → 旧正则**永远匹配不上**，正确的实现也会被判红。
+     要判的是「失败时静默」这三件事：偏好设成 SilentlyContinue + 有 catch + 最后 exit 0。 */
+  check('notify.ps1 失败时静默退出（不让它掀翻主流程）',
+    /ErrorActionPreference\s*=\s*['"]SilentlyContinue['"]/.test(notify) &&
+    /catch\s*\{/.test(notify) && /exit\s+0/.test(notify));
 
-  const b = [System.IO.File]::ReadAllBytes(path.join(ROOT, 'tools/notify.ps1'));
-  check('notify.ps1 有 UTF-8 BOM', b[0] === 0xef && b[1] === 0xbb && b[2] === 0xbf);
-  check('notify.ps1 只有 LF，没有 CR', !b.includes(0x0d));
+  /* ⚠️ 字节断言：**兜住读取**（文件还没建）**且带长度前置**：
+       ① 直接 fs.readFileSync 不存在的文件 → ENOENT → 整个套件崩掉；
+       ② 空 Buffer 的 `!nb.includes(0x0d)` 恒为 true → 「文件不存在」却空过。 */
+  let nb = Buffer.alloc(0);
+  try { nb = fs.readFileSync(path.join(ROOT, 'tools/notify.ps1')); } catch { /* 文件还不存在 */ }
+  check('notify.ps1 有 UTF-8 BOM',
+    nb.length > 0 && nb[0] === 0xef && nb[1] === 0xbb && nb[2] === 0xbf,
+    { bytes: nb.length });
+  check('notify.ps1 只有 LF，没有 CR',
+    nb.length > 0 && !nb.includes(0x0d),
+    { cr: nb.filter((x) => x === 13).length, bytes: nb.length });
 
-  const dash = read('tools/night-dashboard.mjs');
-  check('任务台在出错时会调 notify', /notify\.ps1/.test(dash));
+  const dash7 = read('tools/night-dashboard.mjs');
+  check('任务台在出错时会调 notify', /notify\.ps1/.test(dash7));
   check('notify 有 macOS 的 osascript 分支（spec §8.4「按 process.platform 分支换 osascript」）',
-    /osascript/.test(dash) && /darwin/.test(dash));
+    /osascript/.test(dash7) && /darwin/.test(dash7));
+
+  /* ⚠️🔴 这条是本轮新增的「牙齿」：通知必须走 detachedPowerShell。
+        直接 `spawn('powershell', …, {detached:true})` 会让 PowerShell **立刻退出**、
+        toast 根本发不出去（Task 4 修复轮 2 实测：2026-11-20）。
+        → 这条要是红了，说明通知路径是死的（而且不报错）。 */
+  const nt = (dash7.match(/function notifyToast[\s\S]*?\n\}/) || [''])[0];
+  check('任务台发 toast 走 detachedPowerShell（直连 detached 会让 PowerShell 秒退、通知发不出去）',
+    nt.length > 0 && /detachedPowerShell\s*\(/.test(nt) && !/spawn\s*\(\s*PS_EXE/.test(nt),
+    { hasNotifyToast: nt.length > 0 });
 }
 ```
 
-⚠️ 这组断言里用了 `[System.IO.File]::ReadAllBytes` —— PowerShell 语法在 `.mjs` 里跑不了。
-**改成 Node 写法**：
-
-```js
-const b = fs.readFileSync(path.join(ROOT, 'tools/notify.ps1'));
-check('notify.ps1 有 UTF-8 BOM', b[0] === 0xef && b[1] === 0xbb && b[2] === 0xbf);
-check('notify.ps1 只有 LF，没有 CR', !b.includes(0x0d));
-```
+⚠️ `read()` 是护栏文件里现成的辅助函数，**读不到返回空串** → Step 1 不会崩，缺失会**干净地红**。
+⚠️ Step 1 的断言**一个字都不许改**（母 agent 逐条核实过它们跟实现是对得上的）。
 
 - [ ] **Step 2: 跑测试，确认它红**
 
 Run: `node tools\test-night-dashboard.mjs`
-Expected: FAIL —— `notify.ps1` 不存在（读文件抛错 → 崩）。
-→ 先把这组断言里的读取包 `try/catch` 兜住。
+Expected: FAIL —— 8 条**全部干净地红**（`notify.ps1` 还不存在 → `read()` 返回空串 → 长度断言红；
+字节断言因为有 `nb.length > 0` 前置而红；`dash7` 里还没有 `notify.ps1` / `osascript` / `notifyToast` → 红）。
+
+⚠️ **不能崩**：崩掉的套件没有 `✗` 行 → Task 8 按标签 grep 会误判「没抓到」。
 
 - [ ] **Step 3: 写 `tools/notify.ps1`**
 
-⚠️ `.ps1` 要 **UTF-8 with BOM**。`write` 工具默认不带 BOM → 写完后必须补：
+⚠️ `.ps1` 要 **UTF-8 with BOM**（Step 3b 立刻补）—— `write` 工具默认不带 BOM。
 
 ```powershell
 param(
@@ -2561,6 +2603,20 @@ try {
 exit 0
 ```
 
+- [ ] **Step 3b: 立刻补 BOM（必须在 Step 5 跑测试之前）**
+
+```powershell
+$f = 'E:\voice-pilot\daily-image-site\tools\notify.ps1'
+$txt = [System.IO.File]::ReadAllText($f, [System.Text.Encoding]::UTF8)
+[System.IO.File]::WriteAllText($f, $txt, (New-Object System.Text.UTF8Encoding($true)))
+$b = [System.IO.File]::ReadAllBytes($f)
+Write-Output ("BOM=" + ($b[0] -eq 0xEF -and $b[1] -eq 0xBB -and $b[2] -eq 0xBF) + "  CR=" + ($b | Where-Object { $_ -eq 13 }).Count)
+```
+
+Expected: `BOM=True  CR=0`。
+
+⚠️ `.ps1` = **UTF-8 带 BOM** + LF；`.mjs` = UTF-8 **不带 BOM** + LF。别搞反。
+
 - [ ] **Step 4: 在任务台里接上**
 
 在 `tools/night-dashboard.mjs` 的 `buildState()` 结尾（`return { ... }` 之前）加：
@@ -2589,6 +2645,10 @@ function problemKey(p) { return (p.title || '') + '|' + (p.detail || ''); }
  *    Windows 用 `powershell`（PS 5.1），macOS 用 `pwsh`（PS 7）。
  *    复用 `night-dashboard.mjs` 里已有的 `PS_EXE` 常量。
  * ⚠️ macOS 走 `osascript`（spec §8.4）—— 那边没有 WinRT。
+ * ⚠️⚠️ **Windows 上必须走 `detachedPowerShell()`**（Task 4 修复轮 2 实测）：
+ *    直接 `spawn(PS_EXE, […], { detached: true })` 会让 PowerShell **立刻退出（exit 0）**
+ *    → **toast 根本发不出去，而且不报错**（静默失败，最难查）。
+ *    `detachedPowerShell` 是同一个模块里已 export 的函数，直接调即可。
  */
 function notifyToast(title, body) {
   if (process.platform === 'darwin') {
@@ -2602,36 +2662,36 @@ function notifyToast(title, body) {
   if (process.platform !== 'win32') return;
   const script = path.join(ROOT, 'tools', 'notify.ps1');
   try {
-    spawn(PS_EXE, ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script,
-      '-Title', title, '-Body', body],
-      { cwd: ROOT, detached: true, stdio: 'ignore', windowsHide: true }).unref();
+    const argv = ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script,
+      '-Title', title, '-Body', body];
+    const d = detachedPowerShell(PS_EXE, argv, { cwd: ROOT });
+    spawn(d.cmd, d.args, d.opts).unref();
   } catch { /* 发不出去就算了 */ }
 }
 ```
 
+⚠️ `buildState()` 这个函数名**已核实存在**（母 agent 查过：`function buildState` 在 `tools/night-dashboard.mjs` 里）。
+⚠️ `detachedPowerShell` 也**已核实是 export 的**（Task 4 修复轮 2 加的），同模块直接调。
+⚠️ 顶层函数声明会提升 → `notifyToast` 写在文件靠前位置也能调到后面的 `detachedPowerShell`。
+
 - [ ] **Step 5: 跑测试，确认它绿**
 
 Run: `node tools\test-night-dashboard.mjs`
-Expected: PASS —— `158 通过 / 0 失败`。
+Expected: PASS —— `159 通过 / 0 失败`。
 
-- [ ] **Step 6: 补 BOM + 验证**
+⚠️ 必须是 `✗ <label>` 的红，**不是崩**。
 
-```powershell
-$f = 'E:\voice-pilot\daily-image-site\tools\notify.ps1'
-$txt = [System.IO.File]::ReadAllText($f, [System.Text.Encoding]::UTF8)
-[System.IO.File]::WriteAllText($f, $txt, (New-Object System.Text.UTF8Encoding($true)))
-$b = [System.IO.File]::ReadAllBytes($f)
-Write-Output ("BOM=" + ($b[0] -eq 0xEF -and $b[1] -eq 0xBB -and $b[2] -eq 0xBF) + "  CR=" + ($b | Where-Object { $_ -eq 13 }).Count)
-```
-Expected: `BOM=True  CR=0`。
-
-实跑一次看看能不能弹出来（弹不出来也不报错）：
+- [ ] **Step 6: 实跑一次 toast（弹不弹出来都行，绝不能报错）**
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File 'E:\voice-pilot\daily-image-site\tools\notify.ps1' -Title '任务台' -Body '这是一条测试通知'
 Write-Output ("exit=" + $LASTEXITCODE)
 ```
-Expected: `exit=0`（弹没弹出来都行，**绝不能报错**）。
+
+Expected: `exit=0`。
+
+⚠️ 本机 toast 可能因为「操作中心里没登记过这个 AUMID」而**根本不弹** —— 那是正常的，
+**只要 exit=0 且没有任何报错**就算通过。**不要**为了让它弹出来去改系统注册表。
 
 - [ ] **Step 7: 提交（母本）**
 
@@ -2644,6 +2704,18 @@ git commit -m "feat: 定时任务台服务端 toast（页面关着也能收到�
 
 ---
 
+### 验收标准（母 agent 会独立复核）
+
+1. `node tools\test-night-dashboard.mjs` → **159 通过 / 0 失败**，exit 0。
+2. 既有 151 条断言**逐条逐字未变**（`git diff` 里只能看到新增）。
+3. 运行时 159 个标签**零重复**（源码级也不许重复）。
+4. `tools/notify.ps1` → **BOM=True, CR=0**，且 `node --check` 等价的语法检查过
+   （用 PowerShell 的 `[System.Management.Automation.Language.Parser]::ParseFile` 查）。
+5. **实跑一次 notify.ps1 → exit=0 且无报错**。
+6. `git status` 干净，提交里**只有 3 个点名文件**。
+7. 编码：`tools/*.mjs` 无 BOM + LF；`tools/notify.ps1` **有** BOM + LF。
+
+---
 ## Task 8: 变异护栏 `tools/test-night-dashboard-mutate.mjs`
 
 **Files:**
@@ -2919,7 +2991,7 @@ Expected: `变异测试：12/12 被抓到`。
 ```powershell
 node tools\test-night-dashboard.mjs
 ```
-Expected: PASS —— `158 通过 / 0 失败`（变异脚本会还原源码）。
+Expected: PASS —— `159 通过 / 0 失败`（变异脚本会还原源码）。
 
 再确认工作区干净：
 ```powershell
@@ -2985,7 +3057,7 @@ if (-not $txt.Contains('.night-dashboard-port')) {
 护栏表加：
 
 ```
-| `test-night-dashboard.mjs` | 158 | 定时任务台：三个 helper 的时间戳格式 + 解析层（剥 BOM / 15 节点 / 老日志兼容 / 跨零点）+ 状态与问题判定（中位数只用成功的夜 / **`.done` 优先于日志标记 / dead 点名步骤 / 格式变了退化为 unknown 并按完成记录分级 / 阶段级慢 > 中位数 × 3（只比闭合区间）/ 06:00 闸门 / 阶段级只比闭合区间**）+ HTTP 层（本机 / 动态端口 Origin / 目录穿越金丝雀 / **写路径零副作用** / **by:manual 取 manual 日志** / **只绑 127.0.0.1** / **`/api/log` 只读尾部 64KB**）+ 启动器约定 + 服务端 toast |
+| `test-night-dashboard.mjs` | 159 | 定时任务台：三个 helper 的时间戳格式 + 解析层（剥 BOM / 15 节点 / 老日志兼容 / 跨零点）+ 状态与问题判定（中位数只用成功的夜 / **`.done` 优先于日志标记 / dead 点名步骤 / 格式变了退化为 unknown 并按完成记录分级 / 阶段级慢 > 中位数 × 3（只比闭合区间）/ 06:00 闸门 / 阶段级只比闭合区间**）+ HTTP 层（本机 / 动态端口 Origin / 目录穿越金丝雀 / **写路径零副作用** / **by:manual 取 manual 日志** / **只绑 127.0.0.1** / **`/api/log` 只读尾部 64KB**）+ 启动器约定 + 服务端 toast |
 | `test-portability.mjs` | 45 | 平台可移植性（**含任务台：PowerShell 可执行名按平台分，不许硬编码 `powershell.exe`**） |
 | `test-night-dashboard-mutate.mjs` | 12 组变异 | 改坏**解析层和 HTTP 层**都必须被抓住（剥 BOM / 时间戳正则 / 跨零点 / 负耗时 / 分组 / median / allowWrite 顺序 / by:manual / 绑 0.0.0.0 / 读整份日志） |
 ```
@@ -3158,7 +3230,7 @@ node "E:\voice-pilot\daily-image-site\tools\night-dashboard.mjs"
 | §8.4 通知三条腿 | Task 5（浏览器通知 + 未读问题挂条）+ Task 7（服务端 toast） |
 | §9 错误处理与降级 | Task 3（状态降级）+ Task 4（HTTP 降级）+ Task 7（toast 降级） |
 | §10 安全 | Task 4 `guard()`（动态端口）+ 目录穿越 `serveStatic()` |
-| §11 护栏（`test-night-dashboard.mjs` **158** 条 + `test-portability.mjs` **45** 条） | Task 1/2/3/4/5/6/7 各带一组 + Task 8 变异体 |
+| §11 护栏（`test-night-dashboard.mjs` **159** 条 + `test-portability.mjs` **45** 条） | Task 1/2/3/4/5/6/7 各带一组 + Task 8 变异体 |
 | §12 落地顺序 | Task 1→9 顺序一致 |
 
 **没有任务的 spec 条目**：无。§8.4 的「未读问题提示」在 Task 5 的页面里以「有 N 条未读问题」实现（`st.problems` 已有数据源）。
