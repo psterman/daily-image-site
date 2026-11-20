@@ -22,7 +22,13 @@
   公开副本 `E:\voice-pilot\daily-image-site-open` 的 `publish.ps1` 里是占位符（`your-project` / `your-bucket`），
   **不能在那里跑发布**。
 - 母本**不在 git 里**（父仓 `E:\voice-pilot` 的 `.gitignore` 忽略了它）。
-  → 每个 Task 的收尾步骤 = **把本 Task 改过的文件 Copy-Item 到公开副本，再在公开副本里 `git add` 具体路径 + commit**。
+  → 每个 Task 的收尾步骤 = **把本 Task 改过的文件同步到公开副本，再在公开副本里 `git add` 具体路径 + commit**。
+- ⚠️ **同步时不能无脑覆盖**：公开副本的 `tools/publish.ps1` 里是**占位符**
+  （`your-project` / `your-bucket`），母本里是真项目名（`daily-image-site` / `daily-images`）。
+  `Copy-Item` 覆盖 = **把真项目名泄漏进公开仓**。
+  → **规则**：*新文件*用 `Copy-Item`；*两仓本来就有差异的既有文件*（`tools/publish.ps1`、
+  `AGENTS.md`、`README.md`…）**两边做同样的编辑**，**绝不覆盖文件** ——
+  两仓的 `AGENTS.md` 差 4KB、`publish.ps1` 差占位符，覆盖就是毁掉公开副本自己的内容。
 - ⚠️ 公开副本工作区里**另有 39 条别的未提交改动**（agent / portal 工作线）。
   **只 `git add` 本 Task 涉及的路径**，绝不 `git add -A`、绝不 `git commit -a`、**不 push**。
 
@@ -239,14 +245,28 @@ Expected: 结尾 `总计 45 套件：45 绿 / 0 红 / 0 崩 / 0 跳过`。
 ```powershell
 $src = 'E:\voice-pilot\daily-image-site'
 $dst = 'E:\voice-pilot\daily-image-site-open'
-foreach ($f in 'tools\daily.ps1','tools\daily-review.ps1','tools\publish.ps1','tools\test-night-dashboard.mjs') {
-  Copy-Item -LiteralPath "$src\$f" -Destination "$dst\$f" -Force
+# 新文件：直接覆盖
+Copy-Item -LiteralPath "$src\tools\test-night-dashboard.mjs" -Destination "$dst\tools\test-night-dashboard.mjs" -Force
+# ⚠️ publish.ps1 **不能覆盖** —— 公开副本里是占位符 your-project / your-bucket，
+#    覆盖会把真项目名泄漏进公开仓。两边做同样的单行编辑：
+foreach ($f in 'tools\daily.ps1','tools\daily-review.ps1','tools\publish.ps1') {
+  $p = Join-Path $dst $f
+  $txt = [System.IO.File]::ReadAllText($p, [System.Text.Encoding]::UTF8)
+  $old = 'function Step($msg) { Write-Host "`n=== $msg ===" -ForegroundColor Cyan }'
+  $old2 = 'function Rule($t)  { Write-Host "`n=== $t ===" -ForegroundColor Cyan }'
+  $new = 'function Step($msg) { Write-Host ("`n=== $msg ===  [" + (Get-BjNow).ToString(''HH:mm:ss'') + "]") -ForegroundColor Cyan }'
+  $new2 = 'function Rule($t)  { Write-Host ("`n=== $t ===  [" + (Get-BjNow).ToString(''HH:mm:ss'') + "]") -ForegroundColor Cyan }'
+  if ($txt.Contains($old))  { $txt = $txt.Replace($old,  $new) }
+  if ($txt.Contains($old2)) { $txt = $txt.Replace($old2, $new2) }
+  [System.IO.File]::WriteAllText($p, $txt, (New-Object System.Text.UTF8Encoding($true)))
 }
 Set-Location $dst
 git add -- 'tools/daily.ps1' 'tools/daily-review.ps1' 'tools/publish.ps1' 'tools/test-night-dashboard.mjs'
 git commit -m "feat: 三个 helper 的阶段标记加时间戳（定时任务台第一步）"
 ```
 Expected: 提交里**只有这 4 个文件**。不要 push。
+⚠️ 上面写回 `.ps1` 用的是 **UTF8Encoding($true)**（带 BOM）—— 改完必须再查一次 BOM 和 CR：
+`BOM=True  CR=0`。公开副本的 `publish.ps1` 改完后仍然必须留着 `your-project` / `your-bucket`。
 
 ---
 
@@ -2527,11 +2547,10 @@ Expected: 公开副本里那 5 套**既有**环境性失败仍在（`test-rss` /
 - [ ] **Step 6: 同步 + 提交（最后一批）**
 
 ```powershell
-$src = 'E:\voice-pilot\daily-image-site'; $dst = 'E:\voice-pilot\daily-image-site-open'
-foreach ($f in 'AGENTS.md','.gitignore') {
-  Copy-Item -LiteralPath "$src\$f" -Destination "$dst\$f" -Force
-}
-Set-Location $dst
+# ⚠️ **不要 Copy-Item AGENTS.md** —— 两仓的 AGENTS.md 差 4KB（母本 149KB / 公开副本 153KB），
+#    覆盖会毁掉公开副本自己的内容。Step 1–4 已经让两个仓**各自**改好了同样的内容，
+#    这里只提交公开副本这一边。
+Set-Location 'E:\voice-pilot\daily-image-site-open'
 git add -- 'AGENTS.md' '.gitignore' 'README.md' 'CHANGELOG.md'
 git commit -m "docs: 定时任务台（命令表 / 护栏表 / README / CHANGELOG）"
 ```
