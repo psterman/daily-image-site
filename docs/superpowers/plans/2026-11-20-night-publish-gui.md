@@ -912,7 +912,7 @@ Expected: PASS —— `105 通过 / 0 失败`。
 > 把「合并后数组最后一个元素 ≠ 最后一个观察到的步骤」这个坑钉死。
 > 修复后断言 102 → **105**。
 >
-> 下游 Task 4–8 的期望值同步顺延（**105 → 115 → 132 → 139 → 145**）。
+> 下游 Task 4–8 的期望值同步顺延（**105 → 115 → 120 → 142 → 149 → 156**）。
 > 详见 `.superpowers/sdd/2026-11-20-night-publish-gui/task-3-fix-brief.md`、
 > `task-3-fix-report.md`、`task-3-fix2-brief.md`、`task-3-fix2-report.md`。
 
@@ -1423,7 +1423,22 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
 - [ ] **Step 4: 跑测试，确认它绿**
 
 Run: `node tools\test-night-dashboard.mjs`
-Expected: PASS —— `115 通过 / 0 失败`。
+Expected: PASS —— `120 通过 / 0 失败`（115 + verifier 评审要求补的 5 条护栏）。
+
+### 修复轮 1（verifier 评审结论「需要修」）
+
+评审实测：**实现代码全部符合 spec，没有 Critical**；但护栏有 4 个洞。
+最要紧的一条：brief 自己写着「测试里**绝不许**真的发起一次发布」，
+却**没有任何断言保证这一点** —— 把 `if (!allowWrite)` 挪到 spawn 之后，
+套件仍然 115/0 全绿，而真发布已经被拉起（评审的变异体 M3/M9 打桩命中）。
+
+修复轮的完整 brief 在 `.superpowers/sdd/2026-11-20-night-publish-gui/task-4-fix1-brief.md`，要点：
+
+- `createServer` 加**可注入的 spawn 钩子**（`opts.spawnFn`）→ 护栏能观测「写路径零副作用」
+  而**绝不**真的发一次；测试的主实例**必须**挂这个钩子。
+- 补 5 条断言：写路径零副作用 / allowWrite 判断在 spawn 之前（源码顺序）/ `by:'manual'` 那一夜取 manual 日志（合成 fixture）/ 只绑 `127.0.0.1` / `/api/log` 只读尾部 64KB。
+- 3 处小修：`readSchedule()` 加 10 秒缓存 / 写接口 handler 加 try/catch / `/api/run-now` 不接受 `?date=`（spec §4.4：run-now 只管今天）。
+- `tools/test-portability.mjs` 加 1 条（`night-dashboard.mjs` 不许硬编码 `powershell.exe`）→ 44 → 45。
 
 - [ ] **Step 5: 手动起一下看看**
 
@@ -1456,70 +1471,19 @@ git commit -m "feat: 定时任务台 HTTP 服务（只读接口 + 两个受控�
 - Consumes: Task 4 的 `GET /api/state`、`GET /api/log?date=`、`POST /api/run-now`、`POST /api/republish`
 - Produces: 无代码接口（这是最后一层）。
 
-- [ ] **Step 1: 追加会失败的断言**
+**本轮订正（母 agent 独立核实过，别照抄旧 brief）：**
+1. 旧 brief 的断言块里 `const css` 声明了**两次** → SyntaxError → 护栏**整个崩掉**（不是干净地红）。已改名。
+2. 旧 brief 直接调 `createServer(...)` —— 但它是**第 4 组块内的局部变量**，第 5 组取不到 → ReferenceError → 崩。已改成第 5 组自己动态 import。
+3. 旧 brief 期望「95 通过」是过期数 → 现在是 **142**（120 + 本组 22 条）。
+4. 旧 brief 漏了 spec §8.1「**点一下展开该步的日志尾部**」→ 本 brief 补上（接 `/api/log`）。
+5. 旧 brief 漏了 spec §8.3「源图被清掉的日期**禁用并注明「源图已清理」**」→ 本 brief 补上（前端从 `history − republishDates` 推出来，**不用改接口**）。
+6. 旧 brief 漏了 spec §8.1「00:10:02 **开始** · 00:41:39 **结束**」→ 本 brief 补上 `finishedAt`。
+7. 旧 brief 的历史表只有 4 列，spec §8.1 要 5 列（含「一句话结论」）→ 补上。
+8. 旧 brief 没有「耗时无数值时显示 **—**」的护栏 → 真实数据 11-16~11-20 的 `durationMs` 全是 `null`（Task 1 加时间戳之前跑的），UI 必须优雅降级。
 
-```js
-/* ── 5. 页面 ───────────────────────────────────────────── */
-{
-  const idx = read('tools/dashboard-ui/index.html');
-  check('index.html 存在且非空', idx.length > 200);
-  check('index.html 引了 app.css 和 app.js', /app\.css/.test(idx) && /app\.js/.test(idx));
-  check('index.html 有「立即跑一次」和「补发某一天」两个独立入口',
-    idx.indexOf('立即跑一次') >= 0 && idx.indexOf('补发某一天') >= 0);
+---
 
-  const css = read('tools/dashboard-ui/app.css');
-  check('app.css 里有暗色模式', /prefers-color-scheme/.test(css));
-  check('app.css 里有素白文档风的三个底色',
-    /#ffffff/i.test(css) && /#1d1d1f/i.test(css) && /#86868b/i.test(css));
-
-  const js = read('tools/dashboard-ui/app.js');
-  check('app.js 轮询 /api/state', /\/api\/state/.test(js));
-  check('app.js 调两个写接口',
-    /\/api\/run-now/.test(js) && /\/api\/republish/.test(js));
-  check('app.js 请求了通知权限', /Notification/.test(js));
-  check('app.js 用 <dialog> 做确认条', /dialog/i.test(js) || /dialog/i.test(idx));
-  /* 不可逆文案必须写清楚 */
-  check('确认条写清了「24 小时边缘缓存」',
-    js.indexOf('24 小时') >= 0 || idx.indexOf('24 小时') >= 0);
-  check('补发确认条写清了「线上首页会重新指向」',
-    js.indexOf('线上首页会重新指向') >= 0 || idx.indexOf('线上首页会重新指向') >= 0);
-  check('页面有未读问题提示', /未读/.test(js) || /未读/.test(idx));
-
-  /* 静态资源真能伺服 —— Task 5 才建出 dashboard-ui/，所以断言放在这儿。 */
-  const inst = createServer({ port: 0, root: ROOT, schedule: false, allowWrite: false });
-  await new Promise((res) => inst.server.listen(0, '127.0.0.1', res));
-  const port = inst.getChosenPort();
-  const base = 'http://127.0.0.1:' + port;
-  async function req2(p) {
-    return await new Promise((resolve) => {
-      const r = http.request(base + p, (res) => {
-        let body = '';
-        res.on('data', (c) => { body += c; });
-        res.on('end', () => resolve({ status: res.statusCode, body, headers: res.headers }));
-      });
-      r.on('error', () => resolve({ status: 0, body: '', headers: {} }));
-      r.end();
-    });
-  }
-  const html = await req2('/');
-  check('静态页 / → 200', html.status === 200, { status: html.status });
-  check('静态页带正确的 content-type', /text\/html/.test(String(html.headers['content-type'] || '')));
-  const css = await req2('/app.css');
-  check('/app.css → 200', css.status === 200, { status: css.status });
-  check('/app.css 带正确的 content-type', /text\/css/.test(String(css.headers['content-type'] || '')));
-  const jsResp = await req2('/app.js');
-  check('/app.js → 200', jsResp.status === 200, { status: jsResp.status });
-  await new Promise((res) => inst.server.close(res));
-}
-```
-
-- [ ] **Step 2: 跑测试，确认它红**
-
-Run: `node tools\test-night-dashboard.mjs`
-Expected: FAIL —— 读 `tools/dashboard-ui/index.html` 时 `ENOENT` 抛出来（护栏自己崩了）。
-→ 所以断言前要加一层保护：把 `read()` 改成读不到返回空串。
-
-⚠️ **先改护栏的 `read()`**：
+- [ ] **Step 0: 先把护栏的 `read()` 改成读不到返回空串**
 
 ```js
 function read(rel) {
@@ -1531,7 +1495,115 @@ function read(rel) {
 }
 ```
 
-改完再跑 → 红在断言上（不是崩）✓
+⚠️ **为什么必须先改**：不改的话，Step 1 的断言一读 `tools/dashboard-ui/index.html` 就抛 `ENOENT`，
+**整个套件崩掉**（一条 `✗` 都不会打印）→ Task 8 按标签 grep 会误判「没抓到」。
+改成返回空串之后，缺失会**干净地红**。
+
+⚠️ 改这一处**不会**让既有断言假绿：现有两个调用点
+（`helperBody(read(file), fn)` 和 `read('tools/publish.ps1')`）后面都带空值前置
+（`body !== ''` / `!!stepLine`）—— 读不到 → 那些断言**红**，不会空过。
+
+- [ ] **Step 1: 追加会失败的断言**
+
+```js
+/* ── 5. 页面 ───────────────────────────────────────────── */
+{
+  const idx = read('tools/dashboard-ui/index.html');
+  check('index.html 存在且非空', idx.length > 200, { len: idx.length });
+  check('index.html 引了 app.css 和 app.js', /app\.css/.test(idx) && /app\.js/.test(idx));
+  check('index.html 有「立即跑一次」和「补发某一天」两个独立入口',
+    idx.indexOf('立即跑一次') >= 0 && idx.indexOf('补发某一天') >= 0);
+
+  const cssSrc = read('tools/dashboard-ui/app.css');
+  check('app.css 里有暗色模式', /prefers-color-scheme/.test(cssSrc));
+  check('app.css 里有素白文档风的三个底色',
+    /#ffffff/i.test(cssSrc) && /#1d1d1f/i.test(cssSrc) && /#86868b/i.test(cssSrc));
+
+  const jsSrc = read('tools/dashboard-ui/app.js');
+  check('app.js 轮询 /api/state', /\/api\/state/.test(jsSrc));
+  check('app.js 调两个写接口',
+    /\/api\/run-now/.test(jsSrc) && /\/api\/republish/.test(jsSrc));
+  check('app.js 请求了通知权限', /Notification/.test(jsSrc));
+  check('app.js 用 <dialog> 做确认条', /dialog/i.test(jsSrc) || /dialog/i.test(idx));
+  /* 不可逆文案必须写清楚 */
+  check('确认条写清了「24 小时边缘缓存」',
+    jsSrc.indexOf('24 小时') >= 0 || idx.indexOf('24 小时') >= 0);
+  check('补发确认条写清了「线上首页会重新指向」',
+    jsSrc.indexOf('线上首页会重新指向') >= 0 || idx.indexOf('线上首页会重新指向') >= 0);
+  check('页面有未读问题提示', /未读/.test(jsSrc) || /未读/.test(idx));
+
+  /* ↓↓ spec §8 的三条漏实现，逐条钉死 ↓↓ */
+  check('app.js 会取日志尾部（点了阶段点能看那一步的日志）',
+    /\/api\/log/.test(jsSrc));
+  check('app.js 把「源图已清理」的日期禁用并注明',
+    /源图已清理/.test(jsSrc) && /disabled/.test(jsSrc));
+  check('app.js 把没有数值的耗时显示成「—」（旧日志没有时间戳）',
+    /fmtDur/.test(jsSrc) && /—/.test(jsSrc));
+  check('app.js 首屏显示结束时刻（spec §8.1 的「开始 · 结束」）',
+    /finishedAt/.test(jsSrc));
+  check('历史表有「一句话结论」这一列（spec §8.1 要 5 列）',
+    /一句话结论/.test(idx));
+
+  /* 静态资源真能伺服 —— Task 5 才建出 dashboard-ui/，所以断言放在这儿。
+     ⚠️ createServer 是第 4 组里的**块内局部变量**，这里取不到 →
+        必须在本组自己动态 import（跟第 4 组同一个 try/catch 模式）。
+        ⚠️ `http` 在文件头的 import 区（第 4 组的注释说明了原因）。 */
+  let dash5 = null;
+  try {
+    dash5 = await import('./night-dashboard.mjs');
+  } catch {
+    dash5 = null;
+  }
+  const inst5 = (dash5 && typeof dash5.createServer === 'function')
+    ? dash5.createServer({ port: 0, root: ROOT, schedule: false, allowWrite: false })
+    : null;
+  if (inst5) {
+    await new Promise((res) => inst5.server.listen(0, '127.0.0.1', res));
+  }
+  const port5 = inst5 && typeof inst5.getChosenPort === 'function' ? inst5.getChosenPort() : 0;
+  const base5 = 'http://127.0.0.1:' + port5;
+
+  async function req5(p) {
+    return await new Promise((resolve) => {
+      const r = http.request(base5 + p, (res) => {
+        let body = '';
+        res.on('data', (c) => { body += c; });
+        res.on('end', () => resolve({ status: res.statusCode, body, headers: res.headers }));
+      });
+      r.on('error', () => resolve({ status: 0, body: '', headers: {} }));
+      r.end();
+    });
+  }
+
+  const html5 = await req5('/');
+  check('静态页 / → 200', !!inst5 && html5.status === 200, { status: html5.status });
+  check('静态页带正确的 content-type',
+    !!inst5 && /text\/html/.test(String(html5.headers['content-type'] || '')),
+    { ct: html5.headers['content-type'] });
+  const css5 = await req5('/app.css');
+  check('/app.css → 200', !!inst5 && css5.status === 200, { status: css5.status });
+  check('/app.css 带正确的 content-type',
+    !!inst5 && /text\/css/.test(String(css5.headers['content-type'] || '')),
+    { ct: css5.headers['content-type'] });
+  const js5 = await req5('/app.js');
+  check('/app.js → 200', !!inst5 && js5.status === 200, { status: js5.status });
+
+  if (inst5) {
+    await new Promise((res) => inst5.server.close(res));
+  }
+}
+```
+
+⚠️ 每条静态资源断言都带 `!!inst5` 前置 —— 服务没起来时 `status` 是 `0`，
+不加前置就会「0 !== 200」红掉但**理由是错的**；更糟的是有人图省事写成
+`status !== 200` 就变成**假绿**（服务压根没起来，断言却通过）。
+
+- [ ] **Step 2: 跑测试，确认它红**
+
+Run: `node tools\test-night-dashboard.mjs`
+Expected: FAIL —— **17 条**新断言里，文件不存在的那几条红；
+「静态页 / → 200」这类要等文件建出来才可能绿。
+**必须是 `✗ <label>` 的红，不是整个套件抛异常崩掉。**
 
 - [ ] **Step 3: 写 `index.html`**
 
@@ -1555,6 +1627,7 @@ function read(rel) {
 
   <section class="hero" id="hero">
     <div class="hero-title" id="heroTitle">读取中…</div>
+    <div class="hero-badge" id="heroBadge"></div>
     <div class="hero-sub" id="heroSub"></div>
   </section>
 
@@ -1568,12 +1641,20 @@ function read(rel) {
     </div>
   </section>
 
+  <section class="logbox hidden" id="logBox">
+    <div class="log-head">
+      <span id="logTitle"></span>
+      <button class="link" id="logClose">收起 ✕</button>
+    </div>
+    <pre class="log-body" id="logBody"></pre>
+  </section>
+
   <section class="history">
     <div class="h-head">最近 7 天 <button class="link" id="toggleHistory">展开历史 ▾</button></div>
     <div class="strip" id="strip"></div>
     <table class="h-table hidden" id="hTable">
-      <thead><tr><th>日期</th><th>结果</th><th>耗时</th><th>来源</th></tr></thead>
-      <tbody></tbody>
+      <thead><tr><th>日期</th><th>结果</th><th>耗时</th><th>来源</th><th>一句话结论</th></tr></thead>
+      <tbody id="hBody"></tbody>
     </table>
   </section>
 </main>
@@ -1637,14 +1718,20 @@ body {
 main { max-width: 900px; margin: 0 auto; padding: 32px; }
 .hero { margin-bottom: 28px; }
 .hero-title { font-size: 22px; font-weight: 600; }
-.hero-sub { color: var(--ink-2); font-size: 12px; margin-top: 4px; }
+.hero-badge {
+  display: inline-block; margin-top: 8px; padding: 2px 10px;
+  border-radius: 999px; font-size: 12px;
+  border: 1px solid var(--line); color: var(--ink-2);
+}
+.hero-sub { color: var(--ink-2); font-size: 12px; margin-top: 6px; }
 .group { margin-bottom: 18px; }
 .group-name { font-size: 11px; color: var(--ink-2); letter-spacing: .06em; margin-bottom: 8px; }
 .dots { display: flex; gap: 6px; }
 .dot {
   flex: 1; height: 8px; border-radius: 4px; background: var(--line);
-  position: relative;
+  position: relative; border: none; padding: 0; cursor: pointer;
 }
+.dot:hover { outline: 2px solid var(--ink-2); outline-offset: 2px; }
 .dot.done { background: var(--ok); }
 .dot.running { background: var(--accent); animation: breathe 1.4s ease-in-out infinite; }
 .dot.skipped { background: var(--warn); }
@@ -1666,6 +1753,19 @@ main { max-width: 900px; margin: 0 auto; padding: 32px; }
 .p-icon { font-weight: 700; }
 .p-title { font-weight: 600; }
 .p-detail { color: var(--ink-2); font-size: 12px; margin-top: 2px; }
+.logbox {
+  margin-bottom: 24px; border: 1px solid var(--line);
+  border-radius: 8px; overflow: hidden;
+}
+.log-head {
+  display: flex; align-items: center; gap: 12px; padding: 8px 14px;
+  background: rgba(134,134,139,.07); font-size: 12px;
+}
+.log-body {
+  margin: 0; padding: 12px 14px; max-height: 320px; overflow: auto;
+  font: 12px/1.6 ui-monospace, SFMono-Regular, Consolas, monospace;
+  white-space: pre-wrap; word-break: break-all;
+}
 .history { margin-top: 28px; }
 .h-head { font-size: 12px; color: var(--ink-2); display: flex; align-items: center; gap: 12px; }
 .strip { display: flex; gap: 4px; margin-top: 8px; }
@@ -1686,6 +1786,7 @@ main { max-width: 900px; margin: 0 auto; padding: 32px; }
   padding: 8px 14px; border-radius: 8px; font-size: 13px; cursor: pointer;
 }
 .btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+.btn:disabled { opacity: .45; cursor: default; }
 .pick { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
 dialog {
   border: 1px solid var(--line); border-radius: 14px; padding: 22px;
@@ -1706,6 +1807,7 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
 
 const $ = (id) => document.getElementById(id);
 let last = null;
+let lastStepSig = '';
 
 /** 不可逆动作的确认文案 —— 写不清不可逆性 = 不许发出去。 */
 const CONFIRM = {
@@ -1725,6 +1827,11 @@ const CONFIRM = {
   },
 };
 
+/**
+ * 耗时：没有数值就显示「—」。
+ * ⚠️ 不是装饰 —— 11-16~11-20 的真实日志是 Task 1 加时间戳**之前**跑的，
+ *    `durationMs` 全是 null。显示 "NaN" 或 "null" 就是露怯。
+ */
 function fmtDur(ms) {
   if (!Number.isFinite(ms)) return '—';
   const total = Math.round(ms / 1000);
@@ -1736,9 +1843,38 @@ function fmtDur(ms) {
   return s + ' 秒';
 }
 
+/**
+ * 时刻：**按北京时间显示**。
+ * ⚠️ 不能用 toLocaleTimeString() 的本地时区 —— 浏览器在别的时区时会错位，
+ *    而整站的时基是北京时间（spec §5.4 / Get-BjNow）。
+ */
+function fmtAt(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  try {
+    return new Intl.DateTimeFormat('zh-CN', {
+      timeZone: 'Asia/Shanghai',
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+    }).format(d);
+  } catch {
+    return d.toISOString().slice(11, 19);
+  }
+}
+
 const GROUP_LABEL = { prepare: '准备', verify: '校验与审稿', publish: '发布' };
 
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"]/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+}
+
+/** 阶段点。签名没变就不重画 —— 否则每 3 秒重建 DOM，点一下就闪。 */
 function renderSteps(steps) {
+  const sig = steps.map((s) => s.key + ':' + s.status).join('|');
+  if (sig === lastStepSig) return;
+  lastStepSig = sig;
+
   const groups = [];
   for (const s of steps) {
     let g = groups.find((x) => x.key === s.group);
@@ -1747,26 +1883,74 @@ function renderSteps(steps) {
   }
   $('steps').innerHTML = groups.map((g) =>
     '<div class="group"><div class="group-name">' + g.label + '（' + g.items.length + '）</div>' +
-    '<div class="dots">' + g.items.map((s) =>
-      '<div class="dot ' + (s.status || 'pending') + '" title="' + esc(s.label) + '"></div>').join('') +
+    '<div class="dots">' + g.items.map((s, i) =>
+      '<button class="dot ' + (s.status || 'pending') + '" data-g="' + esc(g.key) +
+      '" data-i="' + i + '" title="' + esc(s.label) + '"></button>').join('') +
     '</div><div class="labels">' + g.items.map((s) =>
       '<span>' + esc(s.label.replace(/（.*?）/g, '').slice(0, 6)) + '</span>').join('') +
     '</div></div>').join('');
+
+  /* 阶段点可点：点一下展开那一步的日志尾部（spec §8.1）。 */
+  for (const el of document.querySelectorAll('#steps .dot')) {
+    el.addEventListener('click', () => {
+      const g = groups.find((x) => x.key === el.getAttribute('data-g'));
+      const item = g && g.items[Number(el.getAttribute('data-i'))];
+      if (item) openStep(item);
+    });
+  }
 }
 
-function esc(s) {
-  return String(s == null ? '' : s).replace(/[&<>"]/g, (c) =>
-    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+/**
+ * 点开某一步：取那一天的日志尾部，切出这一步的那一段。
+ * 日志标记是 `=== 1/5 抓图 + 目录分流 ===`，step 的 label 与它**逐字对得上**。
+ */
+async function openStep(step) {
+  const d = (last && last.current && last.current.date) || '';
+  if (!d) return;
+  $('logBox').classList.remove('hidden');
+  $('logTitle').textContent = step.label + ' · ' + d;
+  $('logBody').textContent = '读取中…';
+  try {
+    const r = await fetch('/api/log?date=' + encodeURIComponent(d), { cache: 'no-store' });
+    const j = await r.json();
+    const lines = (j && Array.isArray(j.lines)) ? j.lines : [];
+    const seg = sliceStep(lines, step);
+    $('logBody').textContent = seg.length ? seg.join('\n')
+      : (lines.length ? lines.join('\n') : '（这一天没有日志内容）');
+  } catch (e) {
+    $('logBody').textContent = '读不到日志：' + (e && e.message ? e.message : e);
+  }
+}
+
+/** 从日志尾部里切出「这一步」那一段：含这一步文案的 === 行 → 下一个 === 行之前。 */
+function sliceStep(lines, step) {
+  const label = step.label || '';
+  let start = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (label && lines[i].indexOf(label) >= 0) { start = i; break; }
+  }
+  if (start < 0) return [];
+  let end = lines.length;
+  for (let i = start + 1; i < lines.length; i++) {
+    /* ⚠️ 分隔用的长横线是 `==========`（第三个 = 后面还是 =），
+       不会命中 `=== ` —— 别把分隔线当阶段边界。 */
+    if (/^\s*=== /.test(lines[i])) { end = i; break; }
+  }
+  return lines.slice(start, end);
 }
 
 function render(st) {
   last = st;
   const c = st.current || {};
+
   $('heroTitle').textContent = (c.date || st.todayBj) + ' 夜间发布';
-  $('heroSub').textContent =
-    (c.headline || '') +
-    (c.startedAt ? ' · ' + new Date(c.startedAt).toLocaleString('zh-CN') : '') +
-    ' · ' + ((c.steps || []).filter((s) => s.status === 'done').length) + '/' + ((c.steps || []).length) + ' 节点完成';
+  $('heroBadge').textContent = c.headline || '—';
+  $('heroSub').textContent = [
+    c.startedAt ? ('开始 ' + fmtAt(c.startedAt)) : '',
+    c.finishedAt ? ('结束 ' + fmtAt(c.finishedAt)) : '',
+    ((c.steps || []).filter((s) => s.status === 'done').length) + '/' +
+      ((c.steps || []).length) + ' 节点完成',
+  ].filter(Boolean).join(' · ');
 
   const sc = st.schedule || {};
   $('sched').textContent = sc.available
@@ -1775,17 +1959,20 @@ function render(st) {
 
   renderSteps(c.steps || []);
 
-  const p = (st.problems || [])[0];
-  $('problem').classList.toggle('hidden', !p);
+  const ps = st.problems || [];
+  const p = ps[0] || null;
   if (p) {
     $('problem').className = 'problem ' + (p.level || 'info');
     $('pTitle').textContent = p.title || '';
     $('pDetail').textContent = p.detail || '';
+  } else {
+    $('problem').className = 'problem hidden';
+    $('pTitle').textContent = '';
+    $('pDetail').textContent = '';
   }
 
   /* 未读问题提示：页面关着的时候也会漏，所以下次打开要补一条。 */
   const unread = $('unread');
-  const ps = st.problems || [];
   unread.classList.toggle('hidden', ps.length === 0);
   if (ps.length) unread.textContent = '有 ' + ps.length + ' 条未读问题：' + (ps[0].title || '');
 
@@ -1793,13 +1980,27 @@ function render(st) {
   $('strip').innerHTML = h.map((x) =>
     '<i class="' + (x.status === 'failed' ? 'err' : (x.status === 'success' ? '' : 'warn')) + '" title="' +
     esc(x.date + ' ' + (x.headline || '')) + '"></i>').join('');
+  $('hBody').innerHTML = h.map((x) =>
+    '<tr><td>' + esc(x.date) + '</td><td>' + esc(x.status) + '</td><td>' + esc(fmtDur(x.durationMs)) +
+    '</td><td>' + esc(x.source || '—') + '</td><td>' + esc(x.headline || '') + '</td></tr>').join('');
 
+  /* 补发日期：源图目录还在的才能选。
+     源图被清掉的**显示但禁用**并注明「源图已清理」（spec §8.3）——
+     哪些被清掉，从 `history − republishDates` 就能推出来，不用改接口。 */
   const pick = $('republishDate');
   const dates = (st.actions && st.actions.republishDates) || [];
-  if (pick.dataset.sig !== dates.join(',')) {
-    pick.dataset.sig = dates.join(',');
-    pick.innerHTML = dates.map((d) => '<option value="' + d + '">' + d + '</option>').join('');
+  const cleaned = (st.history || []).map((x) => x.date).filter((d) => dates.indexOf(d) < 0);
+  const sig = dates.join(',') + '|' + cleaned.join(',');
+  if (pick.dataset.sig !== sig) {
+    pick.dataset.sig = sig;
+    pick.innerHTML = dates.map((d) => '<option value="' + esc(d) + '">' + esc(d) + '</option>').join('') +
+      cleaned.map((d) => '<option value="' + esc(d) + '" disabled>' + esc(d) + '（源图已清理）</option>').join('');
   }
+
+  /* 已经有发布在跑 → 把写按钮置灰（服务端还会再挡一道 409）。 */
+  const busy = !!(st.actions && st.actions.busy);
+  $('runNow').disabled = busy;
+  $('republish').disabled = busy;
 }
 
 async function poll() {
@@ -1830,6 +2031,7 @@ function confirm(title, body, okLabel, onOk) {
 }
 
 $('dCancel').onclick = () => $('confirm').close();
+$('logClose').onclick = () => $('logBox').classList.add('hidden');
 
 $('runNow').onclick = () => {
   confirm(CONFIRM.runNow.title, CONFIRM.runNow.body, CONFIRM.runNow.ok, async () => {
@@ -1858,16 +2060,32 @@ if ('Notification' in window && Notification.permission === 'default') {
   b.onclick = () => Notification.requestPermission();
   document.querySelector('.top').appendChild(b);
 }
+
 let prevStatus = null;
+let prevProblem = null;
 setInterval(async () => {
   await poll();
-  const s = last && last.current && last.current.status;
-  if (prevStatus && prevStatus !== 'running' && s !== prevStatus && s !== 'success') {
+  const st = last || {};
+  const c = st.current || {};
+  const ps = st.problems || [];
+  const p = ps[0] || null;
+  const pkey = p ? ((p.level || '') + '|' + (p.title || '')) : null;
+
+  /* 触发点（spec §8.4）：跑完、出现 error/warn。 */
+  const notify = (body) => {
     if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification('任务台', { body: (last.current.headline || s) });
+      new Notification('任务台', { body: body });
     }
+  };
+  const s = c.status;
+  if (prevStatus && prevStatus !== s && s === 'success') {
+    notify(c.headline || '这一期跑完了');
+  }
+  if (pkey && pkey !== prevProblem && (p.level === 'error' || p.level === 'warn')) {
+    notify((p.title || '') + ' · ' + (p.detail || ''));
   }
   prevStatus = s;
+  prevProblem = pkey;
 }, 3000);
 
 poll();
@@ -1879,7 +2097,10 @@ poll();
 - [ ] **Step 6: 跑测试，确认它绿**
 
 Run: `node tools\test-night-dashboard.mjs`
-Expected: PASS —— `132 通过 / 0 失败`。
+Expected: PASS —— `142 通过 / 0 失败`（120 + 本组 22 条）。
+
+⚠️ 既有 115 条断言的**标签、条件、顺序一个字都不许动**。
+新增的 22 条各自用**独立新标签**（Task 8 按标签 grep 变异点，重复标签会串）。
 
 - [ ] **Step 7: 起服务看一眼**
 
@@ -1887,7 +2108,10 @@ Expected: PASS —— `132 通过 / 0 失败`。
 node "E:\voice-pilot\daily-image-site\tools\night-dashboard.mjs"
 ```
 浏览器打开 `http://127.0.0.1:8801/`（端口从 `.night-dashboard-port` 读）。
-确认：能看到「2026-11-20 夜间发布 / 成功 · 31 分 36 秒」、三组 15 个点、最近 7 天的条带。
+确认：能看到「2026-11-20 夜间发布」、状态徽标「成功 · —」（旧日志没有时间戳，
+耗时就是 **—**，这是对的）、三组 15 个点、最近 7 天的条带；
+**点一下某个阶段点 → 下面弹出那一步的日志尾部**；
+展开历史 → 5 列表格。
 **只读，不点任何写按钮**（写按钮要等 Task 6 之后连着测）。
 
 - [ ] **Step 8: 提交（母本）**
@@ -1900,7 +2124,6 @@ git commit -m "feat: 定时任务台页面（素白文档风 · 今日焦点 · 
 公开副本的同步在 Task 9 一次性做，这一轮**不碰公开副本**。
 
 ---
-
 ## Task 6: 启动器 `起任务台.cmd` + `tools/start-dashboard.mjs`
 
 **Files:**
@@ -2095,7 +2318,7 @@ node tools\start-dashboard.mjs --direct
 - [ ] **Step 5: 跑测试，确认它绿**
 
 Run: `node tools\test-night-dashboard.mjs`
-Expected: PASS —— `139 通过 / 0 失败`。
+Expected: PASS —— `149 通过 / 0 失败`。
 
 - [ ] **Step 6: 双击路径验证（命令行等价）**
 
@@ -2145,6 +2368,8 @@ git commit -m "feat: 定时任务台启动器（explorer.exe 脱 Job + 纯 ASCII
 
   const dash = read('tools/night-dashboard.mjs');
   check('任务台在出错时会调 notify', /notify\.ps1/.test(dash));
+  check('notify 有 macOS 的 osascript 分支（spec §8.4「按 process.platform 分支换 osascript」）',
+    /osascript/.test(dash) && /darwin/.test(dash));
 }
 ```
 
@@ -2231,12 +2456,27 @@ exit 0
 const notifiedFor = new Set();
 function problemKey(p) { return (p.title || '') + '|' + (p.detail || ''); }
 
-/** 发 toast（尽力而为，失败静默）。 */
+/**
+ * 发 toast（尽力而为，失败静默）。
+ *
+ * ⚠️ **不许硬编码 `powershell.exe`** —— macOS 上根本没这个文件 → spawn ENOENT。
+ *    Windows 用 `powershell`（PS 5.1），macOS 用 `pwsh`（PS 7）。
+ *    复用 `night-dashboard.mjs` 里已有的 `PS_EXE` 常量。
+ * ⚠️ macOS 走 `osascript`（spec §8.4）—— 那边没有 WinRT。
+ */
 function notifyToast(title, body) {
+  if (process.platform === 'darwin') {
+    try {
+      spawn('/usr/bin/osascript',
+        ['-e', 'display notification ' + JSON.stringify(body) + ' with title ' + JSON.stringify(title)],
+        { cwd: ROOT, detached: true, stdio: 'ignore' }).unref();
+    } catch { /* 发不出去就算了 */ }
+    return;
+  }
   if (process.platform !== 'win32') return;
   const script = path.join(ROOT, 'tools', 'notify.ps1');
   try {
-    spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script,
+    spawn(PS_EXE, ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script,
       '-Title', title, '-Body', body],
       { cwd: ROOT, detached: true, stdio: 'ignore', windowsHide: true }).unref();
   } catch { /* 发不出去就算了 */ }
@@ -2246,7 +2486,7 @@ function notifyToast(title, body) {
 - [ ] **Step 5: 跑测试，确认它绿**
 
 Run: `node tools\test-night-dashboard.mjs`
-Expected: PASS —— `145 通过 / 0 失败`。
+Expected: PASS —— `156 通过 / 0 失败`。
 
 - [ ] **Step 6: 补 BOM + 验证**
 
@@ -2426,7 +2666,7 @@ Expected: `变异测试：6/6 被抓到`。
 ```powershell
 node tools\test-night-dashboard.mjs
 ```
-Expected: PASS —— `145 通过 / 0 失败`（变异脚本会还原源码）。
+Expected: PASS —— `156 通过 / 0 失败`（变异脚本会还原源码）。
 
 - [ ] **Step 4: 提交（母本）**
 
@@ -2470,7 +2710,7 @@ git commit -m "test: 定时任务台护栏的变异体（证明有牙齿）"
 护栏表加：
 
 ```
-| `test-night-dashboard.mjs` | 145 | 定时任务台：三个 helper 的时间戳格式 + 解析层（剥 BOM / 15 节点 / 老日志兼容 / 跨零点）+ 状态与问题判定（中位数只用成功的夜 / **`.done` 优先于日志标记 / dead 点名步骤 / 格式变了退化为 unknown 并按完成记录分级 / 阶段级慢 > 中位数 × 3（只比闭合区间）/ 06:00 闸门 / 阶段级只比闭合区间**）+ HTTP 层（本机 / 动态端口 Origin / 目录穿越金丝雀）+ 启动器约定 + 服务端 toast |
+| `test-night-dashboard.mjs` | 156 | 定时任务台：三个 helper 的时间戳格式 + 解析层（剥 BOM / 15 节点 / 老日志兼容 / 跨零点）+ 状态与问题判定（中位数只用成功的夜 / **`.done` 优先于日志标记 / dead 点名步骤 / 格式变了退化为 unknown 并按完成记录分级 / 阶段级慢 > 中位数 × 3（只比闭合区间）/ 06:00 闸门 / 阶段级只比闭合区间**）+ HTTP 层（本机 / 动态端口 Origin / 目录穿越金丝雀）+ 启动器约定 + 服务端 toast |
 | `test-night-dashboard-mutate.mjs` | 6 组变异 | 改坏解析器必须被抓住（剥 BOM / 时间戳正则 / 跨零点 / 负耗时 / 分组 / median） |
 ```
 
