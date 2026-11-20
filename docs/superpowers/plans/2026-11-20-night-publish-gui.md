@@ -1480,6 +1480,11 @@ git commit -m "feat: 定时任务台 HTTP 服务（只读接口 + 两个受控�
 6. 旧 brief 漏了 spec §8.1「00:10:02 **开始** · 00:41:39 **结束**」→ 本 brief 补上 `finishedAt`。
 7. 旧 brief 的历史表只有 4 列，spec §8.1 要 5 列（含「一句话结论」）→ 补上。
 8. 旧 brief 没有「耗时无数值时显示 **—**」的护栏 → 真实数据 11-16~11-20 的 `durationMs` 全是 `null`（Task 1 加时间戳之前跑的），UI 必须优雅降级。
+9. **「点开那一步看日志」在 `/api/log` 的契约下只能部分成立** —— 该接口按 spec §7.2 只返回
+   **最后 120 行**，而 11-20 的日志有 **1274 行**、16 个阶段标记里有 **11 个在窗口外**。
+   → 本 brief 改成**诚实降级**：那一步的标记不在窗口里时，明说「不在保留的尾部里」并给出
+   完整日志的文件位置，**不把整个尾巴糊上去冒充那一步的日志**（会让人以为看到了这一步）。
+   → **不改接口契约**（Task 9 会在 spec §8.1 上把这个边界写清）。
 
 ---
 
@@ -1533,8 +1538,8 @@ function read(rel) {
   check('页面有未读问题提示', /未读/.test(jsSrc) || /未读/.test(idx));
 
   /* ↓↓ spec §8 的三条漏实现，逐条钉死 ↓↓ */
-  check('app.js 会取日志尾部（点了阶段点能看那一步的日志）',
-    /\/api\/log/.test(jsSrc));
+  check('app.js 会取日志尾部（点了阶段点能看那一步的日志；拿不到时明说，不假装有）',
+    /\/api\/log/.test(jsSrc) && /不在保留的尾部里/.test(jsSrc));
   check('app.js 把「源图已清理」的日期禁用并注明',
     /源图已清理/.test(jsSrc) && /disabled/.test(jsSrc));
   check('app.js 把没有数值的耗时显示成「—」（旧日志没有时间戳）',
@@ -1915,8 +1920,22 @@ async function openStep(step) {
     const j = await r.json();
     const lines = (j && Array.isArray(j.lines)) ? j.lines : [];
     const seg = sliceStep(lines, step);
-    $('logBody').textContent = seg.length ? seg.join('\n')
-      : (lines.length ? lines.join('\n') : '（这一天没有日志内容）');
+    if (seg.length) {
+      $('logBody').textContent = seg.join('\n');
+    } else if (lines.length) {
+      /* ⚠️ **诚实降级**：这一步的标记不在接口返回的那 120 行里。
+         /api/log 按契约只返回**最后 120 行**（spec §7.2「尾部 120 行」），
+         而 11-20 的日志有 1274 行 —— 16 个阶段标记里有 **11 个在窗口外**。
+         这里**不许**假装有内容，也不许把整个尾巴糊上去冒充「这一步的日志」——
+         那会让人以为看到了这一步，其实看到的是别的步骤。
+         直接说清楚在哪：完整日志在磁盘上的哪个文件。 */
+      $('logBody').textContent =
+        '这一步的日志不在保留的尾部里（/api/log 只返回最后 120 行）。\n' +
+        '完整日志：' + (last && last.current ? last.current.date : '') + ' 的 .night-publish-<日期>.log\n' +
+        '（下面是这次运行的最后 120 行）\n\n' + lines.join('\n');
+    } else {
+      $('logBody').textContent = '（这一天没有日志内容）';
+    }
   } catch (e) {
     $('logBody').textContent = '读不到日志：' + (e && e.message ? e.message : e);
   }
