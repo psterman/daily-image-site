@@ -2141,12 +2141,20 @@ git commit -m "feat: 定时任务台页面（素白文档风 · 今日焦点 · 
 /* ── 6. 启动器约定 ─────────────────────────────────────── */
 {
   const cmdPath = path.join(ROOT, '起任务台.cmd');
-  const bytes = fs.readFileSync(cmdPath);
-  check('起任务台.cmd 是纯 ASCII', bytes.every((b) => b < 128),
-    bytes.filter((b) => b >= 128).length + ' 个非 ASCII 字节');
+  let bytes = Buffer.alloc(0);
+  try { bytes = fs.readFileSync(cmdPath); } catch { /* 文件还不存在 */ }
+  /* ⚠️ 每条都带 `bytes.length > 0` 前置 —— **空 Buffer 会让这些断言空过**：
+       `Buffer.alloc(0).every(...)` 恒为 true、`bytes[0]` 是 undefined →
+       「无 BOM」「只有 LF」两条会**假装通过**，护栏会说「文件格式没问题」，
+       实际它压根没看见文件。跟 Task 1 那条「body !== ''」是同一类假阴性。 */
+  const cmdExists = bytes.length > 0;
+  check('起任务台.cmd 是纯 ASCII', cmdExists && bytes.every((b) => b < 128),
+    { nonAscii: bytes.filter((b) => b >= 128).length, bytes: bytes.length });
   check('起任务台.cmd 无 BOM',
-    !(bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf));
-  check('起任务台.cmd 只有 LF，没有 CR', !bytes.includes(0x0d));
+    cmdExists && !(bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf),
+    { bytes: bytes.length });
+  check('起任务台.cmd 只有 LF，没有 CR', cmdExists && !bytes.includes(0x0d),
+    { cr: bytes.filter((b) => b === 13).length, bytes: bytes.length });
   const cmd = bytes.toString('latin1');
   check('起任务台.cmd 调 start-dashboard.mjs', /start-dashboard\.mjs/.test(cmd));
 
@@ -2164,14 +2172,11 @@ git commit -m "feat: 定时任务台页面（素白文档风 · 今日焦点 · 
 - [ ] **Step 2: 跑测试，确认它红**
 
 Run: `node tools\test-night-dashboard.mjs`
-Expected: FAIL —— 读 `起任务台.cmd` 时 `ENOENT`（护栏崩了）。
-→ 把这组断言里的读文件包一层 `try`，读不到就当空串：
+Expected: FAIL —— Step 1 已经把读文件包了 `try/catch` → 读不到就是空 Buffer →
+**5 条 .cmd 相关的断言全部干净地红**（每条都带了 `bytes.length > 0` 前置，
+不会「文件不存在」却空过），另外 3 条 `start-dashboard.mjs` 的也红（文件还没建）。
 
-```js
-const cmdPath = path.join(ROOT, '起任务台.cmd');
-let bytes = Buffer.alloc(0);
-try { bytes = fs.readFileSync(cmdPath); } catch { /* 文件还不存在 */ }
-```
+⚠️ **不能崩**：崩掉的套件没有 `✗` 行 → Task 8 按标签 grep 会误判「没抓到」。
 
 - [ ] **Step 3: 写 `tools/start-dashboard.mjs`**
 
@@ -2223,15 +2228,16 @@ function readPort() {
   }
 }
 
+/**
+ * 打开页面。**照抄仓库既有惯例**（tools/review.mjs:1701-1708）：
+ * Windows 用 `cmd /c start`，macOS 用 `open`，其他用 `xdg-open`。
+ * ⚠️ 端口可能顺延 → 一定要用**实际端口**的 URL，不能写死 8801。
+ */
 function openBrowser(url) {
+  const cmd = process.platform === 'win32' ? 'cmd' : (process.platform === 'darwin' ? 'open' : 'xdg-open');
+  const args = process.platform === 'win32' ? ['/c', 'start', '', url] : [url];
   try {
-    if (process.platform === 'win32') {
-      spawn('rundll32.exe', ['url.dll,FileProtocolHandler', url], { detached: true, stdio: 'ignore' }).unref();
-    } else if (process.platform === 'darwin') {
-      spawn('open', [url], { detached: true, stdio: 'ignore' }).unref();
-    } else {
-      spawn('xdg-open', [url], { detached: true, stdio: 'ignore' }).unref();
-    }
+    spawn(cmd, args, { detached: true, stdio: 'ignore' }).unref();
   } catch { /* 打开不了就算了，用户可以自己复制链接 */ }
 }
 
@@ -2299,6 +2305,11 @@ if (DIRECT) {
 
 ⚠️ **纯 ASCII**（一个非 ASCII 字节都不行）、LF、无 BOM。
 
+⚠️ **文件内容里不许出现中文文件名**！`起任务台.cmd` 这个名字本身有中文，
+一旦写进内容（比如 `rem explorer.exe "<project-root>\起任务台.cmd"`）
+→ 整个文件不再是纯 ASCII → **「起任务台.cmd 是纯 ASCII」那条断言必红**。
+既有 `起审稿台.cmd` 就是用 `<this file>` 绕开这一条的，照抄那个写法。
+
 ```
 @echo off
 rem Task dashboard launcher.
@@ -2307,7 +2318,7 @@ rem IMPORTANT: launch this file through explorer.exe, so the server escapes
 rem the caller's Windows Job Object. A Job with KILL_ON_JOB_CLOSE kills its
 rem processes with no stderr and no exit code.
 rem
-rem   explorer.exe "<project-root>\起任务台.cmd"
+rem   explorer.exe "<project-root>\<this file>"
 rem
 rem This is only the first hop. It runs the .mjs in --direct mode, which spawns
 rem the server detached (no console window).
@@ -2689,14 +2700,30 @@ git commit -m "test: 定时任务台护栏的变异体（证明有牙齿）"
 - Modify: `.gitignore`（两仓）
 - **本 Task 还要把 Task 1–8 的全部新增/改动文件一次性同步到公开副本**（见 Step 6）
 
-- [ ] **Step 1: `.gitignore` 加一行**
+- [ ] **Step 1: `.gitignore` 补任务台的运行时文件**
 
-两仓的 `.gitignore` 各加：
+⚠️ **母本在 Task 4 里已经加好了**（4 行，别重复加）：
 
 ```
-# 任务台实际占用的端口（端口占用时自动顺延，写下来给一键脚本用）
+# 任务台（定时任务 GUI）的运行时文件
 .night-dashboard-port
+.night-dashboard.pid
+.night-dashboard.out.log
+.night-dashboard.err.log
 ```
+
+**公开副本还没有**（已核实）→ 那边补同样这 4 行：
+
+```powershell
+$p = 'E:\voice-pilot\daily-image-site-open\.gitignore'
+$txt = [System.IO.File]::ReadAllText($p, [System.Text.Encoding]::UTF8)
+$add = "# 任务台（定时任务 GUI）的运行时文件`n.night-dashboard-port`n.night-dashboard.pid`n.night-dashboard.out.log`n.night-dashboard.err.log`n"
+if (-not $txt.Contains('.night-dashboard-port')) {
+  [System.IO.File]::WriteAllText($p, $txt.TrimEnd() + "`n`n" + $add, (New-Object System.Text.UTF8Encoding($false)))
+}
+```
+
+⚠️ `.gitignore` 是 **UTF-8 无 BOM + LF**（不是 `.ps1`，别带 BOM）。
 
 - [ ] **Step 2: `AGENTS.md` 加命令表与护栏表两行（两仓）**
 
@@ -2710,8 +2737,9 @@ git commit -m "test: 定时任务台护栏的变异体（证明有牙齿）"
 护栏表加：
 
 ```
-| `test-night-dashboard.mjs` | 156 | 定时任务台：三个 helper 的时间戳格式 + 解析层（剥 BOM / 15 节点 / 老日志兼容 / 跨零点）+ 状态与问题判定（中位数只用成功的夜 / **`.done` 优先于日志标记 / dead 点名步骤 / 格式变了退化为 unknown 并按完成记录分级 / 阶段级慢 > 中位数 × 3（只比闭合区间）/ 06:00 闸门 / 阶段级只比闭合区间**）+ HTTP 层（本机 / 动态端口 Origin / 目录穿越金丝雀）+ 启动器约定 + 服务端 toast |
-| `test-night-dashboard-mutate.mjs` | 6 组变异 | 改坏解析器必须被抓住（剥 BOM / 时间戳正则 / 跨零点 / 负耗时 / 分组 / median） |
+| `test-night-dashboard.mjs` | 156 | 定时任务台：三个 helper 的时间戳格式 + 解析层（剥 BOM / 15 节点 / 老日志兼容 / 跨零点）+ 状态与问题判定（中位数只用成功的夜 / **`.done` 优先于日志标记 / dead 点名步骤 / 格式变了退化为 unknown 并按完成记录分级 / 阶段级慢 > 中位数 × 3（只比闭合区间）/ 06:00 闸门 / 阶段级只比闭合区间**）+ HTTP 层（本机 / 动态端口 Origin / 目录穿越金丝雀 / **写路径零副作用** / **by:manual 取 manual 日志** / **只绑 127.0.0.1** / **`/api/log` 只读尾部 64KB**）+ 启动器约定 + 服务端 toast |
+| `test-portability.mjs` | 45 | 平台可移植性（**含任务台：PowerShell 可执行名按平台分，不许硬编码 `powershell.exe`**） |
+| `test-night-dashboard-mutate.mjs` | 变异组数见 Task 8 | 改坏**解析层和 HTTP 层**都必须被抓住（剥 BOM / 时间戳正则 / 跨零点 / 负耗时 / 分组 / median / allowWrite 顺序 / by:manual / 绑 0.0.0.0 / 读整份日志） |
 ```
 
 - [ ] **Step 3: 母本 `CHECKPOINT.md` + 公开副本 `CHANGELOG.md`**
@@ -2766,6 +2794,9 @@ Task 1–8 全程只在母本提交。现在把**全部新增/改动文件**一�
 $src = 'E:\voice-pilot\daily-image-site'; $dst = 'E:\voice-pilot\daily-image-site-open'
 
 # ① 新文件：直接覆盖（公开副本里不存在，覆盖不会毁掉任何东西）
+#    ⚠️ `tools\dashboard-ui\` 是**目录** —— 公开副本里还没有（已核实），
+#       不先建的话 Copy-Item 会因为「找不到路径」失败。
+New-Item -ItemType Directory -Force -Path "$dst\tools\dashboard-ui" | Out-Null
 foreach ($f in 'tools\night-dashboard-state.mjs','tools\night-dashboard.mjs','tools\start-dashboard.mjs',
                 'tools\notify.ps1','tools\test-night-dashboard.mjs','tools\test-night-dashboard-mutate.mjs',
                 'tools\dashboard-ui\index.html','tools\dashboard-ui\app.css','tools\dashboard-ui\app.js',
@@ -2776,6 +2807,11 @@ foreach ($f in 'tools\night-dashboard-state.mjs','tools\night-dashboard.mjs','to
 # ② 既有文件：**绝不覆盖** —— 两边做同样的单行编辑
 #    publish.ps1 在公开副本里是占位符 your-project / your-bucket，覆盖 = 泄漏真项目名。
 #    而且公开副本的 publish.ps1 还被 agent/portal 工作线改过，整体覆盖会毁掉那些改动。
+#
+#    ⚠️ `tools/test-portability.mjs` 也在这个列表里 —— Task 4 的修复轮给它加了 1 条断言
+#       （night-dashboard.mjs 不许硬编码 powershell.exe）。**别漏**：漏了的话公开副本的
+#       portability 护栏就少了这条覆盖。
+#       它的改法是**追加一段断言**，不是改既有断言 —— 两边各自追加同样的内容即可。
 foreach ($f in 'tools\daily.ps1','tools\daily-review.ps1','tools\publish.ps1') {
   $p = Join-Path $dst $f
   $txt = [System.IO.File]::ReadAllText($p, [System.Text.Encoding]::UTF8)
@@ -2792,6 +2828,7 @@ foreach ($f in 'tools\daily.ps1','tools\daily-review.ps1','tools\publish.ps1') {
 Set-Location $dst
 git add -- 'tools/night-dashboard-state.mjs' 'tools/night-dashboard.mjs' 'tools/start-dashboard.mjs' `
           'tools/notify.ps1' 'tools/test-night-dashboard.mjs' 'tools/test-night-dashboard-mutate.mjs' `
+          'tools/test-portability.mjs' `
           'tools/dashboard-ui' '起任务台.cmd' `
           'tools/daily.ps1' 'tools/daily-review.ps1' 'tools/publish.ps1' `
           'AGENTS.md' '.gitignore' 'README.md' 'CHANGELOG.md'
@@ -2801,7 +2838,7 @@ git commit -m "feat: 定时任务台（本地 GUI + 三个 helper 时间戳）"
 ⚠️ **不要 Copy-Item `AGENTS.md` / `README.md` / `CHANGELOG.md`** —— 两仓的 `AGENTS.md` 差 4KB（母本 149KB / 公开副本 153KB），
 覆盖会毁掉公开副本自己的内容。Step 1–4 已经让两个仓**各自**改好了同样的内容，这里只提交公开副本这一边。
 
-⚠️ 公开副本工作区里另有 **58 条**别的未提交改动（agent / portal 工作线）。
+⚠️ 公开副本工作区里另有 **76 条**别的未提交改动（agent / portal 工作线，2026-11-20 实测）。
 **只 `git add` 上面列出的路径**，绝不 `git add -A`、绝不 `git commit -a`、**不 push**。
 提交后核对：`git show --stat HEAD` 里只有上面列出的文件。
 
@@ -2828,15 +2865,22 @@ node "E:\voice-pilot\daily-image-site\tools\night-dashboard.mjs"
 - [ ] 有问题时有问题卡，没有时不占地方
 - [ ] 最近 7 天的条带 + 展开历史表格
 - [ ] 「立即跑一次」和「补发某一天」是**两个独立按钮**，点开都是带不可逆文案的确认条
-- [ ] 补发的日期下拉里**只有源图还在的日期**
+- [ ] 补发的日期下拉里：源图还在的**可选**，源图已清理的**显示但禁用**并注明「源图已清理」
 
 **这一轮只读，不点确认。**
 
-- [ ] **Step 8: 可选 —— 开机自启**
+- [ ] **Step 8: 可选 —— 开机自启（要用户同意再做）**
 
-把 `起任务台.cmd` 的一个副本放进
-`C:\Users\pstem\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\`
-（跟夜间发布走同一条路 —— 本机非管理员，`ONSTART`/`ONLOGON` 触发器用不了）。
+在 `C:\Users\pstem\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\`
+放一个**指到仓库里那个 .cmd 的快捷方式**。
+
+⚠️ **不要把 `起任务台.cmd` 本身复制过去** —— 它里面是 `cd /d "%~dp0"`，
+   `%~dp0` = 文件自己所在的目录。复制到 Startup 之后它就 `cd` 到 Startup 目录 →
+   找不到 `tools\start-dashboard.mjs` → **开机自启会静默失败**。
+   要么放快捷方式（目标 = 仓库里那个 .cmd），要么在 Startup 里另写一个
+   指向**绝对路径**的 .cmd。
+
+（跟夜间发布走同一条路 —— 本机非管理员，`ONSTART`/`ONLOGON` 触发器用不了。）
 
 ---
 
@@ -2846,7 +2890,7 @@ node "E:\voice-pilot\daily-image-site\tools\night-dashboard.mjs"
 |---|---|
 | §4.1 组件 | Task 2 / 4 / 5 / 6 / 7 |
 | §4.2 数据流 | Task 4 `buildState()` |
-| §4.3 写操作链路 | Task 4 `guard()` + `spawnPublish()` |
+| §4.3 写操作链路 | Task 4 `guard()` + `spawnDetached()`（**不是** `spawnPublish` —— 实现里没这个函数） |
 | §4.4 三个写操作的脚本与开关 | Task 4（`-Force -NoBrowser` / `-SkipReview -NoConvert -NoHeadlines`） |
 | §4.5 怎么打开页面 | Task 6 |
 | §5.1 三种日志源 | Task 2 `DONE_MARKERS` |
@@ -2862,7 +2906,7 @@ node "E:\voice-pilot\daily-image-site\tools\night-dashboard.mjs"
 | §8.4 通知三条腿 | Task 5（浏览器通知 + 未读问题挂条）+ Task 7（服务端 toast） |
 | §9 错误处理与降级 | Task 3（状态降级）+ Task 4（HTTP 降级）+ Task 7（toast 降级） |
 | §10 安全 | Task 4 `guard()`（动态端口）+ 目录穿越 `serveStatic()` |
-| §11 护栏 26 条 | Task 1/2/3/4/5/6/7 各带一组 + Task 8 变异体 |
+| §11 护栏（`test-night-dashboard.mjs` **156** 条 + `test-portability.mjs` **45** 条） | Task 1/2/3/4/5/6/7 各带一组 + Task 8 变异体 |
 | §12 落地顺序 | Task 1→9 顺序一致 |
 
 **没有任务的 spec 条目**：无。§8.4 的「未读问题提示」在 Task 5 的页面里以「有 N 条未读问题」实现（`st.problems` 已有数据源）。
