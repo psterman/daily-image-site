@@ -21,16 +21,20 @@
 - **实现主战场 = 母本** `E:\voice-pilot\daily-image-site`（真实凭据、真实 project/bucket、真实 `published/`）。
   公开副本 `E:\voice-pilot\daily-image-site-open` 的 `publish.ps1` 里是占位符（`your-project` / `your-bucket`），
   **不能在那里跑发布**。
-- 母本**不在 git 里**（父仓 `E:\voice-pilot` 的 `.gitignore` 忽略了它）。
-  → 每个 Task 的收尾步骤 = **把本 Task 改过的文件同步到公开副本，再在公开副本里 `git add` 具体路径 + commit**。
+- **母本已独立成仓**（2026-11-20 起）：`E:\voice-pilot\daily-image-site` 自己就是一个 git 仓库，
+  分支 `feat/night-publish-gui`，初始快照提交是 `ca5078f`。
+  → **每个 Task 的收尾步骤 = 在母本 `git add` 具体路径 + commit**（评审包靠 `git diff BASE..HEAD` 生成，
+  commit 必须落在母本）。
+  → **公开副本的同步推迟到 Task 9 一次性做**（Task 1–8 只在母本提交，不碰公开副本）。
 - ⚠️ **同步时不能无脑覆盖**：公开副本的 `tools/publish.ps1` 里是**占位符**
   （`your-project` / `your-bucket`），母本里是真项目名（`daily-image-site` / `daily-images`）。
   `Copy-Item` 覆盖 = **把真项目名泄漏进公开仓**。
   → **规则**：*新文件*用 `Copy-Item`；*两仓本来就有差异的既有文件*（`tools/publish.ps1`、
   `AGENTS.md`、`README.md`…）**两边做同样的编辑**，**绝不覆盖文件** ——
   两仓的 `AGENTS.md` 差 4KB、`publish.ps1` 差占位符，覆盖就是毁掉公开副本自己的内容。
-- ⚠️ 公开副本工作区里**另有 39 条别的未提交改动**（agent / portal 工作线）。
+- ⚠️ 公开副本工作区里**另有 58 条别的未提交改动**（agent / portal 工作线）。
   **只 `git add` 本 Task 涉及的路径**，绝不 `git add -A`、绝不 `git commit -a`、**不 push**。
+  ⚠️ 其中 `tools/publish.ps1` 也被那条工作线改过 —— 同步时**只做单行编辑，绝不覆盖整个文件**。
 
 ### 编码约定（逐字节）
 
@@ -100,8 +104,9 @@
 | `AGENTS.md` | 改 | 命令表 + 护栏表 |
 | `CHECKPOINT.md` | 改 | 现状账本 |
 
-**公开副本 `E:\voice-pilot\daily-image-site-open`：** 同步上面除 `CHECKPOINT.md` 以外的全部；
+**公开副本 `E:\voice-pilot\daily-image-site-open`：** 在 **Task 9 Step 6** 一次性同步上面除 `CHECKPOINT.md` 以外的全部；
 `CHECKPOINT.md` 的对应物是 `CHANGELOG.md`（脱敏版）；另改 `AGENTS.md` / `README.md`。
+Task 1–8 全程**只在母本提交**，不碰公开副本。
 
 ---
 
@@ -240,33 +245,15 @@ Run: `node tools\run-all-tests.mjs`
 Expected: 结尾 `总计 45 套件：45 绿 / 0 红 / 0 崩 / 0 跳过`。
 `test-webp.mjs` 要跑 15 分钟左右。
 
-- [ ] **Step 7: 同步 + 提交**
+- [ ] **Step 7: 提交（母本）**
 
 ```powershell
-$src = 'E:\voice-pilot\daily-image-site'
-$dst = 'E:\voice-pilot\daily-image-site-open'
-# 新文件：直接覆盖
-Copy-Item -LiteralPath "$src\tools\test-night-dashboard.mjs" -Destination "$dst\tools\test-night-dashboard.mjs" -Force
-# ⚠️ publish.ps1 **不能覆盖** —— 公开副本里是占位符 your-project / your-bucket，
-#    覆盖会把真项目名泄漏进公开仓。两边做同样的单行编辑：
-foreach ($f in 'tools\daily.ps1','tools\daily-review.ps1','tools\publish.ps1') {
-  $p = Join-Path $dst $f
-  $txt = [System.IO.File]::ReadAllText($p, [System.Text.Encoding]::UTF8)
-  $old = 'function Step($msg) { Write-Host "`n=== $msg ===" -ForegroundColor Cyan }'
-  $old2 = 'function Rule($t)  { Write-Host "`n=== $t ===" -ForegroundColor Cyan }'
-  $new = 'function Step($msg) { Write-Host ("`n=== $msg ===  [" + (Get-BjNow).ToString(''HH:mm:ss'') + "]") -ForegroundColor Cyan }'
-  $new2 = 'function Rule($t)  { Write-Host ("`n=== $t ===  [" + (Get-BjNow).ToString(''HH:mm:ss'') + "]") -ForegroundColor Cyan }'
-  if ($txt.Contains($old))  { $txt = $txt.Replace($old,  $new) }
-  if ($txt.Contains($old2)) { $txt = $txt.Replace($old2, $new2) }
-  [System.IO.File]::WriteAllText($p, $txt, (New-Object System.Text.UTF8Encoding($true)))
-}
-Set-Location $dst
+Set-Location 'E:\voice-pilot\daily-image-site'
 git add -- 'tools/daily.ps1' 'tools/daily-review.ps1' 'tools/publish.ps1' 'tools/test-night-dashboard.mjs'
 git commit -m "feat: 三个 helper 的阶段标记加时间戳（定时任务台第一步）"
 ```
-Expected: 提交里**只有这 4 个文件**。不要 push。
-⚠️ 上面写回 `.ps1` 用的是 **UTF8Encoding($true)**（带 BOM）—— 改完必须再查一次 BOM 和 CR：
-`BOM=True  CR=0`。公开副本的 `publish.ps1` 改完后仍然必须留着 `your-project` / `your-bucket`。
+Expected: 提交里**只有这 4 个文件**。公开副本的同步在 Task 9 一次性做，这一轮**不碰公开副本**。
+⚠️ 三个 `.ps1` 改完必须再查一次 BOM 和 CR：`BOM=True  CR=0`。
 
 ---
 
@@ -597,16 +584,14 @@ Write-Output ("BOM=" + ($b[0] -eq 0xEF -and $b[1] -eq 0xBB -and $b[2] -eq 0xBF) 
 ```
 Expected: `BOM=False  CR=0`。
 
-- [ ] **Step 6: 同步 + 提交**
+- [ ] **Step 6: 提交（母本）**
 
 ```powershell
-$src = 'E:\voice-pilot\daily-image-site'; $dst = 'E:\voice-pilot\daily-image-site-open'
-Copy-Item -LiteralPath "$src\tools\night-dashboard-state.mjs" -Destination "$dst\tools\night-dashboard-state.mjs" -Force
-Copy-Item -LiteralPath "$src\tools\test-night-dashboard.mjs" -Destination "$dst\tools\test-night-dashboard.mjs" -Force
-Set-Location $dst
+Set-Location 'E:\voice-pilot\daily-image-site'
 git add -- 'tools/night-dashboard-state.mjs' 'tools/test-night-dashboard.mjs'
 git commit -m "feat: 定时任务台解析层（剥 BOM / 解析 15 节点 / 阶段耗时）"
 ```
+公开副本的同步在 Task 9 一次性做，这一轮**不碰公开副本**。
 
 ---
 
@@ -925,17 +910,14 @@ import { computePublishState, describeDeadState } from './publish-state.mjs';
 Run: `node tools\test-night-dashboard.mjs`
 Expected: PASS —— `59 通过 / 0 失败`。
 
-- [ ] **Step 5: 同步 + 提交**
+- [ ] **Step 5: 提交（母本）**
 
 ```powershell
-$src = 'E:\voice-pilot\daily-image-site'; $dst = 'E:\voice-pilot\daily-image-site-open'
-foreach ($f in 'tools\night-dashboard-state.mjs','tools\test-night-dashboard.mjs') {
-  Copy-Item -LiteralPath "$src\$f" -Destination "$dst\$f" -Force
-}
-Set-Location $dst
+Set-Location 'E:\voice-pilot\daily-image-site'
 git add -- 'tools/night-dashboard-state.mjs' 'tools/test-night-dashboard.mjs'
 git commit -m "feat: 定时任务台状态判定与问题判定"
 ```
+公开副本的同步在 Task 9 一次性做，这一轮**不碰公开副本**。
 
 ---
 
@@ -1445,17 +1427,14 @@ node "E:\voice-pilot\daily-image-site\tools\night-dashboard.mjs"
 Expected: 打印 `任务台：http://127.0.0.1:8801/`，且 `E:\voice-pilot\daily-image-site\.night-dashboard-port` 里写着 `8801`。
 用 `Ctrl+C` 停掉。
 
-- [ ] **Step 6: 同步 + 提交**
+- [ ] **Step 6: 提交（母本）**
 
 ```powershell
-$src = 'E:\voice-pilot\daily-image-site'; $dst = 'E:\voice-pilot\daily-image-site-open'
-foreach ($f in 'tools\night-dashboard.mjs','tools\test-night-dashboard.mjs') {
-  Copy-Item -LiteralPath "$src\$f" -Destination "$dst\$f" -Force
-}
-Set-Location $dst
+Set-Location 'E:\voice-pilot\daily-image-site'
 git add -- 'tools/night-dashboard.mjs' 'tools/test-night-dashboard.mjs'
 git commit -m "feat: 定时任务台 HTTP 服务（只读接口 + 两个受控写操作）"
 ```
+公开副本的同步在 Task 9 一次性做，这一轮**不碰公开副本**。
 
 ---
 
@@ -1905,17 +1884,14 @@ node "E:\voice-pilot\daily-image-site\tools\night-dashboard.mjs"
 确认：能看到「2026-11-20 夜间发布 / 成功 · 31 分 36 秒」、三组 15 个点、最近 7 天的条带。
 **只读，不点任何写按钮**（写按钮要等 Task 6 之后连着测）。
 
-- [ ] **Step 8: 同步 + 提交**
+- [ ] **Step 8: 提交（母本）**
 
 ```powershell
-$src = 'E:\voice-pilot\daily-image-site'; $dst = 'E:\voice-pilot\daily-image-site-open'
-foreach ($f in 'tools\dashboard-ui\index.html','tools\dashboard-ui\app.css','tools\dashboard-ui\app.js','tools\test-night-dashboard.mjs') {
-  Copy-Item -LiteralPath "$src\$f" -Destination "$dst\$f" -Force
-}
-Set-Location $dst
+Set-Location 'E:\voice-pilot\daily-image-site'
 git add -- 'tools/dashboard-ui' 'tools/test-night-dashboard.mjs'
 git commit -m "feat: 定时任务台页面（素白文档风 · 今日焦点 · 两个独立确认条）"
 ```
+公开副本的同步在 Task 9 一次性做，这一轮**不碰公开副本**。
 
 ---
 
@@ -2125,17 +2101,14 @@ Invoke-WebRequest -Uri ("http://127.0.0.1:" + (Get-Content 'E:\voice-pilot\daily
 ```
 Expected: 端口文件里是一个 4 位数端口，HTTP 200。
 
-- [ ] **Step 7: 同步 + 提交**
+- [ ] **Step 7: 提交（母本）**
 
 ```powershell
-$src = 'E:\voice-pilot\daily-image-site'; $dst = 'E:\voice-pilot\daily-image-site-open'
-foreach ($f in 'tools\start-dashboard.mjs','起任务台.cmd','tools\test-night-dashboard.mjs') {
-  Copy-Item -LiteralPath "$src\$f" -Destination "$dst\$f" -Force
-}
-Set-Location $dst
+Set-Location 'E:\voice-pilot\daily-image-site'
 git add -- 'tools/start-dashboard.mjs' '起任务台.cmd' 'tools/test-night-dashboard.mjs'
 git commit -m "feat: 定时任务台启动器（explorer.exe 脱 Job + 纯 ASCII 入口）"
 ```
+公开副本的同步在 Task 9 一次性做，这一轮**不碰公开副本**。
 
 ---
 
@@ -2288,17 +2261,14 @@ Write-Output ("exit=" + $LASTEXITCODE)
 ```
 Expected: `exit=0`（弹没弹出来都行，**绝不能报错**）。
 
-- [ ] **Step 7: 同步 + 提交**
+- [ ] **Step 7: 提交（母本）**
 
 ```powershell
-$src = 'E:\voice-pilot\daily-image-site'; $dst = 'E:\voice-pilot\daily-image-site-open'
-foreach ($f in 'tools\notify.ps1','tools\night-dashboard.mjs','tools\test-night-dashboard.mjs') {
-  Copy-Item -LiteralPath "$src\$f" -Destination "$dst\$f" -Force
-}
-Set-Location $dst
+Set-Location 'E:\voice-pilot\daily-image-site'
 git add -- 'tools/notify.ps1' 'tools/night-dashboard.mjs' 'tools/test-night-dashboard.mjs'
 git commit -m "feat: 定时任务台服务端 toast（页面关着也能收到）"
 ```
+公开副本的同步在 Task 9 一次性做，这一轮**不碰公开副本**。
 
 ---
 
@@ -2452,17 +2422,14 @@ node tools\test-night-dashboard.mjs
 ```
 Expected: PASS —— `99 通过 / 0 失败`（变异脚本会还原源码）。
 
-- [ ] **Step 4: 同步 + 提交**
+- [ ] **Step 4: 提交（母本）**
 
 ```powershell
-$src = 'E:\voice-pilot\daily-image-site'; $dst = 'E:\voice-pilot\daily-image-site-open'
-foreach ($f in 'tools\test-night-dashboard-mutate.mjs','tools\test-night-dashboard.mjs') {
-  Copy-Item -LiteralPath "$src\$f" -Destination "$dst\$f" -Force
-}
-Set-Location $dst
+Set-Location 'E:\voice-pilot\daily-image-site'
 git add -- 'tools/test-night-dashboard-mutate.mjs' 'tools/test-night-dashboard.mjs'
 git commit -m "test: 定时任务台护栏的变异体（证明有牙齿）"
 ```
+公开副本的同步在 Task 9 一次性做，这一轮**不碰公开副本**。
 
 ---
 
@@ -2474,6 +2441,7 @@ git commit -m "test: 定时任务台护栏的变异体（证明有牙齿）"
 - Modify: `CHANGELOG.md`（公开副本）
 - Modify: `README.md`（公开副本）
 - Modify: `.gitignore`（两仓）
+- **本 Task 还要把 Task 1–8 的全部新增/改动文件一次性同步到公开副本**（见 Step 6）
 
 - [ ] **Step 1: `.gitignore` 加一行**
 
@@ -2544,15 +2512,61 @@ node tools\run-all-tests.mjs
 Expected: 公开副本里那 5 套**既有**环境性失败仍在（`test-rss` / `test-rss-images` / `test-product-validity` / `test-retag` / `test-webp`）——
 **与本次改动无关**（已用 stash 对照实验证明过）。新增的 2 套必须绿。
 
-- [ ] **Step 6: 同步 + 提交（最后一批）**
+- [ ] **Step 6: 一次性同步到公开副本 + 两仓提交（最后一批）**
+
+Task 1–8 全程只在母本提交。现在把**全部新增/改动文件**一次性同步到公开副本。
 
 ```powershell
-# ⚠️ **不要 Copy-Item AGENTS.md** —— 两仓的 AGENTS.md 差 4KB（母本 149KB / 公开副本 153KB），
-#    覆盖会毁掉公开副本自己的内容。Step 1–4 已经让两个仓**各自**改好了同样的内容，
-#    这里只提交公开副本这一边。
-Set-Location 'E:\voice-pilot\daily-image-site-open'
-git add -- 'AGENTS.md' '.gitignore' 'README.md' 'CHANGELOG.md'
-git commit -m "docs: 定时任务台（命令表 / 护栏表 / README / CHANGELOG）"
+$src = 'E:\voice-pilot\daily-image-site'; $dst = 'E:\voice-pilot\daily-image-site-open'
+
+# ① 新文件：直接覆盖（公开副本里不存在，覆盖不会毁掉任何东西）
+foreach ($f in 'tools\night-dashboard-state.mjs','tools\night-dashboard.mjs','tools\start-dashboard.mjs',
+                'tools\notify.ps1','tools\test-night-dashboard.mjs','tools\test-night-dashboard-mutate.mjs',
+                'tools\dashboard-ui\index.html','tools\dashboard-ui\app.css','tools\dashboard-ui\app.js',
+                '起任务台.cmd') {
+  Copy-Item -LiteralPath "$src\$f" -Destination "$dst\$f" -Force
+}
+
+# ② 既有文件：**绝不覆盖** —— 两边做同样的单行编辑
+#    publish.ps1 在公开副本里是占位符 your-project / your-bucket，覆盖 = 泄漏真项目名。
+#    而且公开副本的 publish.ps1 还被 agent/portal 工作线改过，整体覆盖会毁掉那些改动。
+foreach ($f in 'tools\daily.ps1','tools\daily-review.ps1','tools\publish.ps1') {
+  $p = Join-Path $dst $f
+  $txt = [System.IO.File]::ReadAllText($p, [System.Text.Encoding]::UTF8)
+  $old  = 'function Step($msg) { Write-Host "`n=== $msg ===" -ForegroundColor Cyan }'
+  $old2 = 'function Rule($t)  { Write-Host "`n=== $t ===" -ForegroundColor Cyan }'
+  $new  = 'function Step($msg) { Write-Host ("`n=== $msg ===  [" + (Get-BjNow).ToString(''HH:mm:ss'') + "]") -ForegroundColor Cyan }'
+  $new2 = 'function Rule($t)  { Write-Host ("`n=== $t ===  [" + (Get-BjNow).ToString(''HH:mm:ss'') + "]") -ForegroundColor Cyan }'
+  if ($txt.Contains($old))  { $txt = $txt.Replace($old,  $new) }
+  if ($txt.Contains($old2)) { $txt = $txt.Replace($old2, $new2) }
+  [System.IO.File]::WriteAllText($p, $txt, (New-Object System.Text.UTF8Encoding($true)))
+}
+
+# ③ 公开副本提交：只 add 本次涉及的路径
+Set-Location $dst
+git add -- 'tools/night-dashboard-state.mjs' 'tools/night-dashboard.mjs' 'tools/start-dashboard.mjs' `
+          'tools/notify.ps1' 'tools/test-night-dashboard.mjs' 'tools/test-night-dashboard-mutate.mjs' `
+          'tools/dashboard-ui' '起任务台.cmd' `
+          'tools/daily.ps1' 'tools/daily-review.ps1' 'tools/publish.ps1' `
+          'AGENTS.md' '.gitignore' 'README.md' 'CHANGELOG.md'
+git commit -m "feat: 定时任务台（本地 GUI + 三个 helper 时间戳）"
+```
+
+⚠️ **不要 Copy-Item `AGENTS.md` / `README.md` / `CHANGELOG.md`** —— 两仓的 `AGENTS.md` 差 4KB（母本 149KB / 公开副本 153KB），
+覆盖会毁掉公开副本自己的内容。Step 1–4 已经让两个仓**各自**改好了同样的内容，这里只提交公开副本这一边。
+
+⚠️ 公开副本工作区里另有 **58 条**别的未提交改动（agent / portal 工作线）。
+**只 `git add` 上面列出的路径**，绝不 `git add -A`、绝不 `git commit -a`、**不 push**。
+提交后核对：`git show --stat HEAD` 里只有上面列出的文件。
+
+⚠️ 写回 `.ps1` 用的是 **UTF8Encoding($true)**（带 BOM）—— 改完必须再查一次 BOM 和 CR：
+`BOM=True  CR=0`。公开副本的 `publish.ps1` 改完后仍然必须留着 `your-project` / `your-bucket`。
+
+```powershell
+# 母本也提交 Task 9 的文档改动
+Set-Location 'E:\voice-pilot\daily-image-site'
+git add -- 'AGENTS.md' 'CHECKPOINT.md' '.gitignore'
+git commit -m "docs: 定时任务台（命令表 / 护栏表 / 现状账本）"
 ```
 
 - [ ] **Step 7: 端到端验收（只读）**
