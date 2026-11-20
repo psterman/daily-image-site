@@ -3142,6 +3142,33 @@ foreach ($f in 'tools\night-dashboard-state.mjs','tools\night-dashboard.mjs','to
   Copy-Item -LiteralPath "$src\$f" -Destination "$dst\$f" -Force
 }
 
+
+#    ④ `tools/test-portability.mjs` —— **两边各自追加**（不许 Copy-Item 覆盖）
+#
+#       母本在 Task 4 修复轮 1 时给它加了 1 条断言，公开副本**还没有**
+#       （母 agent 实测：母本 41 个 check() 调用点 / 公开副本 40 个）。
+#       ⚠️ 这条断言读的是 `tools/night-dashboard.mjs` —— 公开副本里那个文件
+#          要等 Step 6 的 ① 复制过去之后才存在 → **顺序：先复制文件，再追加断言**。
+#       插入点：公开副本 `tools/test-portability.mjs` 的**第 210 行**
+#       （`reviewCode` 那条 check 之后、`const refreshCode = ...` 之前），
+#       跟母本的布局保持一致。
+#
+# 追加这一段（母 agent 已核对过母本第 210–218 行，逐字照抄）：
+
+  /* 定时任务台 —— 同一个坑：PowerShell 的可执行名在 macOS 上是 pwsh，
+     写死 powershell.exe → spawn ENOENT → 「有没有发布在跑」永远返回 false
+     → 撞上夜间任务时两道门形同虚设。 */
+  const dashCode = stripComments(read(process.env.DASHBOARD_MJS || 'tools/night-dashboard.mjs'));
+  check('night-dashboard.mjs 的 PowerShell 可执行名按平台分（不硬编码 powershell.exe）',
+    /process\.platform/.test(dashCode) && /pwsh/.test(dashCode) &&
+    !/['"]powershell\.exe['"]/.test(dashCode),
+    'macOS 上没有 powershell.exe，spawn 会 ENOENT');
+
+# 追加完在**公开副本**里验一下：
+#   cd E:\voice-pilot\daily-image-site-open
+#   node tools\test-portability.mjs
+#   → 期望 **45 通过 / 0 失败**（母本也是 45 —— 两边一致）
+#
 # ② 既有文件：**绝不覆盖** —— 两边做同样的单行编辑
 #    publish.ps1 在公开副本里是占位符 your-project / your-bucket，覆盖 = 泄漏真项目名。
 #    而且公开副本的 publish.ps1 还被 agent/portal 工作线改过，整体覆盖会毁掉那些改动。
