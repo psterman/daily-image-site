@@ -3145,7 +3145,7 @@ node tools\run-all-tests.mjs
 ```
 Expected: `总计 35 套件：35 绿 / 0 红 / 0 崩 / 0 跳过`（34 原有常规 + 新增 `test-night-dashboard`）。
 跑批器默认**不含**变异套件 —— 变异那套要单独跑：
-`node tools\run-all-tests.mjs --mutate` → 46 套（35 常规 + 11 个 `-mutate`，含新增的 `test-night-dashboard-mutate`）。
+`node tools\run-all-tests.mjs --mutate` → **47 套**（35 常规 + 12 个 `-mutate`，含新增的 `test-night-dashboard-mutate`）。
 
 ```powershell
 Set-Location 'E:\voice-pilot\daily-image-site-open'
