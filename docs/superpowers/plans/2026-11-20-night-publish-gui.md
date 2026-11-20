@@ -2158,7 +2158,7 @@ poll();
 - [ ] **Step 6: 跑测试，确认它绿**
 
 Run: `node tools\test-night-dashboard.mjs`
-Expected: PASS —— `144 通过 / 0 失败`（142 + 本组 22 条；142 = 120 + Task 5 的 22）。
+Expected: PASS —— `142 通过 / 0 失败`（120 + 本组 22 条）。
 
 ⚠️ 既有 120 条断言的**标签、条件、顺序一个字都不许动**。
 新增的 22 条各自用**独立新标签**（Task 8 按标签 grep 变异点，重复标签会串）。
@@ -3153,7 +3153,7 @@ node "E:\voice-pilot\daily-image-site\tools\night-dashboard.mjs"
 | §8.4 通知三条腿 | Task 5（浏览器通知 + 未读问题挂条）+ Task 7（服务端 toast） |
 | §9 错误处理与降级 | Task 3（状态降级）+ Task 4（HTTP 降级）+ Task 7（toast 降级） |
 | §10 安全 | Task 4 `guard()`（动态端口）+ 目录穿越 `serveStatic()` |
-| §11 护栏（`test-night-dashboard.mjs` **156** 条 + `test-portability.mjs` **45** 条） | Task 1/2/3/4/5/6/7 各带一组 + Task 8 变异体 |
+| §11 护栏（`test-night-dashboard.mjs` **158** 条 + `test-portability.mjs` **45** 条） | Task 1/2/3/4/5/6/7 各带一组 + Task 8 变异体 |
 | §12 落地顺序 | Task 1→9 顺序一致 |
 
 **没有任务的 spec 条目**：无。§8.4 的「未读问题提示」在 Task 5 的页面里以「有 N 条未读问题」实现（`st.problems` 已有数据源）。
