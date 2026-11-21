@@ -3187,7 +3187,7 @@ if (-not $txt.Contains('.night-dashboard-port')) {
 两个写操作（立即跑一次 / 补发某一天）都会先弹确认条 —— **发布不可逆**。
 ```
 
-- [ ] **Step 5: 跑全量护栏（母本 + 公开副本）**
+- [ ] **Step 5: 跑全量护栏（母本）**
 
 ```powershell
 Set-Location 'E:\voice-pilot\daily-image-site'
@@ -3197,12 +3197,8 @@ Expected: `总计 35 套件：35 绿 / 0 红 / 0 崩 / 0 跳过`（34 原有常�
 跑批器默认**不含**变异套件 —— 变异那套要单独跑：
 `node tools\run-all-tests.mjs --mutate` → **47 套**（35 常规 + 12 个 `-mutate`，含新增的 `test-night-dashboard-mutate`）。
 
-```powershell
-Set-Location 'E:\voice-pilot\daily-image-site-open'
-node tools\run-all-tests.mjs
-```
-Expected: 公开副本里那 5 套**既有**环境性失败仍在（`test-rss` / `test-rss-images` / `test-product-validity` / `test-retag` / `test-webp`）——
-**与本次改动无关**（已用 stash 对照实验证明过）。新增的 2 套必须绿。
+⚠️ **公开副本那一半在 Step 6 同步完之后才跑**（见 Step 6 末尾）——
+先同步再跑，否则测的是**旧状态**（公开副本里还没有那 10 个新文件）。
 
 - [ ] **Step 6: 一次性同步到公开副本 + 两仓提交（最后一批）**
 
@@ -3335,6 +3331,46 @@ Set-Location 'E:\voice-pilot\daily-image-site'
 git add -- 'AGENTS.md' 'CHECKPOINT.md' '.gitignore'
 git commit -m "docs: 定时任务台（命令表 / 护栏表 / 现状账本）"
 ```
+
+#### ⚠️ 公开副本的**部分暂存**（2026-11-21 母 agent 实做）
+
+公开副本的工作区里混着**另一条工作线**（agent / portal）的未提交改动，
+而本次要提交的文件（`.gitignore` / `AGENTS.md` / `README.md` / `CHANGELOG.md` / `tools/publish.ps1`）
+**两边都改过同一个文件** → **不能 `git add <file>`（会连别人的一起提交），也不�� `git add -p`（交互式，用不了）**。
+
+**母 agent 实做的办法**：**按 HEAD 基线重建 index 版本** ——
+`.superpowers/sdd/2026-11-20-night-publish-gui/stage-part.mjs` + `stage-spec.txt`：
+
+1. 取该文件的 **HEAD 版本**当基线（不含任何人的未提交改动）；
+2. 在基线上**重放我这次在工作区里做的那几处精确替换**（spec 里一条一替换，
+   **每条锚点必须在基线里恰好命中 1 次**，命中 0 次或 >1 次直接 exit 1）；
+3. 写临时文件 → `git hash-object -w` → `git update-index --cacheinfo`。
+   → **index 里只有我的改动，工作区里别人的改动原封不动**。
+
+```powershell
+node .superpowers\sdd\2026-11-20-night-publish-gui\stage-part.mjs `
+  'E:\voice-pilot\daily-image-site-open' `
+  '.superpowers\sdd\2026-11-20-night-publish-gui\stage-spec.txt'
+```
+
+⚠️ **两个坑**：
+- 剥掉基线的**结尾换行**会让暂存出来的文件变成「最后一行没换行」→
+  diff 里出现 `\ No newline at end of file`，而工程约定是每个文本文件都以 LF 收尾。
+- 同一行上**别人的改动和我的改动混在一起**时（比如「合计 ≈812 项断言」那行，
+  别人先改成 819、我再改成 984），hunk 补丁**根本分不开** → 只能按行取净效果（812 → 984）。
+
+提交后必须核对：`git show --stat HEAD` 里**只有上面列出的 20 个文件**，
+且 `git status --short` 里**别人的那 100+ 条改动还在**。
+
+#### Step 6之二：跑公开副本的全量护栏（同步之后）
+
+```powershell
+Set-Location 'E:\voice-pilot\daily-image-site-open'
+node tools\run-all-tests.mjs
+```
+Expected: 公开副本里那 5 套**既有**环境性失败仍在（`test-rss` / `test-rss-images` /
+`test-product-validity` / `test-retag` / `test-webp`）—— **与本次改动无关**。
+新增的 `test-night-dashboard` 必须绿（165/0），`test-portability` 45/0。
 
 - [ ] **Step 7: 端到端验收（只读）**
 
