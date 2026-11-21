@@ -48,6 +48,8 @@
 | **往期重分**（分类规则改了，要重算已发布各期的 tag/tags；**内容一个字节不动**） | `node tools\build.mjs --retag --date 2026-11-04` —— 旧 manifest **恒从工程 `published/<日期>/` 读**（不跟 `--out` 走），产物写回同一目录；**先写新 manifest → 再删旧 manifest → 最后改 index.html 引用**，不 rm 目录。**跟 `--keep-manifest` 互斥**；缺 `--date`、缺旧 manifest、源没配分类 → **一律 exit 1 且什么都不写**。试验用 `--out PROJECT_ROOT\.exp\retag-test` |
 | 预览 `--out` 出来的产物（页面伺服它，图仍从 R2 母本取） | `node tools\dev-server.mjs 8790 PROJECT_ROOT\.exp\out r2` |
 | **长驻本地预览（8790，经 explorer.exe 脱身 Job）** | `node .exp\start-preview.mjs` —— **`.exp\out` 在就伺服它，不在就伺服 `published\`**（2026-11-11 改：试验产物清掉后预览不能跟着一起废） |
+| **起定时任务台（默认端口 8801，占用时顺延，实值写 `.night-dashboard-port`）** | `node tools\start-dashboard.mjs`（双击根目录 `起任务台.cmd` 同样） |
+| **从任何 Job Object 之外起任务台** | `node tools\start-dashboard.mjs` → Windows 内部经 `explorer.exe` 转交给根目录的 `起任务台.cmd` |
 
 **发布挂了直接重跑 `tools\publish.ps1 -Date <日期>`** —— 凭证是落盘的，审稿台死了也不丢。
 重跑前核对凭证总数 / 分类数与源目录一致。
@@ -810,14 +812,16 @@ const watchList = [...followSchedule, ...movieList, ...videoList, ...followEvent
 | `test-build-feed-mutate.mjs` | 11 组变异 | 改坏 RSS 必须被抓住（**11/11 全抓**：相对路径 link / 本地时间 pubDate / 不转义 / 升序 / 少一个 tab / description 写回「三栏」 / 写到当期目录 / 只扫当期 / type 改 text/xml / 不校验非法日期 / 往期页订阅链接被删） |
 | `test-build-lqip.mjs` | 39 | **模糊占位**：`flags=fast_bilinear` 正向 + **`flags=fast` 负向**（ffmpeg 9.0.2 非法值）+ 24px + 批量 12（运行时证据：24 张 = 2 批 2 次 ffmpeg）+ data URI + 全失败返空 Map + build.mjs 只收照片 + app.js 写 `--lqip` + app.css 的 `::before`/`is-loaded` + **不许有 `filter: blur()`**（要区分 `backdrop-filter:`） |
 | `test-build-lqip-mutate.mjs` | 9 组变异 | 改坏 LQIP 必须被抓住（**9/9 全抓**：`flags=fast` / batchSize=1 / 宽度 96 / 失败改成 throw / 不写 lqip 字段 / 构建被掀翻 / 不设 `--lqip` / opacity 改成 .9 / 加 `filter: blur(20px)`） |
-| `test-portability.mjs` | 44 | 跨平台护栏：macOS 部署包 / launchd 定时点对齐 / Python 侧 OUT_BASE + OCR / Node 侧 where→which、spawn 分支 / 全局残留扫描 / **图根默认值不许出现盘符字面量**（脱敏后改盯这条） |
+| `test-portability.mjs` | 45 | 跨平台护栏：macOS 部署包 / launchd 定时点对齐 / Python 侧 OUT_BASE + OCR / Node 侧 where→which、spawn 分支 / 全局残留扫描 / **图根默认值不许出现盘符字面量**（脱敏后改盯这条） / **任务台：PowerShell 可执行名按平台分** |
 | `test-orphan-clean.mjs` | 48 | 孤儿清理：键集抽取（**base-36 hash 不是 hex**）/ REST 删除的成功判据（**不能只看 HTTP 码**：`success:false` + `code 10007` 才是幂等成功）/ 干跑不删 / 失败如实报 / **凭据懒检查**（构造不抛、真删才抛） |
 | `test-media-fallback.mjs` | 15 | ffmpeg 格式回退机制 |
 | `test-likes.mjs` / `test-board.mjs` / `test-functions.mjs` | 67 / 42 / 35 | 点赞后端 / 留言板 / Functions 公共层 |
 | `test-likes-ui.mjs` / `test-board-ui.mjs` | 32 / 45 | 前端点赞 / 留言板版面 |
 | `test-webp.mjs` | 8322 文件 | WebP 宽高解析器 vs ffprobe 逐个对照（母本每多一期就多几百个文件，2026-11-11 起 8322 个，约 12 分钟） |
+| `test-night-dashboard.mjs` | 165 | 定时任务台：三个 helper 的时间戳格式 + 解析层（剥 BOM / 15 节点 / 老日志兼容 / 跨零点）+ 状态与问题判定（中位数只用成功的夜 / **`.done` 优先于日志标记 / dead 点名步骤 / 格式变了退化为 unknown 并按完成记录分级 / 阶段级慢 > 中位数 × 3（只比闭合区间）/ 06:00 闸门 / 阶段级只比闭合区间** / **计划任务「正在运行」不算失败**）+ HTTP 层（本机 / 动态端口 Origin / 目录穿越金丝雀 / **写路径零副作用** / **by:manual 取 manual 日志** / **只绑 127.0.0.1** / **`/api/log` 只读尾部 64KB**）+ 启动器约定 + 服务端 toast（**AUMID 字面量只放 common.ps1**） |
+| `test-night-dashboard-mutate.mjs` | 14 组变异 | 改坏**解析层、HTTP 层和 toast 的 AUMID 归位**都必须被抓住（剥 BOM / 时间戳正则 / 跨零点 / 负耗时 / 分组 / median / allowWrite 顺序 / by:manual / 绑 0.0.0.0 / 读整份日志 / **AUMID 字面量搬回 notify.ps1** / **common.ps1 里的 Get-ToastAumid 被改名**） |
 
-**合计 ≈812 项断言**（不含 45 组变异、8322 文件对照）。改完代码至少跑相关的那几套。
+**合计 ≈984 项断言**（不含 59 组变异、8322 文件对照）。改完代码至少跑相关的那几套。
 
 | 工具 | 用途 |
 |---|---|

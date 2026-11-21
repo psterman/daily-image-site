@@ -48,7 +48,7 @@ Set-Location $Root
 # macOS 上跑的是同一份 .ps1（PowerShell 7），helper 负责把那几处 Windows 绑定拆掉。
 . (Join-Path $PSScriptRoot 'common.ps1')
 
-function Step($msg) { Write-Host "`n=== $msg ===" -ForegroundColor Cyan }
+function Step($msg) { Write-Host ("`n=== $msg ===  [" + (Get-BjNow).ToString('HH:mm:ss') + "]") -ForegroundColor Cyan }
 
 # ── 原生命令统一入口 ──────────────────────────────────────────────
 #

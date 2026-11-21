@@ -381,3 +381,39 @@ schtasks /query /tn "DailyImageSite-NightPublish-0010" /fo LIST /v
 ## 九、机器相关
 
 74 个 Chrome 进程是用户自己的浏览器，**不要杀**。本机到 Cloudflare 的 TLS 连接会**间歇 ECONNRESET** → 所有联网脚本自带重试。**机器重启/关机也会带走长驻进程** —— 查事件日志 1074（正常关机）/12（启动）/41/6008 对时间线，别误报成「程序崩了」。**长驻进程静默消失 + 无日志，先查 Job Object，再查控制台。**
+
+---
+
+## 十、定时任务台（2026-11-21 新增）
+
+**是什么**：一个**只读为主的本地网页**（`127.0.0.1:8801`，占用时顺延，实值写 `.night-dashboard-port`），
+看夜间发布跑到哪一步、有没有问题；外加两个受控写操作。
+
+- **怎么起**：双击根目录 `起任务台.cmd`，或 `node tools\start-dashboard.mjs`
+  （Windows 内部经 `explorer.exe` 脱 Job Object；macOS/Linux 直接 detached）。
+- **状态从哪来**：本机三种日志源 `.night-publish-<日期>.log` / `.manual-publish-<日期>.log` /
+  `.review-publish-<日期>.log` + 标记文件 `.night-publish-<日期>.done`。
+  **`.done` 是唯一权威完成记录**（日志尾部的 `NIGHT_DONE` / `MANUAL_DONE` / `PUBLISH_DONE` 只作兜底）；
+  `finishedAt / durationMs / exitCode / source` 必须**同源**（不许混着拼）。
+- **阶段耗时**：靠三个 helper 现在带的 `[HH:mm:ss]` 时间戳算。
+  ⚠️ **11-20 及之前的老日志没有时间戳** → 那几期阶段耗时显示 `—`，**不是「0 秒」**。
+- **补发某一天 = 线上首页重新指向那一天** —— **不可逆**（撤回要等 24 小时边缘缓存）。
+  → 「立即跑一次」和「补发某一天」是**两个独立按钮**，各带一条写明不可逆的确认条。
+- **桌面通知的三条腿**：① 页面内状态卡（永远）② 浏览器 Notification API（页面开着）③
+  服务端 Windows toast（`tools/notify.ps1`，**页面关着也收得到**，唯一的补位）。
+  ③ 是**尽力而为**：发不出去就静默降级，**绝不影响主流程**；
+  macOS 上按 `process.platform` 分支换 `osascript`。
+- **护栏**：`tools/test-night-dashboard.mjs` **165/0** + `tools/test-night-dashboard-mutate.mjs`
+  **14/14 全抓** + `tools/test-portability.mjs` **45/0**。
+
+### ⚠️ 这个功能的两个真坑（2026-11-20/21 **实测**，不是推理）
+
+1. **Windows 上 `spawn('powershell', …, {detached:true})` 起的 PowerShell 会「立刻退出（exit 0）」，脚本根本没跑**
+   → 发布进程根本没起来，但 HTTP 层返回 **202 `{ok:true,pid}`**，看着像受理了 → **静默无操作**。
+   → 必须 `cmd /c start /b`（`detachedPowerShell()`）。
+2. **Windows 在计划任务「正在运行」期间就把 `LastTaskResult` 报成 267009（`SCHED_S_TASK_RUNNING`）**
+   → 不排除掉的话，**每天晚上发布进行中**任务台都会弹「上一次运行没有正常结束」→ **天天误报**。
+   → 判据抽成纯函数 `scheduleProblem(sched)`，排除 267009 / 267011，并用 `state === 'Running'` 互为印证；
+   **真失败码（267014）仍然要报**（防止一刀切返回 null 把判据整个废掉）。
+3. **Windows toast 的 AUMID 字面量同时含反斜杠路径和硬编码 `powershell.exe`** → 住在
+   `tools/common.ps1` 里（工程约定：平台字面量只放那一个文件），`notify.ps1` 只调 `Get-ToastAumid`。

@@ -49,3 +49,9 @@ __pycache__/
 # 抓取器自动下载的模型（22 万字节，第一次跑会自己下载）
 tools/grab/models/
 *.onnx
+
+# 任务台（定时任务 GUI）的运行时文件
+.night-dashboard-port
+.night-dashboard.pid
+.night-dashboard.out.log
+.night-dashboard.err.log

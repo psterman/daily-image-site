@@ -208,6 +208,15 @@ console.log('\n4) Node 侧');
   check('review.mjs 的「点发布」spawn 按平台分（Windows 用 cmd start，其他用 pwsh）',
     /process\.platform/.test(reviewCode) && /pwsh|cmd\.exe/.test(reviewCode));
 
+  /* 定时任务台 —— 同一个坑：PowerShell 的可执行名在 macOS 上是 pwsh，
+     写死 powershell.exe → spawn ENOENT → 「有没有发布在跑」永远返回 false
+     → 撞上夜间任务时两道门形同虚设。 */
+  const dashCode = stripComments(read(process.env.DASHBOARD_MJS || 'tools/night-dashboard.mjs'));
+  check('night-dashboard.mjs 的 PowerShell 可执行名按平台分（不硬编码 powershell.exe）',
+    /process\.platform/.test(dashCode) && /pwsh/.test(dashCode) &&
+    !/['"]powershell\.exe['"]/.test(dashCode),
+    'macOS 上没有 powershell.exe，spawn 会 ENOENT');
+
   const refreshCode = stripComments(REFRESH);
   check('refresh-token.mjs 的 wrangler 配置路径按平台分',
     /win32/.test(refreshCode) && /XDG_CONFIG_HOME/.test(refreshCode) && /\.config/.test(refreshCode) &&

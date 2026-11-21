@@ -95,7 +95,7 @@ $LogFile   = Join-Path $Root '.daily-review.log'
 $LockFile  = Join-Path $Root '.daily-review.lock'
 $PortFile  = Join-Path $Root '.review-port'
 
-function Rule($t)  { Write-Host "`n=== $t ===" -ForegroundColor Cyan }
+function Rule($t)  { Write-Host ("`n=== $t ===  [" + (Get-BjNow).ToString('HH:mm:ss') + "]") -ForegroundColor Cyan }
 function Ok($t)   { Write-Host "  [OK] $t" -ForegroundColor Green }
 function Warn($t) { Write-Host "  [!]  $t" -ForegroundColor Yellow }
 

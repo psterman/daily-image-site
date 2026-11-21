@@ -90,6 +90,24 @@ function Get-ShellExe {
   return 'pwsh'
 }
 
+# ── Windows toast 的 AppUserModelID ───────────────────────────
+function Get-ToastAumid {
+  <#
+    发 Windows toast 必须指定**注册过的** AppUserModelID（AUMID），
+    系统不认这个 AUMID → 通知发不出去，而且**不报错**（最难查的一类静默失败）。
+    PowerShell 自己的 AUMID 就是下面这个。
+
+    ⚠️ 这个字面量**必须住在 common.ps1**，不能写在 notify.ps1 里：
+      它同时含**反斜杠路径**和**硬编码的 powershell.exe**，
+      而工程约定是「平台字面量只放 common.ps1 一个文件」
+      （test-night-flow.mjs 那两条扫描会把 tools/ 下别的 .ps1
+        里的反斜杠路径 / 硬编码 powershell.exe 判红；
+        那两条扫描都显式豁免 common.ps1）。
+      所以 notify.ps1 只调这个函数，不自己拼。
+  #>
+  return '{1AC14E77-02E7-4E5D-B744-2EB1AE519E7B}\WindowsPowerShell\v1.0\powershell.exe'
+}
+
 # ── 图像根目录 ─────────────────────────────────────────────────
 function Get-ImageRoot {
   <#

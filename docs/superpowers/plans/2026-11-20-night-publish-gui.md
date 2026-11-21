@@ -257,8 +257,8 @@ Expected: 至少 4 行，形如 `=== 6/6 跳过 Pages 部署 ===  [09:2x:xx]`。
 
 Run: `node tools\run-all-tests.mjs`
 Expected: 结尾 `总计 35 套件：35 绿 / 0 红 / 0 崩 / 0 跳过`。
-（`tools/test-*.mjs` 共 46 个文件 = 35 个常规 + 11 个 `-mutate`；跑批器**默认排除** `-mutate`，
-所以常规批次是 35 套。想连变异一起跑用 `node tools\run-all-tests.mjs --mutate` → 46 套。）
+（`tools/test-*.mjs` 共 47 个文件 = 35 个常规 + 12 个 `-mutate`；跑批器**默认排除** `-mutate`，
+所以常规批次是 35 套。想连变异一起跑用 `node tools\run-all-tests.mjs --mutate` → 47 套。）
 `test-webp.mjs` 要跑 15 分钟左右。
 
 - [ ] **Step 7: 提交（母本）**
@@ -1453,6 +1453,38 @@ Windows 在计划任务**运行期间**就把 `LastTaskResult` 报成这个码�
 spec 和实现**都是对的**（对着一份有 bug 的 spec 忠实实现），**只有真实跑起来才暴露**。
 → **教训**：判据里凡是涉及**外部系统的状态码**，都要把「非失败的码」列全；
 spec 里举的例子值本身就该核一下（267009 当时只是随手写的）。
+
+### 修复轮 4（母 agent 跑**全量护栏**跑出来的真回归：notify.ps1 的 AUMID 撞了两条 .ps1 扫描）
+
+⚠️ **2026-11-21 母 agent 跑母本全量护栏（35 套）时跑出来的**：
+`test-night-flow.mjs` **49 通过 / 1 失败** —— 红的不是老代码写坏，是 **Task 7 新落的 `tools/notify.ps1`**
+撞了两条 .ps1 扫描：
+
+| 断言 | 红的真因 |
+|---|---|
+| `没有 .ps1 硬编码 powershell.exe（起子进程都走 Get-ShellExe）` | AUMID 字面量里带 `powershell.exe` |
+| `没有 .ps1 在代码里拼反斜杠路径（macOS 上会当成文件名）` | AUMID 字面量里带 `WindowsPowerShell\v1.0` |
+
+**为什么 notify.ps1 里会有这个字面量**：AUMID（AppUserModelID）是 PowerShell 自己注册的那个 ID，
+发 Windows toast **必须**用它，系统不认就**发不出去而且不报错**。
+但它同时含**反斜杠路径**和**硬编码的 powershell.exe** → 正好是那两条扫描要拦的东西。
+
+**修法**：工程约定本来就是「**平台字面量只放 `tools/common.ps1` 一个文件**」
+（那两条扫描都**显式豁免 common.ps1** —— 它本来就住着 `'D:\daily-images'`、
+`'China Standard Time'`、`'powershell.exe'`）。
+→ AUMID 搬进 `common.ps1` 的 `Get-ToastAumid`；`notify.ps1` 只 dot-source + 调它。
+
+⚠️ 母 agent **先试**的是「用 `[char]92` 拼反斜杠」→ 反斜杠那条绿了，
+但拼出来的末段变成独立引号串 `'powershell.exe'` → **又撞上另一条**。
+→ 教训：**别在调用方绕**，回到「字面量只有一个合法住处」这个约定上。
+
+**顺带钉住**（不然以后有人「顺手搬回来」没人拦）：
+- AUMID 字面量不留在 `notify.ps1`；
+- `common.ps1` 定义了 `Get-ToastAumid`；
+- `notify.ps1` dot-source 了 `common.ps1`；
+- `notify.ps1` **能被 PowerShell 解析**（它自己的设计是「失败一律静默」→ 语法坏了没人知道）。
+
+→ 护栏 161 → **165**（+4 条），变异 12 → **14** 组（新增 2 组，各证明一条新断言会红）。
 
 ### 修复轮 2（母 agent 实测发现的真 bug：`spawnDetached` 在 Windows 上**起不来**发布进程）
 
@@ -2803,6 +2835,8 @@ const GUARD = path.join(ROOT, 'tools', 'test-night-dashboard.mjs');
 const TARGETS = {
   state: path.join(ROOT, 'tools', 'night-dashboard-state.mjs'),
   http: path.join(ROOT, 'tools', 'night-dashboard.mjs'),
+  notify: path.join(ROOT, 'tools', 'notify.ps1'),
+  common: path.join(ROOT, 'tools', 'common.ps1'),
 };
 
 const MUTANTS = [
@@ -2892,6 +2926,22 @@ const MUTANTS = [
     to: 'if (false) {',
     expectFail: ['目录穿越（%2f 形式）拿不到金丝雀'],
     expectGreen: ['/api/state → 200'],
+  },
+
+  /* ── AUMID 归位（平台字面量只放 common.ps1） ────────────── */
+  {
+    id: 'M13', file: 'notify', name: '把 AUMID 字面量搬回 notify.ps1（反斜杠路径 + 硬编码 powershell.exe 又回来了）',
+    from: '  $aumid = Get-ToastAumid',
+    to: "  $aumid = '{1AC14E77-02E7-4E5D-B744-2EB1AE519E7B}\\WindowsPowerShell\\v1.0\\powershell.exe'",
+    expectFail: ['notify.ps1 的 AUMID 走 common.ps1 的 Get-ToastAumid'],
+    expectGreen: ['common.ps1 定义了 Get-ToastAumid', 'notify.ps1 dot-source 了 common.ps1', 'notify.ps1 能被 PowerShell 解析'],
+  },
+  {
+    id: 'M14', file: 'common', name: 'Get-ToastAumid 被改名/删掉（notify.ps1 拿不到 AUMID → toast 发不出去）',
+    from: 'function Get-ToastAumid {',
+    to: 'function Get-ToastAumidRemoved {',
+    expectFail: ['common.ps1 定义了 Get-ToastAumid'],
+    expectGreen: ['notify.ps1 的 AUMID 走 common.ps1 的 Get-ToastAumid', 'notify.ps1 能被 PowerShell 解析'],
   },
 ];
 
@@ -3039,7 +3089,7 @@ Expected: `变异测试：12/12 被抓到`。
 ```powershell
 node tools\test-night-dashboard.mjs
 ```
-Expected: PASS —— `161 通过 / 0 失败`（变异脚本会还原源码）。
+Expected: PASS —— `165 通过 / 0 失败`（变异脚本会还原源码）。
 
 再确认工作区干净：
 ```powershell
@@ -3105,9 +3155,9 @@ if (-not $txt.Contains('.night-dashboard-port')) {
 护栏表加：
 
 ```
-| `test-night-dashboard.mjs` | 161 | 定时任务台：三个 helper 的时间戳格式 + 解析层（剥 BOM / 15 节点 / 老日志兼容 / 跨零点）+ 状态与问题判定（中位数只用成功的夜 / **`.done` 优先于日志标记 / dead 点名步骤 / 格式变了退化为 unknown 并按完成记录分级 / 阶段级慢 > 中位数 × 3（只比闭合区间）/ 06:00 闸门 / 阶段级只比闭合区间**）+ HTTP 层（本机 / 动态端口 Origin / 目录穿越金丝雀 / **写路径零副作用** / **by:manual 取 manual 日志** / **只绑 127.0.0.1** / **`/api/log` 只读尾部 64KB**）+ 启动器约定 + 服务端 toast |
+| `test-night-dashboard.mjs` | 165 | 定时任务台：三个 helper 的时间戳格式 + 解析层（剥 BOM / 15 节点 / 老日志兼容 / 跨零点）+ 状态与问题判定（中位数只用成功的夜 / **`.done` 优先于日志标记 / dead 点名步骤 / 格式变了退化为 unknown 并按完成记录分级 / 阶段级慢 > 中位数 × 3（只比闭合区间）/ 06:00 闸门 / 阶段级只比闭合区间**）+ HTTP 层（本机 / 动态端口 Origin / 目录穿越金丝雀 / **写路径零副作用** / **by:manual 取 manual 日志** / **只绑 127.0.0.1** / **`/api/log` 只读尾部 64KB**）+ 启动器约定 + 服务端 toast（**AUMID 字面量只放 common.ps1**） |
 | `test-portability.mjs` | 45 | 平台可移植性（**含任务台：PowerShell 可执行名按平台分，不许硬编码 `powershell.exe`**） |
-| `test-night-dashboard-mutate.mjs` | 12 组变异 | 改坏**解析层和 HTTP 层**都必须被抓住（剥 BOM / 时间戳正则 / 跨零点 / 负耗时 / 分组 / median / allowWrite 顺序 / by:manual / 绑 0.0.0.0 / 读整份日志） |
+| `test-night-dashboard-mutate.mjs` | 14 组变异 | 改坏**解析层和 HTTP 层**都必须被抓住（剥 BOM / 时间戳正则 / 跨零点 / 负耗时 / 分组 / median / allowWrite 顺序 / by:manual / 绑 0.0.0.0 / 读整份日志 / **AUMID 字面量搬回 notify.ps1** / **common.ps1 里的 Get-ToastAumid 被改名**） |
 ```
 
 - [ ] **Step 3: 母本 `CHECKPOINT.md` + 公开副本 `CHANGELOG.md`**
@@ -3219,10 +3269,45 @@ foreach ($f in 'tools\daily.ps1','tools\daily-review.ps1','tools\publish.ps1') {
   [System.IO.File]::WriteAllText($p, $txt, (New-Object System.Text.UTF8Encoding($true)))
 }
 
+# ⑤ `tools/common.ps1` —— **两边各自追加**（不许 Copy-Item 覆盖）
+#    修复轮 4 把 Windows toast 的 AUMID 搬进了 common.ps1 的 `Get-ToastAumid` ——
+#    那个字面量同时含**反斜杠路径**和**硬编码的 powershell.exe**，
+#    放在 tools/ 下别的 .ps1 里会撞上 test-night-flow.mjs 那两条扫描
+#    （那两条扫描都显式豁免 common.ps1）。
+#    ⚠️ common.ps1 是**既有文件** → 公开副本那边**追加同样的函数**，不整体覆盖。
+#    ⚠️ **别用 PowerShell here-string 拼**：双引号 here-string 会插值 `$`，
+#       单引号 here-string 的收尾 `'@` 又必须顶格（缩进就报错）——
+#       而且这段内容里有反斜杠。**最稳的是用精确字符串替换**（`edit` 工具
+#       或等价的「读出来 → 找到锚点 → 插进去 → 写回」）。
+#
+#    插入点：`tools/common.ps1` 的 `# ── 图像根目录 ───` 那行**之前**，
+#    追加这一整段（与母本逐字一致）：
+#
+#      # ── Windows toast 的 AppUserModelID ───────────────────────────
+#      function Get-ToastAumid {
+#        <#
+#          发 Windows toast 必须指定**注册过的** AppUserModelID（AUMID），
+#          系统不认这个 AUMID → 通知发不出去，而且**不报错**（最难查的一类静默失败）。
+#          PowerShell 自己的 AUMID 就是下面这个。
+#
+#          ⚠️ 这个字面量**必须住在 common.ps1**，不能写在 notify.ps1 里：
+#            它同时含**反斜杠路径**和**硬编码的 powershell.exe**，
+#            而工程约定是「平台字面量只放 common.ps1 一个文件」
+#            （test-night-flow.mjs 那两条扫描会把 tools/ 下别的 .ps1
+#              里的反斜杠路径 / 硬编码 powershell.exe 判红；
+#              那两条扫描都显式豁免 common.ps1）。
+#            所以 notify.ps1 只调这个函数，不自己拼。
+#        #>
+#        return '{1AC14E77-02E7-4E5D-B744-2EB1AE519E7B}\WindowsPowerShell\v1.0\powershell.exe'
+#      }
+#
+#    写回编码：`.ps1` = **UTF-8 with BOM + LF**（`UTF8Encoding($true)`）。
+#    改完必须验：BOM=True、CR=0，且两仓 common.ps1 的 `Get-ToastAumid` 段落**逐字一致**。
+
 # ③ 公开副本提交：只 add 本次涉及的路径
 Set-Location $dst
 git add -- 'tools/night-dashboard-state.mjs' 'tools/night-dashboard.mjs' 'tools/start-dashboard.mjs' `
-          'tools/notify.ps1' 'tools/test-night-dashboard.mjs' 'tools/test-night-dashboard-mutate.mjs' `
+          'tools/notify.ps1' 'tools/common.ps1' 'tools/test-night-dashboard.mjs' 'tools/test-night-dashboard-mutate.mjs' `
           'tools/test-portability.mjs' `
           'tools/dashboard-ui' '起任务台.cmd' `
           'tools/daily.ps1' 'tools/daily-review.ps1' 'tools/publish.ps1' `
@@ -3305,7 +3390,7 @@ node "E:\voice-pilot\daily-image-site\tools\night-dashboard.mjs"
 | §8.4 通知三条腿 | Task 5（浏览器通知 + 未读问题挂条）+ Task 7（服务端 toast） |
 | §9 错误处理与降级 | Task 3（状态降级）+ Task 4（HTTP 降级）+ Task 7（toast 降级） |
 | §10 安全 | Task 4 `guard()`（动态端口）+ 目录穿越 `serveStatic()` |
-| §11 护栏（`test-night-dashboard.mjs` **161** 条 + `test-portability.mjs` **45** 条） | Task 1/2/3/4/5/6/7 各带一组 + Task 8 变异体 |
+| §11 护栏（`test-night-dashboard.mjs` **165** 条 + `test-portability.mjs` **45** 条） | Task 1/2/3/4/5/6/7 各带一组 + Task 8 变异体 |
 | §12 落地顺序 | Task 1→9 顺序一致 |
 
 **没有任务的 spec 条目**：无。§8.4 的「未读问题提示」在 Task 5 的页面里以「有 N 条未读问题」实现（`st.problems` 已有数据源）。
