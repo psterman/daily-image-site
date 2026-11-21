@@ -1505,6 +1505,23 @@ spec 里举的例子值本身就该核一下（267009 当时只是随手写的�
 → 因此又加了一条断言：把**整串** AUMID 钉住（不只是 GUID 前缀）。
 → 护栏 165 → **166**。
 
+### 修复轮 5（最终全分支评审的 3 条 Important：**护栏没牙齿**，补成真断言 + 真变异）
+
+最终评审（`.superpowers/sdd/2026-11-20-night-publish-gui/final-review.md`，275 行）结论：
+**Critical 0，可以收尾**；但指出 3 条 Important —— 全是「**护栏压根没测到**」，
+不是「实现有 bug」。本轮把它们补成**真断言 + 真变异**。
+
+| # | 终审结论 | 缺什么 | 本轮怎么补 |
+|---|---|---|---|
+| Important-1 | `scheduleProblem()` 的 267009/267011 **码排除没有独立护栏** | 原来那条断言同时给了 `state:'Running'` → 而实现里 `state === 'Running'` 那行排在**码排除之后** → **把码排除那一行删了照样绿**（终审变异 N1 存活） | 加 2 条断言：状态**不是** Running、**只靠结果码**也必须判成「不是失败」 |
+| Important-2 | 「POST 非本机 → 403」**零断言** | `guard` 没导出 → 只能拿源码 grep，grep 不到就红 → 那是**形状断言**不是**行为断言** | 把 `guard` 导出（**行为一个字没改**）+ 3 条行为断言（挡非本机 / 挡跨站 Origin / 放行本机同源） |
+| Important-3 | 「已有任务在跑 → 409」**零覆盖** | `isBusy()` 每次都要 spawn 一次 PowerShell 去看有没有发布在跑 → 没法在测试里注入 | 加 `opts.isBusyFn` 注入缝（**默认就是真的 `isBusy`，行为不变**）+ 1 条断言：**另开一个实例**（`allowWrite:true` + **假 spawnFn** + **假 busy 钩子**）→ 断 409 且**零 spawn** |
+
+⚠️ Important-3 那条断言用的是**假 spawnFn** → 即使 409 那道门被改坏，
+最坏也只是**多记一条假 spawn**，**绝不可能真的发起一次发布**。
+
+→ 护栏 166 → **172**（+6 条），变异 14 → **17** 组（新增 M15/M16/M17，各证明一条新断言会红）。
+
 ### 修复轮 2（母 agent 实测发现的真 bug：`spawnDetached` 在 Windows 上**起不来**发布进程）
 
 
@@ -3108,7 +3125,7 @@ Expected: `变异测试：12/12 被抓到`。
 ```powershell
 node tools\test-night-dashboard.mjs
 ```
-Expected: PASS —— `166 通过 / 0 失败`（变异脚本会还原源码）。
+Expected: PASS —— `172 通过 / 0 失败`（变异脚本会还原源码）。
 
 再确认工作区干净：
 ```powershell
@@ -3174,9 +3191,9 @@ if (-not $txt.Contains('.night-dashboard-port')) {
 护栏表加：
 
 ```
-| `test-night-dashboard.mjs` | 166 | 定时任务台：三个 helper 的时间戳格式 + 解析层（剥 BOM / 15 节点 / 老日志兼容 / 跨零点）+ 状态与问题判定（中位数只用成功的夜 / **`.done` 优先于日志标记 / dead 点名步骤 / 格式变了退化为 unknown 并按完成记录分级 / 阶段级慢 > 中位数 × 3（只比闭合区间）/ 06:00 闸门 / 阶段级只比闭合区间**）+ HTTP 层（本机 / 动态端口 Origin / 目录穿越金丝雀 / **写路径零副作用** / **by:manual 取 manual 日志** / **只绑 127.0.0.1** / **`/api/log` 只读尾部 64KB**）+ 启动器约定 + 服务端 toast（**AUMID 字面量只放 common.ps1**） |
+| `test-night-dashboard.mjs` | 172 | 定时任务台：三个 helper 的时间戳格式 + 解析层（剥 BOM / 15 节点 / 老日志兼容 / 跨零点）+ 状态与问题判定（中位数只用成功的夜 / **`.done` 优先于日志标记 / dead 点名步骤 / 格式变了退化为 unknown 并按完成记录分级 / 阶段级慢 > 中位数 × 3（只比闭合区间）/ 06:00 闸门 / 阶段级只比闭合区间 / **267009·267011 只靠结果码也判成「不是失败」**）+ HTTP 层（本机 / 动态端口 Origin / 目录穿越金丝雀 / **写路径零副作用** / **by:manual 取 manual 日志** / **只绑 127.0.0.1** / **`/api/log` 只读尾部 64KB** / **guard 挡非本机 + 挡跨站 + 放行本机同源** / **已有发布在跑 → 409 且零 spawn**）+ 启动器约定 + 服务端 toast（**AUMID 字面量只放 common.ps1**） |
 | `test-portability.mjs` | 45 | 平台可移植性（**含任务台：PowerShell 可执行名按平台分，不许硬编码 `powershell.exe`**） |
-| `test-night-dashboard-mutate.mjs` | 14 组变异 | 改坏**解析层和 HTTP 层**都必须被抓住（剥 BOM / 时间戳正则 / 跨零点 / 负耗时 / 分组 / median / allowWrite 顺序 / by:manual / 绑 0.0.0.0 / 读整份日志 / **AUMID 字面量搬回 notify.ps1** / **common.ps1 里的 Get-ToastAumid 被改名**） |
+| `test-night-dashboard-mutate.mjs` | 17 组变异 | 改坏**解析层和 HTTP 层**都必须被抓住（剥 BOM / 时间戳正则 / 跨零点 / 负耗时 / 分组 / median / allowWrite 顺序 / by:manual / 绑 0.0.0.0 / 读整份日志 / **AUMID 字面量搬回 notify.ps1** / **common.ps1 里的 Get-ToastAumid 被改名** / **删掉结果码排除** / **guard 放行非本机** / **409 那道门失效**） |
 ```
 
 - [ ] **Step 3: 母本 `CHECKPOINT.md` + 公开副本 `CHANGELOG.md`**
@@ -3389,7 +3406,7 @@ node tools\run-all-tests.mjs
 ```
 Expected: 公开副本里那 5 套**既有**环境性失败仍在（`test-rss` / `test-rss-images` /
 `test-product-validity` / `test-retag` / `test-webp`）—— **与本次改动无关**。
-新增的 `test-night-dashboard` 必须绿（166/0），`test-portability` 45/0。
+新增的 `test-night-dashboard` 必须绿（172/0），`test-portability` 45/0。
 
 - [ ] **Step 7: 端到端验收（只读）**
 
@@ -3445,7 +3462,7 @@ node "E:\voice-pilot\daily-image-site\tools\night-dashboard.mjs"
 | §8.4 通知三条腿 | Task 5（浏览器通知 + 未读问题挂条）+ Task 7（服务端 toast） |
 | §9 错误处理与降级 | Task 3（状态降级）+ Task 4（HTTP 降级）+ Task 7（toast 降级） |
 | §10 安全 | Task 4 `guard()`（动态端口）+ 目录穿越 `serveStatic()` |
-| §11 护栏（`test-night-dashboard.mjs` **166** 条 + `test-portability.mjs` **45** 条） | Task 1/2/3/4/5/6/7 各带一组 + Task 8 变异体 |
+| §11 护栏（`test-night-dashboard.mjs` **172** 条 + `test-portability.mjs` **45** 条） | Task 1/2/3/4/5/6/7 各带一组 + Task 8 变异体 |
 | §12 落地顺序 | Task 1→9 顺序一致 |
 
 **没有任务的 spec 条目**：无。§8.4 的「未读问题提示」在 Task 5 的页面里以「有 N 条未读问题」实现（`st.problems` 已有数据源）。

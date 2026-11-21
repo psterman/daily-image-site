@@ -338,7 +338,7 @@ function scanDates(root) {
 
 /* ── 状态组装 ───────────────────────────────────────────── */
 
-function buildState(root, withSchedule) {
+function buildState(root, withSchedule, busyFn) {
   const now = Date.now();
   const today = todayBj();
   const dates = scanDates(root);
@@ -347,7 +347,7 @@ function buildState(root, withSchedule) {
   /* 进程探测**只做一次**（一次 PowerShell 调用），且**只用于今天这一夜** ——
      历史日期不可能还在跑。而且探测结果要**缓存 10 秒**：
      页面会轮询，每次都 spawn 一次 PowerShell 扛不住。 */
-  const alive = isBusy();
+  const alive = (typeof busyFn === 'function' ? busyFn : isBusy)();
 
   const history = [];
   for (const d of withToday.slice(0, 30)) {
@@ -494,7 +494,7 @@ function buildState(root, withSchedule) {
  *
  * @param chosenPort 服务**实际**监听的端口（不是配置里那个默认端口）
  */
-function guard(req, chosenPort) {
+export function guard(req, chosenPort) {
   const remote = req.socket.remoteAddress || '';
   if (!/^(::1|::ffff:127\.|127\.)/.test(remote)) return '只允许本机触发';
   const origin = req.headers.origin;
@@ -625,6 +625,11 @@ export function createServer(opts = {}) {
      而**不必**真的发起一次发布。
      （评审实测：没有这道缝，把 allowWrite 挪到 spawn 之后就会真发一次。） */
   const spawnFn = typeof opts.spawnFn === 'function' ? opts.spawnFn : spawnDetached;
+  /* ⚠️ busy 钩子：跟 spawnFn 一个套路 —— 默认就是真的 isBusy（行为不变），
+     但测试可以注入一个假的 → 护栏就能断言「已经有发布在跑 → 409」这道门，
+     而**不必**真的去起一个发布进程去看它有没有跑起来。
+     （终审实测：没有这道缝，「409」这条分支一条断言都写不了。） */
+  const isBusyFn = typeof opts.isBusyFn === 'function' ? opts.isBusyFn : isBusy;
   let chosenPort = port;
 
   /** 服务**实际**监听的端口。 */
@@ -646,7 +651,7 @@ export function createServer(opts = {}) {
 
     if (p === '/api/state' && req.method === 'GET') {
       try {
-        return sendJson(res, 200, buildState(root, withSchedule));
+        return sendJson(res, 200, buildState(root, withSchedule, isBusyFn));
       } catch (e) {
         return sendJson(res, 500, { ok: false, error: String((e && e.message) || e) });
       }
@@ -690,7 +695,7 @@ export function createServer(opts = {}) {
         if (deny) return sendJson(res, 403, { ok: false, error: deny });
         /* ⚠️ allowWrite 必须在 spawn 之前判 —— 测试里**绝不许**真的发起一次发布。 */
         if (!allowWrite) return sendJson(res, 503, { ok: false, error: '这个实例禁用了写操作' });
-        if (isBusy()) return sendJson(res, 409, { ok: false, error: '已经在跑了，等它跑完' });
+        if (isBusyFn()) return sendJson(res, 409, { ok: false, error: '已经在跑了，等它跑完' });
 
         let script;
         let args;

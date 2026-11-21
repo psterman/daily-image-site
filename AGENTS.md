@@ -818,10 +818,10 @@ const watchList = [...followSchedule, ...movieList, ...videoList, ...followEvent
 | `test-likes.mjs` / `test-board.mjs` / `test-functions.mjs` | 67 / 42 / 35 | 点赞后端 / 留言板 / Functions 公共层 |
 | `test-likes-ui.mjs` / `test-board-ui.mjs` | 32 / 45 | 前端点赞 / 留言板版面 |
 | `test-webp.mjs` | 8322 文件 | WebP 宽高解析器 vs ffprobe 逐个对照（母本每多一期就多几百个文件，2026-11-11 起 8322 个，约 12 分钟） |
-| `test-night-dashboard.mjs` | 165 | 定时任务台：三个 helper 的时间戳格式 + 解析层（剥 BOM / 15 节点 / 老日志兼容 / 跨零点）+ 状态与问题判定（中位数只用成功的夜 / **`.done` 优先于日志标记 / dead 点名步骤 / 格式变了退化为 unknown 并按完成记录分级 / 阶段级慢 > 中位数 × 3（只比闭合区间）/ 06:00 闸门 / 阶段级只比闭合区间** / **计划任务「正在运行」不算失败**）+ HTTP 层（本机 / 动态端口 Origin / 目录穿越金丝雀 / **写路径零副作用** / **by:manual 取 manual 日志** / **只绑 127.0.0.1** / **`/api/log` 只读尾部 64KB**）+ 启动器约定 + 服务端 toast（**AUMID 字面量只放 common.ps1**） |
-| `test-night-dashboard-mutate.mjs` | 14 组变异 | 改坏**解析层、HTTP 层和 toast 的 AUMID 归位**都必须被抓住（剥 BOM / 时间戳正则 / 跨零点 / 负耗时 / 分组 / median / allowWrite 顺序 / by:manual / 绑 0.0.0.0 / 读整份日志 / **AUMID 字面量搬回 notify.ps1** / **common.ps1 里的 Get-ToastAumid 被改名**） |
+| `test-night-dashboard.mjs` | 172 | 定时任务台：三个 helper 的时间戳格式 + 解析层（剥 BOM / 15 节点 / 老日志兼容 / 跨零点）+ 状态与问题判定（中位数只用成功的夜 / **`.done` 优先于日志标记 / dead 点名步骤 / 格式变了退化为 unknown 并按完成记录分级 / 阶段级慢 > 中位数 × 3（只比闭合区间）/ 06:00 闸门 / 阶段级只比闭合区间** / **计划任务「正在运行」不算失败** / **267009·267011 只靠结果码也判成「不是失败」**）+ HTTP 层（本机 / 动态端口 Origin / 目录穿越金丝雀 / **写路径零副作用** / **by:manual 取 manual 日志** / **只绑 127.0.0.1** / **`/api/log` 只读尾部 64KB** / **guard 挡非本机 + 挡跨站 + 放行本机同源** / **已有发布在跑 → 409 且零 spawn**）+ 启动器约定 + 服务端 toast（**AUMID 字面量只放 common.ps1**） |
+| `test-night-dashboard-mutate.mjs` | 17 组变异 | 改坏**解析层、HTTP 层和 toast 的 AUMID 归位**都必须被抓住（剥 BOM / 时间戳正则 / 跨零点 / 负耗时 / 分组 / median / allowWrite 顺序 / by:manual / 绑 0.0.0.0 / 读整份日志 / **AUMID 字面量搬回 notify.ps1** / **common.ps1 里的 Get-ToastAumid 被改名** / **删掉结果码排除** / **guard 放行非本机** / **409 那道门失效**） |
 
-**合计 ≈984 项断言**（不含 59 组变异、8322 文件对照）。改完代码至少跑相关的那几套。
+**合计 ≈991 项断言**（不含 62 组变异、8322 文件对照）。改完代码至少跑相关的那几套。
 
 | 工具 | 用途 |
 |---|---|

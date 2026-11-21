@@ -1028,6 +1028,68 @@ import * as ST from './night-dashboard-state.mjs';
   }
 }
 
+/* ── 4c. 两道门 + 409（终审 Important-2 / Important-3） ───── */
+{
+  /* ⚠️ 需要 `dash`（第 4 组里 import 进来的模块）—— 这里自己再 import 一次，
+     免得依赖别的块的块内变量（它们在块外取不到）。 */
+  let dash4c = null;
+  try { dash4c = await import('./night-dashboard.mjs'); } catch { dash4c = null; }
+  const createServer4c = (dash4c && typeof dash4c.createServer === 'function') ? dash4c.createServer : null;
+
+  /* ① guard() 的三件事（终审：这两条以前**一条断言都写不了** ——
+        `guard` 没导出 → 只能拿源码去 grep，grep 不到就红 —— 那是「形状断言」，
+        不是「行为断言」。本轮把 `export function guard` 导出（**行为一个字没改**）。 */
+  const g = (dash4c && typeof dash4c.guard === 'function') ? dash4c.guard : null;
+  const fakeReq = (addr, origin) => ({ socket: { remoteAddress: addr }, headers: origin ? { origin } : {} });
+  const denyRemote = g ? g(fakeReq('10.1.2.3'), 8801) : '（guard 没导出）';
+  check('guard() 挡掉非本机来源的写请求（只允许本机触发）',
+    denyRemote === '只允许本机触发', { got: denyRemote });
+  const denyOrigin = g ? g(fakeReq('127.0.0.1', 'http://evil.example.com'), 8801) : '（guard 没导出）';
+  check('guard() 挡掉跨站 Origin 的写请求',
+    denyOrigin === '跨站请求被拒绝', { got: denyOrigin });
+  const allowLocal = g ? g(fakeReq('127.0.0.1', 'http://127.0.0.1:8801'), 8801) : '（guard 没导出）';
+  check('guard() 放行本机同源请求（别把正常路径也一起挡了）',
+    allowLocal === null, { got: allowLocal });
+
+  /* ② 「已经有发布在跑 → 409」这道门（终审 Important-3：以前**零覆盖**）。
+     ⚠️ **另开一个实例**：`allowWrite:true` + **假 spawn 钩子** + **假 busy 钩子**。
+     即使 409 那道门被改坏，最坏也只是**记录到一次假 spawn**，
+     **绝不可能真的发起一次发布**（spawnFn 是假的）。
+     ⚠️ `isBusyFn` 是本轮新加的注入缝（跟 spawnFn 一个套路）：
+        没有它，`isBusy()` 每次都要 spawn 一次 PowerShell 去看有没有发布在跑，
+        这条断言根本没法写。 */
+  const busySpawns = [];
+  let instBusy = null;
+  if (createServer4c) {
+    try {
+      instBusy = createServer4c({
+        port: 0, root: ROOT, schedule: false, allowWrite: true,
+        spawnFn: (script, args) => { busySpawns.push({ script, args }); return -1; },
+        isBusyFn: () => true,
+      });
+    } catch { instBusy = null; }
+  }
+  let busyStatus = 0;
+  if (instBusy) {
+    await new Promise((res) => instBusy.server.listen(0, '127.0.0.1', res));
+    const pb = instBusy.getChosenPort();
+    const r = await new Promise((resolve) => {
+      const rq = http.request('http://127.0.0.1:' + pb + '/api/run-now',
+        { method: 'POST', headers: { origin: 'http://127.0.0.1:' + pb } }, (res) => {
+          let b = ''; res.on('data', (c) => { b += c; });
+          res.on('end', () => resolve({ status: res.statusCode, body: b }));
+        });
+      rq.on('error', () => resolve({ status: 0, body: '' }));
+      rq.end();
+    });
+    busyStatus = r.status;
+    try { instBusy.server.close(); } catch { /* 关不掉就算了 */ }
+  }
+  check('已经有发布在跑时写操作返回 409（并且一个发布都没起）',
+    busyStatus === 409 && busySpawns.length === 0,
+    { status: busyStatus, spawnCalls: busySpawns.length });
+}
+
 /* ── 4b. HTTP 层的三个洞（verifier 评审 I-2 / m-2） ─────── */
 {
   /* ⚠️ 需要 `os` 模块：文件头加一行 `import os from 'node:os';`
@@ -1230,6 +1292,23 @@ try { dashFix3 = await import('./night-dashboard.mjs'); } catch { dashFix3 = nul
   check('计划任务真的失败时仍然要报（结果码 267014）',
     !!schedFailed && schedFailed.level === 'info' && /267014/.test(schedFailed.title || ''),
     { got: schedFailed });
+
+  /* ⚠️⚠️ **终审实测抓到的「假护栏」**：上面那条 267009 的断言**同时**给了
+     `state:'Running'` → 而实现里 `state === 'Running'` 那一行排在**码排除之后**
+     → 就算有人把**码排除那一行删了**，这条断言照样绿 → **码判断压根没被单独测过**，
+     修复轮 3 那个「每晚误报」的回归**不会被抓住**。
+     → 这两条专门测**码排除本身**：状态不是 Running，只靠结果码也必须判成「不是失败」。
+     （终审变异 N1：删掉码排除 → 这两条红。） */
+  const schedCodeOnly = (dashFix3 && typeof dashFix3.scheduleProblem === 'function')
+    ? dashFix3.scheduleProblem({ available: true, name: 'T', state: 'Ready', lastResult: 267009 })
+    : '（scheduleProblem 没导出）';
+  check('计划任务 267009 只靠结果码也判成「不是失败」（不依赖 state==Running）',
+    schedCodeOnly === null, { got: schedCodeOnly });
+  const schedNever = (dashFix3 && typeof dashFix3.scheduleProblem === 'function')
+    ? dashFix3.scheduleProblem({ available: true, name: 'T', state: 'Ready', lastResult: 267011 })
+    : '（scheduleProblem 没导出）';
+  check('计划任务 267011「从未运行」也不算失败（不依赖 state==Running）',
+    schedNever === null, { got: schedNever });
 }
 
 /* ── 5. 页面 ───────────────────────────────────────────── */

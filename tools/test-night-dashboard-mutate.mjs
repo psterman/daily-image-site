@@ -137,6 +137,50 @@ const MUTANTS = [
     expectFail: ['common.ps1 定义了 Get-ToastAumid'],
     expectGreen: ['notify.ps1 的 AUMID 走 common.ps1 的 Get-ToastAumid', 'notify.ps1 能被 PowerShell 解析'],
   },
+
+  /* ── 终审 Important 1/2/3：把「护栏没牙齿」的洞钉死 ──────────
+     终审（final-review.md）指出三条重要缺口，这三条变异就是它们的牙齿：
+       M15 ← Important-1（结果码排除没有独立护栏 → 终审变异 N1 存活）
+       M16 ← Important-2（「非本机 → 403」零断言 → 护栏根本没导出 guard）
+       M17 ← Important-3（「已有任务在跑 → 409」零覆盖 → 没有 isBusy 注入缝）
+     ⚠️ M17 会让写路径**往下走一步**（409 门失效）→ 那一步调用的是**假 spawnFn**
+        （护栏里 `spawnFn: (script, args) => { busySpawns.push(...); return -1; }`）
+        → 最坏只是多记一条假 spawn，**绝不可能真的发起一次发布**。 */
+  {
+    id: 'M15', file: 'http', name: '删掉结果码排除（267009/267011 又被当成失败 → 天天误报回来）',
+    from: '  if (r === SCHED_RESULT_RUNNING || r === SCHED_RESULT_NEVER_RUN) return null;',
+    to: '  /* 变异：删掉码排除 */',
+    expectFail: [
+      '计划任务 267009 只靠结果码也判成「不是失败」（不依赖 state==Running）',
+      '计划任务 267011「从未运行」也不算失败（不依赖 state==Running）',
+    ],
+    expectGreen: [
+      '计划任务「正在运行」（结果码 267009）不算「上次没正常结束」',
+      '计划任务真的失败时仍然要报（结果码 267014）',
+      '/api/state → 200',
+    ],
+  },
+  {
+    id: 'M16', file: 'http', name: 'guard 放行非本机来源（跨机写操作不再被挡）',
+    from: "  if (!/^(::1|::ffff:127\\.|127\\.)/.test(remote)) return '只允许本机触发';",
+    to: "  if (false) return '只允许本机触发';",
+    expectFail: ['guard() 挡掉非本机来源的写请求（只允许本机触发）'],
+    expectGreen: [
+      'guard() 挡掉跨站 Origin 的写请求',
+      'guard() 放行本机同源请求（别把正常路径也一起挡了）',
+      '/api/state → 200',
+    ],
+  },
+  {
+    id: 'M17', file: 'http', name: '409 这道门失效（已经有发布在跑时还能再发一次）',
+    from: "        if (isBusyFn()) return sendJson(res, 409, { ok: false, error: '已经在跑了，等它跑完' });",
+    to: "        if (false) return sendJson(res, 409, { ok: false, error: '已经在跑了，等它跑完' });",
+    expectFail: ['已经有发布在跑时写操作返回 409（并且一个发布都没起）'],
+    expectGreen: [
+      '/api/state → 200',
+      '写接口在 allowWrite:false 下**不产生任何发布副作用**',
+    ],
+  },
 ];
 
 /** 护栏输出里所有「红了的断言」标签（子串匹配用）。 */
