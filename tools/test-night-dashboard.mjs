@@ -1391,6 +1391,18 @@ try { dashFix3 = await import('./night-dashboard.mjs'); } catch { dashFix3 = nul
   check('common.ps1 定义了 Get-ToastAumid（AUMID 字面量住在这儿）',
     commonPs1.length > 0 && /function\s+Get-ToastAumid\s*\{/.test(commonPs1) && commonPs1.includes(AUMID_GUID),
     { hasFn: /function\s+Get-ToastAumid\s*\{/.test(commonPs1), hasLiteral: commonPs1.includes(AUMID_GUID) });
+  /* ⚠️ 把**整串** AUMID 钉住（不只是 GUID 前缀）——
+     尾号一个字符写错，toast 就发不出去，而且**不报错**（CreateToastNotifier
+     对「非空但未登记」的 AUMID 照样返回，只有空串才抛）。
+     实测（2026-11-21）：真发一次 toast，
+     `Microsoft-Windows-PushNotification-Platform/Operational` 日志里出现
+     3052「已将…Toast 传送到会话 1 上的 {AUMID}」→ **确实送到桌面**。
+     ⚠️ 顺带记一笔：`Get-StartApps` 里登记的是**另一个**尾号（5198B7），
+     两者都能投递（Windows 对同一个 exe 有多套登记）→ **别按它去「修正」**。 */
+  const AUMID_FULL = '{1AC14E77-02E7-4E5D-B744-2EB1AE519E7B}\\WindowsPowerShell\\v1.0\\powershell.exe';
+  check('common.ps1 的 AUMID 是完整一整串（实测 Windows 会投递，尾号写错就静默发不出）',
+    commonPs1.length > 0 && commonPs1.includes(AUMID_FULL),
+    { hasFullAumid: commonPs1.includes(AUMID_FULL) });
   const dotSource = /^\s*\.\s*\(Join-Path\s+\$PSScriptRoot\s+'common\.ps1'\)/m;
   check('notify.ps1 dot-source 了 common.ps1（不 dot-source 就拿不到 Get-ToastAumid）',
     notify.length > 0 && dotSource.test(notify),

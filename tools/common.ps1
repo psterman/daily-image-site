@@ -104,6 +104,17 @@ function Get-ToastAumid {
         里的反斜杠路径 / 硬编码 powershell.exe 判红；
         那两条扫描都显式豁免 common.ps1）。
       所以 notify.ps1 只调这个函数，不自己拼。
+
+    ⚠️ **别按 `Get-StartApps` 去「修正」这个值**（2026-11-21 实测差点改错）：
+      `Get-StartApps` 里「Windows PowerShell」登记的是
+      `{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\WindowsPowerShell\v1.0\powershell.exe`
+      （尾号 **5198B7**）—— 跟上面这个（尾号 **519E7B**）**不是同一个**，
+      但**两个都能投递**（Windows 对同一个 exe 有多套登记）。
+      证据：真发一次 toast 后，
+      `Microsoft-Windows-PushNotification-Platform/Operational` 日志里
+      **两条** 3052 事件（ID 3052「已将…Toast 传送到会话 1 上的 {AUMID}」）
+      分别写着这两个 AUMID → **两个都真的送到桌面了**。
+      → 判据要看**投递事件**，不是看某个查询接口返回哪个值。
   #>
   return '{1AC14E77-02E7-4E5D-B744-2EB1AE519E7B}\WindowsPowerShell\v1.0\powershell.exe'
 }

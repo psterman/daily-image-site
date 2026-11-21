@@ -1486,6 +1486,25 @@ spec 里举的例子值本身就该核一下（267009 当时只是随手写的�
 
 → 护栏 161 → **165**（+4 条），变异 12 → **14** 组（新增 2 组，各证明一条新断言会红）。
 
+#### 顺带把「toast 到底发不发得出去」**实测**了一遍（2026-11-21）
+
+⚠️ `notify.ps1` 的 toast 路径**以前从没被真的执行过**：不带 `-Body` 时脚本在
+`if (-not $Body) { exit 0 }` 就退出了 → **「实跑 exit 0 无输出」证明不了任何事**。
+
+**实测方法**：真弹一次 toast，然后读
+`Microsoft-Windows-PushNotification-Platform/Operational` 日志里的
+**ID 3052**（「已将…Toast 传送到会话 1 上的 {AUMID}」）→ **有事件 = 真送到桌面了**。
+
+⚠️ 途中差点改错：**`Get-StartApps` 里「Windows PowerShell」登记的 AUMID 尾号是 `5198B7`**，
+而代码里用的是 `519E7B` → 看着像 bug。**但日志显示两个都能投递**
+（同一个 exe 在 Windows 里有**多套登记**）→ **别按某一个查询接口去「修正」**。
+
+⚠️ 另一半教训：**事件日志必须看**全量消息**。第一次只看被截断的输出，
+把两条事件都读成了 `5198B7` → **差点报一个不存在的 bug**。
+
+→ 因此又加了一条断言：把**整串** AUMID 钉住（不只是 GUID 前缀）。
+→ 护栏 165 → **166**。
+
 ### 修复轮 2（母 agent 实测发现的真 bug：`spawnDetached` 在 Windows 上**起不来**发布进程）
 
 
@@ -3089,7 +3108,7 @@ Expected: `变异测试：12/12 被抓到`。
 ```powershell
 node tools\test-night-dashboard.mjs
 ```
-Expected: PASS —— `165 通过 / 0 失败`（变异脚本会还原源码）。
+Expected: PASS —— `166 通过 / 0 失败`（变异脚本会还原源码）。
 
 再确认工作区干净：
 ```powershell
@@ -3155,7 +3174,7 @@ if (-not $txt.Contains('.night-dashboard-port')) {
 护栏表加：
 
 ```
-| `test-night-dashboard.mjs` | 165 | 定时任务台：三个 helper 的时间戳格式 + 解析层（剥 BOM / 15 节点 / 老日志兼容 / 跨零点）+ 状态与问题判定（中位数只用成功的夜 / **`.done` 优先于日志标记 / dead 点名步骤 / 格式变了退化为 unknown 并按完成记录分级 / 阶段级慢 > 中位数 × 3（只比闭合区间）/ 06:00 闸门 / 阶段级只比闭合区间**）+ HTTP 层（本机 / 动态端口 Origin / 目录穿越金丝雀 / **写路径零副作用** / **by:manual 取 manual 日志** / **只绑 127.0.0.1** / **`/api/log` 只读尾部 64KB**）+ 启动器约定 + 服务端 toast（**AUMID 字面量只放 common.ps1**） |
+| `test-night-dashboard.mjs` | 166 | 定时任务台：三个 helper 的时间戳格式 + 解析层（剥 BOM / 15 节点 / 老日志兼容 / 跨零点）+ 状态与问题判定（中位数只用成功的夜 / **`.done` 优先于日志标记 / dead 点名步骤 / 格式变了退化为 unknown 并按完成记录分级 / 阶段级慢 > 中位数 × 3（只比闭合区间）/ 06:00 闸门 / 阶段级只比闭合区间**）+ HTTP 层（本机 / 动态端口 Origin / 目录穿越金丝雀 / **写路径零副作用** / **by:manual 取 manual 日志** / **只绑 127.0.0.1** / **`/api/log` 只读尾部 64KB**）+ 启动器约定 + 服务端 toast（**AUMID 字面量只放 common.ps1**） |
 | `test-portability.mjs` | 45 | 平台可移植性（**含任务台：PowerShell 可执行名按平台分，不许硬编码 `powershell.exe`**） |
 | `test-night-dashboard-mutate.mjs` | 14 组变异 | 改坏**解析层和 HTTP 层**都必须被抓住（剥 BOM / 时间戳正则 / 跨零点 / 负耗时 / 分组 / median / allowWrite 顺序 / by:manual / 绑 0.0.0.0 / 读整份日志 / **AUMID 字面量搬回 notify.ps1** / **common.ps1 里的 Get-ToastAumid 被改名**） |
 ```
@@ -3370,7 +3389,7 @@ node tools\run-all-tests.mjs
 ```
 Expected: 公开副本里那 5 套**既有**环境性失败仍在（`test-rss` / `test-rss-images` /
 `test-product-validity` / `test-retag` / `test-webp`）—— **与本次改动无关**。
-新增的 `test-night-dashboard` 必须绿（165/0），`test-portability` 45/0。
+新增的 `test-night-dashboard` 必须绿（166/0），`test-portability` 45/0。
 
 - [ ] **Step 7: 端到端验收（只读）**
 
@@ -3426,7 +3445,7 @@ node "E:\voice-pilot\daily-image-site\tools\night-dashboard.mjs"
 | §8.4 通知三条腿 | Task 5（浏览器通知 + 未读问题挂条）+ Task 7（服务端 toast） |
 | §9 错误处理与降级 | Task 3（状态降级）+ Task 4（HTTP 降级）+ Task 7（toast 降级） |
 | §10 安全 | Task 4 `guard()`（动态端口）+ 目录穿越 `serveStatic()` |
-| §11 护栏（`test-night-dashboard.mjs` **165** 条 + `test-portability.mjs` **45** 条） | Task 1/2/3/4/5/6/7 各带一组 + Task 8 变异体 |
+| §11 护栏（`test-night-dashboard.mjs` **166** 条 + `test-portability.mjs` **45** 条） | Task 1/2/3/4/5/6/7 各带一组 + Task 8 变异体 |
 | §12 落地顺序 | Task 1→9 顺序一致 |
 
 **没有任务的 spec 条目**：无。§8.4 的「未读问题提示」在 Task 5 的页面里以「有 N 条未读问题」实现（`st.problems` 已有数据源）。
