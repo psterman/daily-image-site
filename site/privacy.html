@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0b0b0f">
+<meta name="format-detection" content="telephone=no">
+<meta name="referrer" content="no-referrer">
+<title>隐私政策 · 过目 Lookon</title>
+<meta name="description" content="过目 Lookon（Chrome 扩展）隐私政策。">
+<link rel="icon" href="/assets/logo.jpg" type="image/jpeg">
+<style>
+  :root {
+    --bg: #0b0b0f;
+    --bg-elev: #16161d;
+    --bg-elev-2: #1e1e28;
+    --line: #26262f;
+    --text: #e8e8ee;
+    --text-dim: #8b8b99;
+    --accent: #4a8cff;
+    --danger: #ff5c5c;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: rgba(0,0,0,0); }
+  html, body {
+    margin: 0; padding: 0; background: var(--bg); color: var(--text);
+    -webkit-text-size-adjust: 100%; text-size-adjust: 100%;
+  }
+  body {
+    font: 15px/1.6 -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    padding-bottom: calc(32px + var(--safe-bottom));
+  }
+  a { color: var(--accent); text-decoration: none; }
+
+  .wrap { max-width: 560px; margin: 0 auto; padding: 0 16px; }
+
+  /* ── 顶栏 ── */
+  .topbar {
+    position: -webkit-sticky; position: sticky; top: 0; z-index: 20;
+    background: rgba(11,11,15,.92);
+    -webkit-backdrop-filter: saturate(160%) blur(12px);
+    backdrop-filter: saturate(160%) blur(12px);
+    border-bottom: 1px solid var(--line);
+    padding-top: var(--safe-top);
+  }
+  .topbar-row {
+    display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center;
+    padding: 12px 16px 12px;
+  }
+  .brand { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; }
+  .brand-mark { width: 28px; height: 28px; border-radius: 8px; margin-right: 10px; background: #fff; }
+  .brand-text h1 { margin: 0; font-size: 16px; font-weight: 600; letter-spacing: .3px; }
+  .brand-text p { margin: 2px 0 0; font-size: 12px; color: var(--text-dim); }
+  .topbar-actions { margin-left: auto; }
+  .home-link { font-size: 13px; color: var(--text-dim); }
+  .home-link .chev { margin-left: 4px; font-size: 15px; }
+
+  /* ── 通用块 ── */
+  .card {
+    background: var(--bg-elev); border: 1px solid var(--line);
+    border-radius: 14px; padding: 16px; margin-top: 18px;
+  }
+  .card h2 { margin: 0 0 4px; font-size: 15px; font-weight: 600; }
+  .card .hint { margin: 0 0 14px; font-size: 12px; color: var(--text-dim); }
+
+  /* ── 正文排版 ── */
+  .doc-title { margin: 0 0 4px; font-size: 19px; font-weight: 600; line-height: 1.4; }
+  .card p { margin: 10px 0 0; font-size: 15px; line-height: 1.65; }
+  .card h2 { margin: 0 0 4px; font-size: 16px; font-weight: 600; }
+  .card h3 { margin: 18px 0 0; font-size: 14px; font-weight: 600; color: var(--text); }
+  .card strong { color: #fff; }
+  .card ul, .card ol { margin: 10px 0 0; padding-left: 1.25em; }
+  .card li { margin: 6px 0; line-height: 1.65; }
+  .card li > ul, .card li > ol { margin: 6px 0 0; }
+  .card blockquote {
+    margin: 12px 0 0; padding: 10px 12px;
+    border-left: 3px solid var(--line); border-radius: 0 10px 10px 0;
+    background: var(--bg-elev-2); color: var(--text-dim); font-size: 13px; line-height: 1.6;
+  }
+  .card code {
+    background: var(--bg-elev-2); border: 1px solid var(--line); border-radius: 6px;
+    padding: 1px 5px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 13px; word-break: break-word;
+  }
+  .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 12px 0 0; }
+  .doc-table { width: 100%; border-collapse: collapse; font-size: 13px; line-height: 1.55; }
+  .doc-table th, .doc-table td {
+    border: 1px solid var(--line); padding: 8px 10px;
+    text-align: left; vertical-align: top;
+  }
+  .doc-table th { background: var(--bg-elev-2); color: var(--text); font-weight: 600; }
+  .doc-table td { color: var(--text-dim); }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-row">
+    <div class="brand">
+      <img class="brand-mark" src="/assets/logo.webp" alt="" width="28" height="28">
+      <div class="brand-text">
+        <h1>隐私政策</h1>
+        <p>过目 Lookon · Chrome 扩展</p>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <a class="home-link" href="/">回首页<span class="chev">›</span></a>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="card">
+    <h1 class="doc-title">过目 Lookon（Chrome 扩展）隐私政策</h1>
+    <p><strong>适用产品</strong>：过目 Lookon —— Chrome 应用商店上的 Chrome 扩展（Manifest V3）<br><strong>最近更新</strong>：2026-11-22<br><strong>扩展版本</strong>：0.10.0</p>
+    <blockquote>本政策适用于过目 Lookon 这个 Chrome 扩展。它与「过目站」（my.onetone.app）和「一声 OneTone」桌面端<br>是不同产品：桌面端的隐私政策见 <a href="https://www.onetone.app/privacy">www.onetone.app/privacy</a>。</blockquote>
+  </div>
+
+  <div class="card">
+    <h2>一句话</h2>
+    <p>过目是一个<strong>侧栏 AI 阅读扩展</strong>：你打开侧栏，它读<strong>你当前正在看的那一个页面</strong>的正文，送到<strong>你自己选定的模型通道</strong>做总结/解读，回复显示在侧栏里。</p>
+    <p><strong>扩展没有自建服务器，不向开发者发送任何数据。</strong> 你打开侧栏时，页面正文只会发往你启用的那一个模型通道（Kimi / WorkBuddy / 小浣熊 / OpenCode Zen / Kilo 公共 / Pollinations 公共），或者完全不联网（Chrome 本机 AI）。</p>
+  </div>
+
+  <div class="card">
+    <h2>1. 扩展会读取什么</h2>
+    <div class="table-wrap">
+    <table class="doc-table">
+    <thead><tr>
+    <th>数据</th>
+    <th>具体内容</th>
+    <th>什么时候读</th>
+    </tr></thead>
+    <tbody>
+    <tr>
+    <td>当前页正文</td>
+    <td>当前活动标签页的可见文本（<code>document.body.innerText</code>）、页面标题、页面 URL</td>
+    <td>见下方第 2 节</td>
+    </tr>
+    <tr>
+    <td>登录凭据</td>
+    <td>OAuth 的 access token / refresh token、短信登录得到的会话凭据</td>
+    <td>你点击「连接/登录」时</td>
+    </tr>
+    <tr>
+    <td>你的偏好</td>
+    <td>提示词模板、所选通道与模型、剪藏内容</td>
+    <td>你在设置里改的时候</td>
+    </tr>
+    <tr>
+    <td>模型回复</td>
+    <td>通道返回的文本</td>
+    <td>每次请求后</td>
+    </tr>
+    </tbody>
+    </table>
+    </div>
+    <p><strong>扩展不收集</strong>：浏览历史、书签、Cookie、密码表单内容、键盘输入、剪贴板、地理位置、身份信息、设备指纹、任何广告或统计标识。</p>
+  </div>
+
+  <div class="card">
+    <h2>2. 什么时候会读当前页</h2>
+    <p>只有在你<strong>主动打开侧栏之后</strong>才会发生。侧栏关闭时，扩展不读任何页面。</p>
+    <p>侧栏打开期间：</p>
+    <ol>
+    <li><strong>每 4 秒</strong>刷新一次「当前活动标签页」的标题与正文，用来感知你切了页面或页面内容变了。</li>
+    <li><strong>自动「页面解读」</strong>在以下时机触发：切换标签页、当前页加载完成、或你手动点侧栏上的快捷芯片。
+    <ul>
+    <li>同一「标签页 + 同一 URL + 同一内容指纹」<strong>只跑一次</strong>，不会反复发。</li>
+    <li>页面正文过短、或没有启用任何通道时，<strong>不会触发</strong>。</li>
+    </ul></li>
+    <li><strong>手动动作</strong>：点「总结 / 要点 / 通俗讲 / 译成中文」或在输入框追问。</li>
+    <li><strong>右键菜单</strong>「用过目总结此页」「加入过目（本页摘要）」「加入过目（仅链接）」。</li>
+    <li><strong>过目阅读器站内</strong>「AI 阅读」：由过目站页面指定要读的 URL，扩展打开一个隐藏标签页读取该页正文，结果回传给页面。</li>
+    <li><strong>剪藏同步</strong>：你点右键菜单把当前页加入过目时，扩展先把它存在本机；等你在已登录的过目站打开时，再交给该页面。</li>
+    </ol>
+    <h3>一个重要的前提</h3>
+    <p><strong>在你没有启用任何模型通道之前</strong>，扩展只在本机读取正文，用来判断"要不要自动解读"，<strong>不会把任何内容发到网络</strong>。只有当你点了某个通道的「一键启用」或完成登录之后，页面正文才会发往那个通道。</p>
+  </div>
+
+  <div class="card">
+    <h2>3. 数据去了哪里</h2>
+    <p>扩展<strong>只</strong>与你选定的通道通信。以下是全部出站目标：</p>
+    <div class="table-wrap">
+    <table class="doc-table">
+    <thead><tr>
+    <th>通道</th>
+    <th>出站主机</th>
+    <th>说明</th>
+    </tr></thead>
+    <tbody>
+    <tr>
+    <td>Kilo 公共通道</td>
+    <td><code>https://ai-gateway.kilo.ai</code></td>
+    <td>第三方免 API Key 公共服务</td>
+    </tr>
+    <tr>
+    <td>Pollinations 公共通道</td>
+    <td><code>https://text.pollinations.ai</code></td>
+    <td>第三方免 API Key 公共服务</td>
+    </tr>
+    <tr>
+    <td>Kimi 网页会员</td>
+    <td><code>https://www.kimi.com</code>、<code>https://kimi.moonshot.cn</code></td>
+    <td>你用 Kimi 账号登录后的会员对话</td>
+    </tr>
+    <tr>
+    <td>WorkBuddy（腾讯 CodeBuddy）</td>
+    <td><code>https://copilot.tencent.com</code></td>
+    <td>你完成 CodeBuddy 登录后</td>
+    </tr>
+    <tr>
+    <td>小浣熊（商汤）</td>
+    <td><code>https://xiaohuanxiong.com</code></td>
+    <td>微信扫码登录后</td>
+    </tr>
+    <tr>
+    <td>OpenCode Zen</td>
+    <td><code>https://opencode.ai</code>、<code>https://console.opencode.ai</code></td>
+    <td>设备登录授权后</td>
+    </tr>
+    <tr>
+    <td>Chrome 本机 AI</td>
+    <td><strong>无网络请求</strong></td>
+    <td>Gemini Nano 完全在本机运行</td>
+    </tr>
+    </tbody>
+    </table>
+    </div>
+    <h3>扩展不发送数据的地方</h3>
+    <ul>
+    <li><strong>不发送</strong>给你（开发者）。扩展没有统计、没有埋点、没有遥测、没有崩溃上报、没有后端。</li>
+    <li><strong>不主动</strong>向 <code>my.onetone.app</code>（过目站）发起任何请求。扩展与过目阅读器之间只通过页面内的 <code>postMessage</code> 通信。</li>
+    <li>有一处需要说清楚：<strong>剪藏（clip）</strong>。你点右键菜单「加入过目」时，扩展会把标题、链接和（如果你选的）本页摘要<strong>先存在本机扩展存储</strong>里，工具栏图标上会出现一个待同步角标。当你在<strong>已登录过目账号</strong>的状态下打开过目站时，扩展才会把这些剪藏内容交给该页面；<strong>过目站随后怎么处理、是否上传到它自己的服务器，适用过目站自己的隐私政策</strong>，与本扩展无关。扩展本身不会替你把内容传到任何地方。</li>
+    <li>不会把 A 页的内容发到 B 页。剪藏只存在本机扩展存储里（上限 40 条）。</li>
+    </ul>
+    <h3>一个需要单独说明的技术细节</h3>
+    <p>启用 <strong>WorkBuddy</strong> 通道时，扩展会用 Chrome 的 <code>declarativeNetRequest</code> API，<strong>仅对 <code>copilot.tencent.com</code> 这一个域名</strong>，把请求的 <code>User-Agent</code> 头改成一个标识为 CodeBuddy CLI 的字符串，以便复用该服务的官方接口。这条规则不影响其他任何网站，也不涉及其他请求头。</p>
+  </div>
+
+  <div class="card">
+    <h2>4. 数据存在哪、多久</h2>
+    <ul>
+    <li><strong>全部在本机</strong>，存在 Chrome 扩展存储（<code>chrome.storage.local</code>）里：登录 token、偏好设置、剪藏内容。</li>
+    <li>只有少量<strong>非敏感偏好</strong>（比如提示词模板、界面设置）会同步到你的 Chrome 账号（<code>chrome.storage.sync</code>）。<strong>token 和剪藏内容不会同步。</strong></li>
+    <li>扩展不写 Cookie，不写浏览历史。</li>
+    <li><strong>卸载扩展 = 全部删除。</strong> 卸载后本机存储的 token 与剪藏一并清除；Chrome 账号里同步过的那几条偏好需要你手动在 <code>chrome://extensions</code> 的「同步」开关里关掉。</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>5. 第三方通道</h2>
+    <p>当你启用某个通道时，页面正文会经过那个通道的服务器，并适用<strong>它自己的</strong>隐私政策与用户协议：</p>
+    <ul>
+    <li><strong>Kilo 公共通道</strong>、<strong>Pollinations 公共通道</strong> 是第三方提供的<strong>免费公共通道</strong>，不是过目（也不是 Kimi）提供的服务。它们是免 API Key 的公共服务，稳定性、可用性与数据处理方式由第三方决定。</li>
+    <li><strong>Kimi / WorkBuddy / 小浣熊 / OpenCode Zen</strong> 的通道调用的是各自官方服务的接口，你使用它们需要遵守各自的服务条款。</li>
+    <li>你随时可以在侧栏里断开某个通道（点通道上的关闭按钮）。</li>
+    </ul>
+    <p><strong>如果你不希望任何内容离开本机</strong>，只用「Chrome 本机 AI」通道即可 —— 那条通道完全离线。</p>
+  </div>
+
+  <div class="card">
+    <h2>6. 权限说明</h2>
+    <div class="table-wrap">
+    <table class="doc-table">
+    <thead><tr>
+    <th>权限</th>
+    <th>用途</th>
+    </tr></thead>
+    <tbody>
+    <tr>
+    <td><code>https://*/*</code></td>
+    <td>读取你当前正在看的网页正文用于总结 —— 这是扩展的核心功能</td>
+    </tr>
+    <tr>
+    <td><code>tabs</code></td>
+    <td>读当前活动标签的 URL（浏览器受限页面无法读到 URL）</td>
+    </tr>
+    <tr>
+    <td><code>scripting</code></td>
+    <td>把读取正文的脚本注入当前页</td>
+    </tr>
+    <tr>
+    <td><code>storage</code></td>
+    <td>在本机保存 token、偏好与剪藏</td>
+    </tr>
+    <tr>
+    <td><code>sidePanel</code></td>
+    <td>在 Chrome 右侧栏显示扩展界面</td>
+    </tr>
+    <tr>
+    <td><code>activeTab</code></td>
+    <td>你点击工具栏图标时，临时访问当前页</td>
+    </tr>
+    <tr>
+    <td><code>contextMenus</code></td>
+    <td>提供「用过目总结此页」右键菜单</td>
+    </tr>
+    <tr>
+    <td><code>declarativeNetRequestWithHostAccess</code></td>
+    <td>仅用于 WorkBuddy 通道的单域名 User-Agent 规则</td>
+    </tr>
+    <tr>
+    <td>指定域名</td>
+    <td>Kimi、过目站、以及上表列出的各模型通道主机 —— 扩展只会访问这些域名</td>
+    </tr>
+    </tbody>
+    </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>7. 你的控制权</h2>
+    <ul>
+    <li><strong>关闭侧栏</strong> → 立即停止读取页面。</li>
+    <li><strong>断开通道</strong> → 侧栏里点通道上的关闭按钮；之后正文不会再发往该通道。</li>
+    <li><strong>关掉自动解读</strong> → 在侧栏设置里关掉「打开侧栏时自动页面解读」。</li>
+    <li><strong>清数据</strong> → <code>chrome://extensions</code> → 过目 → 「详细信息」→ 清除扩展数据。</li>
+    <li><strong>卸载</strong> → 彻底移除扩展与本机存储的全部内容。</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>8. 儿童</h2>
+    <p>过目是通用型效率工具，不面向 13 岁以下儿童。</p>
+  </div>
+
+  <div class="card">
+    <h2>9. 政策变更</h2>
+    <p>政策如有实质变更（例如新增通道、改变数据流向），会随扩展版本更新同步更新本页日期，并在扩展的更新说明里注明。</p>
+  </div>
+
+  <div class="card">
+    <h2>10. 联系我们</h2>
+    <ul>
+    <li>问题反馈：<a href="https://github.com/psterman/onetone/issues">https://github.com/psterman/onetone/issues</a></li>
+    <li>过目站：<a href="https://my.onetone.app/">https://my.onetone.app/</a></li>
+    <li>一声 OneTone 官网：<a href="https://www.onetone.app/">https://www.onetone.app/</a></li>
+    </ul>
+  </div>
+
+</div>
+
+</body>
+</html>
