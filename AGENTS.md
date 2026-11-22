@@ -843,8 +843,8 @@ const watchList = [...followSchedule, ...movieList, ...videoList, ...followEvent
 site/       前端模板：template.html · app.js · app.css · board.html · assets/
 tools/      全部构建与运维脚本（70 个）；tools/grab/ 是 Python 抓取层；
             tools/macos/ 是 macOS 部署包（launchd plist + .sh）
-functions/  Pages Functions：_middleware.js(访问口令) · img/[[path]].js(图片代理) · board/ · likes/
-lib/        r2-json.mjs(单文件+etag乐观锁) · rate-limit.mjs
+functions/  Pages Functions：_middleware.js(访问口令) · img/[[path]].js(图片代理) · board/ · likes/ · loomy-sign/(讯飞短信登录签名，密钥只在 Cloudflare Secret)
+lib/        r2-json.mjs(单文件+etag乐观锁) · rate-limit.mjs · loomy-signature.mjs + loomy-sign-service.mjs(讯飞签名算法与 HTTP 层)
 published/  待部署产物：每期一个日期目录 + index.html(根路径=今天) + archive/
 docs/       rss-candidates · superpowers/{plans,specs} · macos-migration.md(迁移手册)
 assets/     shortcut.ico（桌面快捷方式图标）
