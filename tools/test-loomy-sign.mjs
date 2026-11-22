@@ -20,6 +20,7 @@ import {
   signRequest,
 } from '../lib/loomy-signature.mjs';
 import { handleSignRequest, _resetRateLimit } from '../lib/loomy-sign-service.mjs';
+import { onRequest } from '../functions/loomy-sign/index.js';
 
 const V = {
   secret: 'vector-secret-not-a-real-key',
@@ -235,6 +236,20 @@ _resetRateLimit();
     if (res.status === 429) limited++;
   }
   assert.equal(limited, 5, `限流应拦下 5 次，实际 ${limited}`);
+}
+
+// Pages 入口文件本身也要能跑通（functions/loomy-sign/index.js -> POST /loomy-sign）
+{
+  _resetRateLimit();
+  const res = await onRequest({
+    request: makeRequest({ path: '/login/phone/sendMsgCode', contentMd5: MD5_OK }),
+    env: ENV,
+  });
+  assert.equal(res.status, 200);
+  const data = await res.json();
+  assert.equal(data.ok, true);
+  assert.match(data.headers.Authorization, /^account test-key-id:/);
+  assert.equal(data.headers['Content-MD5'], MD5_OK);
 }
 
 _resetRateLimit();
