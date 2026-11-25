@@ -148,6 +148,16 @@ function richTextOf(block, tag) {
   return htmlToText(unwrapCdata(m[1]));
 }
 
+/** 在多个 feed 字段里取最长纯文本（Feedly/Inoreader：信源站给的摘要）。 */
+export function pickLongestFeedText(block, tags = ['content:encoded', 'content', 'description', 'summary']) {
+  let best = '';
+  for (const tag of tags) {
+    const t = richTextOf(block, tag);
+    if (t.length > best.length) best = t;
+  }
+  return best;
+}
+
 /** Atom 的 <link href="..."/> 与 RSS 的 <link>url</link> 都要认 */
 function linkOf(block) {
   const inner = textOf(block, 'link');
@@ -338,19 +348,21 @@ export function parseFeed(xml, baseUrl) {
       textOf(block, 'published') ||
       textOf(block, 'updated') ||
       textOf(block, 'dc:date');
-    const desc =
-      richTextOf(block, 'description') ||
-      richTextOf(block, 'summary') ||
-      richTextOf(block, 'content:encoded') ||
-      richTextOf(block, 'content');
-    // 推文短帖放宽；文章仍截短导读（全文走按需抽取，不入库）
+    // Inoreader/Feedly：吃满 feed 自带字段，取最长可用文本当 L1 摘要（非硬抽正文）
+    const desc = pickLongestFeedText(block, [
+      'content:encoded',
+      'content',
+      'description',
+      'summary',
+    ]);
+    // 推文放宽；文章导读抬到 ~900 字，减少「空摘要逼 L2」
     const twDesc =
       /(?:twitter\.com|x\.com|api\.xgo\.ing|xgo\.ing)/i.test(link + ' ' + (baseUrl || ''));
     out.push({
       title,
       link,
       ts: parseDate(dateStr),
-      desc: desc.slice(0, twDesc ? 2000 : 220),
+      desc: desc.slice(0, twDesc ? 2000 : 900),
       categories: categoriesOf(block),
       // 候选配图（按优先级排好）。**候选不等于能用** ——
       // 到底哪张合适由 tools/rss-images.mjs 下载后按尺寸/体积筛。
@@ -457,6 +469,45 @@ function isRetryable(err) {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
+ * 单源级超时。
+ *
+ * 优先级：**单源 `timeoutMs` > 按 host 的默认（`cfg.timeoutMsByHost`）> 全局 `timeoutMs`**。
+ *
+ * 为什么要「按 host 设默认」（2026-11-26 夜跑实测）：
+ *   RSSHub 的路由是**现生成**的 —— 缓存过期后第一次访问要重新生成，
+ *   冷启动可能跑几十秒。`rsshub.bestblogs.dev` 上的源全都有这个风险。
+ *   而全局 `timeoutMs` 只有 15 秒 → 冷启动那一晚**该源直接消失（贡献 0 条）**。
+ *   实测：2026-11-26 夜跑「法广中文」连超时 3 次（15s × 3 + 退避 ≈ 47 秒）仍失败；
+ *   放宽到 45 秒后，第一次尝试等路由生成完，后两次就能命中热缓存。
+ *
+ * 为什么用「按 host 设默认」而不是给每个源单独写 `timeoutMs`：
+ *   同一个 host 下的源行为完全一样，逐个写要多出十几行重复配置；
+ *   而且公开副本那边同一个 host 下有**几百个**源 —— 一行顶几百行。
+ *
+ * ⚠️ 抓取是**限流并发**的（`mapPool`）→ 放宽某个 host 的超时**不会**把总时长
+ *    乘以源数量，墙钟最多多等一轮超时。
+ *
+ * @param {object} feed 单源配置
+ * @param {number} globalTimeoutMs 全局超时
+ * @param {object|null} byHost `{host: 毫秒}` 的默认表
+ * @returns {number} 这个源实际该用的超时（毫秒）
+ */
+export function feedTimeout(feed, globalTimeoutMs, byHost) {
+  const own = Number(feed && feed.timeoutMs);
+  if (own > 0) return own;
+  if (byHost && typeof byHost === 'object') {
+    try {
+      const host = new URL(feed.url).hostname;
+      const t = Number(byHost[host]);
+      if (t > 0) return t;
+    } catch {
+      /* URL 不合法 → 当没配，走全局 */
+    }
+  }
+  return globalTimeoutMs;
+}
+
+/**
  * 抓一个源，并丢掉过期条目。
  *
  * 为什么要有这一步（2026-11-05 评审加）：
@@ -468,8 +519,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
  *
  * 没有时间的条目一律保留 —— 判断不了新旧，不该乱丢。
  */
-async function fetchOne(feed, timeoutMs, defaultMaxAgeDays) {
-  const r = await requestFeed(feed.url, timeoutMs);
+async function fetchOne(feed, timeoutMs, defaultMaxAgeDays, byHost) {
+  const t = feedTimeout(feed, timeoutMs, byHost);
+  const r = await requestFeed(feed.url, t);
   const days = Number(feed.maxAgeDays) > 0 ? Number(feed.maxAgeDays) : defaultMaxAgeDays;
   const newestTs = r.items.reduce((m, it) => Math.max(m, it.ts || 0), 0);
   if (!days) return { items: r.items, dropped: 0, total: r.items.length, newestTs };
@@ -482,10 +534,13 @@ async function fetchOne(feed, timeoutMs, defaultMaxAgeDays) {
  * 探测单个 URL 能不能当 RSS 用（加进 rss.config.json 之前先测一下）。
  * @returns {{ok:boolean,count:number,error:string,titles:string[],bytes:number,ms:number,sampleLink:string}}
  */
-export async function probeFeed(url, timeoutMs = 15000) {
+export async function probeFeed(url, timeoutMs = 15000, byHost = null) {
   const t0 = Date.now();
+  // 探测要用**跟正式抓取一样的超时规则** ——
+  // 否则会出现「探测 3 秒过了、夜里 15 秒超时」的假象（RSSHub 冷启动）。
+  const t = feedTimeout({ url }, timeoutMs, byHost);
   try {
-    const r = await requestFeed(url, timeoutMs);
+    const r = await requestFeed(url, t);
     return {
       ok: true,
       count: r.items.length,
@@ -496,7 +551,7 @@ export async function probeFeed(url, timeoutMs = 15000) {
       sampleLink: r.items[0] ? r.items[0].link : '',
     };
   } catch (e) {
-    const msg = e.name === 'AbortError' ? `超时 ${timeoutMs}ms` : e.message;
+    const msg = e.name === 'AbortError' ? `超时 ${t}ms` : e.message;
     return {
       ok: false,
       count: 0,
@@ -584,6 +639,9 @@ export async function fetchHeadlines(cfg) {
   const perFeed = Number(cfg.perFeed) > 0 ? Number(cfg.perFeed) : 8;
   const maxItems = Number(cfg.maxItems) > 0 ? Number(cfg.maxItems) : 24;
   const timeoutMs = Number(cfg.timeoutMs) > 0 ? Number(cfg.timeoutMs) : 15000;
+  // 按 host 设的默认超时（RSSHub 路由冷启动要等更久 —— 见 feedTimeout 的说明）
+  const timeoutMsByHost =
+    cfg.timeoutMsByHost && typeof cfg.timeoutMsByHost === 'object' ? cfg.timeoutMsByHost : null;
   // 过期条目闸门：0 = 不限。默认不启用，配置里显式写死数值。
   const maxAgeDays = Number(cfg.maxAgeDays) > 0 ? Number(cfg.maxAgeDays) : 0;
   // 890 源全开并发会触发 undici Parser.finish 断言；16~24 稳
@@ -597,10 +655,14 @@ export async function fetchHeadlines(cfg) {
         { ...feed, maxAgeDays: policy.maxAgeDays },
         timeoutMs,
         policy.maxAgeDays || maxAgeDays,
+        timeoutMsByHost,
       );
       return { feed, ...r, ok: true, policy };
     } catch (e) {
-      const msg = e.name === 'AbortError' ? `超时 ${timeoutMs}ms` : e.message;
+      // ⚠️ 报错要报**这个源实际用的**超时，不是全局那个
+      //    （不然单源放宽了超时，日志里还写着「超时 15000ms」，会误导排查）。
+      const msg =
+        e.name === 'AbortError' ? `超时 ${feedTimeout(feed, timeoutMs, timeoutMsByHost)}ms` : e.message;
       return { feed, items: [], ok: false, error: msg, policy };
     }
   });
@@ -661,15 +723,16 @@ export async function fetchHeadlines(cfg) {
   items.sort((a, b) => (b.ts || 0) - (a.ts || 0));
 
   // 公平配额：
-  //  1) 普通源 fairCap，防无名话痨霸屏
+  //  1) 无 policy 的源用 fairCap，防无名话痨霸屏
   //  2) 安静源保底 1 条
-  //  3) 流水白名单（board/wire/media）按 dailyCap 豁免均分刀
+  //  3) 已声明 dailyCap 的源（含 article/note 默认）按 cap 收满，不再被均分刀削成 4 条
+  //     —— 否则订阅 AI RSS「当日一条不漏」在入库前就被砍掉
   const srcCount = new Set(items.map((i) => i.source)).size;
   const fairCap = Math.max(2, Math.ceil(maxItems / Math.max(1, srcCount)));
   const fairFor = (it) => {
     const p = policyBySource.get(it.source);
     if (p && p.pipeline) return Math.max(1, p.dailyCap);
-    if (p && p.dailyCap > 0) return Math.min(Math.max(fairCap, 1), p.dailyCap);
+    if (p && p.dailyCap > 0) return Math.max(1, p.dailyCap);
     return fairCap;
   };
 
@@ -727,7 +790,20 @@ if (isMain) {
       console.error('用法：node tools/fetch-rss.mjs --probe <url>');
       process.exit(2);
     }
-    const r = await probeFeed(url);
+    // 探测用配置里的超时规则（单源 > 按 host > 全局）——
+    // 配置文件坏了也不能让 --probe 用不了，所以整个包在 try 里。
+    let probeGlobal = 15000;
+    let probeByHost = null;
+    try {
+      const probeCfg = loadConfig() || {};
+      if (Number(probeCfg.timeoutMs) > 0) probeGlobal = Number(probeCfg.timeoutMs);
+      if (probeCfg.timeoutMsByHost && typeof probeCfg.timeoutMsByHost === 'object') {
+        probeByHost = probeCfg.timeoutMsByHost;
+      }
+    } catch {
+      /* 配置读不到就用默认 */
+    }
+    const r = await probeFeed(url, probeGlobal, probeByHost);
     if (r.ok) {
       console.log(`✓ 能抓  ${url}`);
       console.log(`  条目 ${r.count} / ${r.bytes} 字节 / ${r.ms}ms`);

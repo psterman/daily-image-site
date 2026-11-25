@@ -213,6 +213,12 @@
 - ⚠️ **`德国之声中文` 已删除**：DNS 被污染，且 RSSHub 上没有对应中文路由（`dw/zh` / `dw/chinese` / `dw/chi` 全 404，`dw/news` 是**英文**源违反「只收中文」硬约束）→ 它的位置由**法广中文**接替（同为欧洲国际广播机构、同样有中文节目）。
 - ⚠️ **`rsshub.app` 公共实例已被风控（403）**，能用的是 `rsshub.bestblogs.dev`。
 - ⚠️ 删源要**同步删 `tools/news-taxonomy.json` 里的 `sourceCategory` 映射**（`test-news-taxonomy.mjs` 断言「源数量 == 映射数量」且「没有已下线的源」）。
+- ⚠️⚠️ **RSSHub 镜像源要按 host 放宽超时**（**2026-11-26 夜跑实测**）：换源后第一晚「**法广中文**」就**超时丢了** —— 根因是 **RSSHub 的路由是现生成的**，缓存过期后第一次访问要重新生成，**冷启动可能跑几十秒**，而全局 `timeoutMs` 只有 15 秒 → 连超时 3 次（15s × 3 + 退避 ≈ 47 秒）仍失败 → **该源当晚贡献 0 条**（不是源坏了，几小时后复探又是 44 条 / 2.4 秒）。
+  - **解法**：新增顶层 **`timeoutMsByHost`**（按 host 设默认超时），`rsshub.bestblogs.dev` → **45 秒**；单个源还能用 `timeoutMs` 字段再单独覆盖。**优先级：单源 > 按 host > 全局**。
+  - **为什么按 host 设而不逐个源写**：同一 host 下行为完全一样（这个 host 上有十几个源），逐个写要多十几行重复配置；**公开副本这边同一个 host 下有几百个源 —— 一行顶几百行**。
+  - ⚠️ 抓取是**限流并发**的（`mapPool`）→ 放宽某个 host 的超时**不会**把总时长乘以源数量，墙钟最多多等一轮超时。
+  - ⚠️ `--probe` 也走同一套规则 —— 否则会出现「探测 3 秒过了、夜里 15 秒超时」的假象。
+  - **护栏**：`test-rss.mjs` 里那组是**真跑出来的**（本地慢服务器 600ms + 超时 200ms → 必须失败；同 URL + 按 host 3000ms → 必须成功），不是查源码。
 
 **⑥ 日志轮转**
 
@@ -838,7 +844,7 @@ const watchList = [...followSchedule, ...movieList, ...videoList, ...followEvent
 
 | 文件 | 断言 | 测什么 |
 |---|---|---|
-| `test-rss.mjs` | 48 | RSS 解析 / 反爬识别 / 重试 / 过期闸门 |
+| `test-rss.mjs` | 59 | RSS 解析 / 反爬识别 / 重试 / 过期闸门 / **单源级超时（单源 > 按 host > 全局）** |
 | `test-news-taxonomy.mjs` | 40 | 见报分类表 + 归属计算 |
 | `test-news-taxonomy-mutate.mjs` | 6 组变异 | 改坏分类逻辑必须被抓住 |
 | `test-build-taxonomy.mjs` | 30 | 真在临时目录跑构建，验 manifest 分类 + **`/archive/` 日期索引必须包含最新一期** + **日期条目必须带 `class="row"`（卡片样式才生效）** |
@@ -872,7 +878,7 @@ const watchList = [...followSchedule, ...movieList, ...videoList, ...followEvent
 | `test-night-hardening.mjs` | 46 | 2026-11-25 那轮夜间加固的契约：告警下沉（`Send-Alert` 在 common.ps1 / 失败才发 / 通知失败不掀翻主流程）+ 看门狗（`.done` 判定 / exit≠0 不重复告警 / `.cmd` 纯 ASCII 无 pause / 参数透传）+ 抓图总预算（**每个源都查**）+ pHash 增量缓存（**mtime+size 都要比** / 原子写盘 / 新图登记进缓存 / **改模块级标志位的函数必须有 `global` 声明**）+ RSS 换源（**V2EX 官方 / NYT中文+法广中文走 bestblogs / DW 中文已删 / 不许加回用户移除过的源**）+ 日志轮转（切历史不删文件 / 夜间流程最后调）。第 7 组（计划任务属性）**只在传 `SCHED_SETTINGS_FILE` 时才断言**，否则跳过 |
 | `test-night-hardening-mutate.mjs` | 18 组变异 | 证明上面那套护栏**真的有牙齿**：改坏告警链路 / 看门狗 `.cmd` / 抓图预算 / pHash 缓存键 / **两处 `global` 声明** / RSS 地址 / 日志轮转，**18/18 全被抓**。⚠️ 第一版有 **4 个假绿**（只查「函数名出现过」→ 变异把调用换掉也不红），已改成**查结构不查词 presence** |
 
-**合计 ≈1037 项断言**（不含 80 组变异、8322 文件对照）。改完代码至少跑相关的那几套。
+**合计 ≈1048 项断言**（不含 80 组变异、8322 文件对照）。改完代码至少跑相关的那几套。
 
 | 工具 | 用途 |
 |---|---|

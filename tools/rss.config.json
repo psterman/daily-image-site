@@ -17,12 +17,16 @@
     "2026-11-18 tophub/folo 补源": "新增机核/游研社/喷嚏网/豆瓣四源/财联社三源/豆瓣图书榜；maxItems=312。微博/头条/B站 RSSHub 本轮未加。",
     "2026-11-18 格式五板块白名单": "从 format-feeds.json（cutoff≥2026-01-01）每桶精选；Twitter 来自 BestBlogs_RSS_Twitters.opml（api.xgo.ing）。feed 可带 contentType。生成：node tools/build-format-catalog.mjs",
     "2026-11-18 BestBlogs扩源": "expand-rss-from-catalog：+0 更新824 跳过体育等0；feeds=890 maxItems=2670",
-    "2026-11-25 换掉的 3 个源（网络层被拦死）": "**根因不是源坏了，是这台机器的网络层把它们拦死了**（实测 Node 与 PowerShell 两种运行时都一样）：`rss.dw.com` DNS 解析成 **0.0.0.0**（污染）；`cn.nytimes.com` / `rss.mifaw.com` / `www.rfi.fr` 全部 **ERR_SSL_SSL/TLS_ALERT_HANDSHAKE_FAILURE**（TLS 握手被阻断）。**换域名解决不了**，必须走国内通道。实测结论：**官方 feed 反而更稳** —— V2EX 官方 `www.v2ex.com/feed/tab/hot.xml` 通（40 条，多轮稳定），而原来的 RSS屋镜像 `rss.mifaw.com` 挂 → **已改用官方地址**。纽约时报中文 → `rsshub.bestblogs.dev/nytimes/world`（10 条，中文标题，链接仍指向 cn.nytimes.com）。法广中文 → `rsshub.bestblogs.dev/rfi/cn`（44 条；直连 www.rfi.fr 同样被 TLS 拦死）。**德国之声中文已删除**：直连 DNS 被污染，且 RSSHub 上没有对应中文路由（dw/zh / dw/chinese / dw/chi 全 404，dw/news 是**英文**源，违反「只收中文」硬约束）→ 它的位置由**法广中文**接替（同为欧洲国际广播机构、同样有中文节目）。**注意 `rsshub.app` 公共实例已被风控（403）**，能用的是 `rsshub.bestblogs.dev`。"
+    "2026-11-25 换掉的 3 个源（网络层被拦死）": "**根因不是源坏了，是这台机器的网络层把它们拦死了**（实测 Node 与 PowerShell 两种运行时都一样）：`rss.dw.com` DNS 解析成 **0.0.0.0**（污染）；`cn.nytimes.com` / `rss.mifaw.com` / `www.rfi.fr` 全部 **ERR_SSL_SSL/TLS_ALERT_HANDSHAKE_FAILURE**（TLS 握手被阻断）。**换域名解决不了**，必须走国内通道。实测结论：**官方 feed 反而更稳** —— V2EX 官方 `www.v2ex.com/feed/tab/hot.xml` 通（40 条，多轮稳定），而原来的 RSS屋镜像 `rss.mifaw.com` 挂 → **已改用官方地址**。纽约时报中文 → `rsshub.bestblogs.dev/nytimes/world`（10 条，中文标题，链接仍指向 cn.nytimes.com）。法广中文 → `rsshub.bestblogs.dev/rfi/cn`（44 条；直连 www.rfi.fr 同样被 TLS 拦死）。**德国之声中文已删除**：直连 DNS 被污染，且 RSSHub 上没有对应中文路由（dw/zh / dw/chinese / dw/chi 全 404，dw/news 是**英文**源，违反「只收中文」硬约束）→ 它的位置由**法广中文**接替（同为欧洲国际广播机构、同样有中文节目）。**注意 `rsshub.app` 公共实例已被风控（403）**，能用的是 `rsshub.bestblogs.dev`。",
+    "2026-11-26 RSSHub 镜像源放宽超时": "**根因**：RSSHub 的路由是**现生成**的 —— 缓存过期后第一次访问要重新生成，冷启动可能跑几十秒。而全局 `timeoutMs` 只有 15 秒 → **冷启动那一晚该源直接消失（贡献 0 条）**。实测：2026-11-26 夜跑「法广中文」连超时 3 次（15s × 3 + 退避 ≈ 47 秒）仍失败。**解法**：新增顶层 `timeoutMsByHost`（按 host 设默认超时），`rsshub.bestblogs.dev` → 45 秒；单个源还能用 `timeoutMs` 字段再单独覆盖（优先级：单源 > 按 host > 全局）。**为什么按 host 设而不逐个源写**：同一 host 下行为完全一样，而且公开副本这边同一个 host 下有几百个源 —— 一行顶几百行。⚠️ 抓取是**限流并发**的 → 放宽超时**不会**把总时长乘以源数量。"
   },
   "enabled": true,
   "perFeed": 6,
   "maxItems": 2670,
   "timeoutMs": 15000,
+  "timeoutMsByHost": {
+    "rsshub.bestblogs.dev": 45000
+  },
   "maxAgeDays": 2,
   "feeds": [
     {

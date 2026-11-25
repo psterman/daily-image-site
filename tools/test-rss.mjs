@@ -6,7 +6,21 @@
  * 退出码：0 = 全过；1 = 有失败
  */
 import http from 'node:http';
-import { parseFeed, looksLikeFeed, normalizeLink, probeFeed, fetchHeadlines, fmtTime } from './fetch-rss.mjs';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import {
+  parseFeed,
+  looksLikeFeed,
+  normalizeLink,
+  probeFeed,
+  fetchHeadlines,
+  fmtTime,
+  pickLongestFeedText,
+  feedTimeout,
+} from './fetch-rss.mjs';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 let pass = 0;
 let fail = 0;
@@ -123,6 +137,18 @@ eq(
 );
 eq('空输入返回空数组', parseFeed('').length, 0);
 eq('非字符串返回空数组', parseFeed(null).length, 0);
+
+const longFeed = parseFeed(`<?xml version="1.0"?><rss><channel>
+  <item>
+    <title>长摘要优先</title>
+    <link>https://example.com/long</link>
+    <description>短摘要</description>
+    <content:encoded><![CDATA[<p>${'正文段落。'.repeat(40)}</p>]]></content:encoded>
+  </item>
+</channel></rss>`);
+eq('取最长 feed 字段（content:encoded 优先于短 description）', longFeed[0].desc.length > 40, true);
+check('导读上限抬到约 900', longFeed[0].desc.length <= 900);
+eq('pickLongestFeedText 导出可用', typeof pickLongestFeedText, 'function');
 
 /* ────────────────────── 是不是 RSS ────────────────────── */
 console.log('\n是不是 RSS');
@@ -252,6 +278,59 @@ function startServer(handler) {
   );
   check('406 回退不消耗重试次数（请求数 = 2）', hits === 2, `实际请求数=${hits}`);
   server.close();
+}
+
+console.log('\n单源级超时（RSSHub 冷启动）');
+
+/**
+ * ⚠️ 这组是**真跑出来的**，不是查源码 —— 2026-11-26 夜跑实测：
+ *   RSSHub 的路由是现生成的，冷启动可能跑几十秒；全局 15 秒 → 该源直接消失（贡献 0 条）。
+ *   「法广中文」那一晚连超时 3 次（15s × 3 + 退避 ≈ 47 秒）仍失败。
+ */
+{
+  // 本地服务器故意慢 600ms —— 比「超时 200ms」慢，比「超时 3000ms」快
+  const { server, url } = await startServer((req, res) => {
+    setTimeout(() => {
+      res.writeHead(200, { 'Content-Type': 'application/rss+xml' });
+      res.end(FEED_XML);
+    }, 600);
+  });
+  const short = await probeFeed(url, 200);
+  check('超时太短 → 抓不到（判据本身有效，不是恒真）',
+    !short.ok && /超时 200ms/.test(short.error), short.error);
+  const relaxed = await probeFeed(url, 200, { '127.0.0.1': 3000 });
+  check('按 host 设的更长超时会生效（RSSHub 冷启动就靠这个）',
+    relaxed.ok && relaxed.count === 1, JSON.stringify({ ok: relaxed.ok, count: relaxed.count, error: relaxed.error }));
+  server.close();
+}
+
+// 超时优先级：单源 > 按 host > 全局
+{
+  check('单源 timeoutMs 优先于按 host 的默认',
+    feedTimeout({ url: 'https://x.example/f', timeoutMs: 999 }, 15000, { 'x.example': 45000 }) === 999);
+  check('按 host 的默认优先于全局',
+    feedTimeout({ url: 'https://rsshub.bestblogs.dev/nytimes/world' }, 15000, { 'rsshub.bestblogs.dev': 45000 }) === 45000);
+  check('都没配就用全局',
+    feedTimeout({ url: 'https://example.com/f' }, 15000, { 'rsshub.bestblogs.dev': 45000 }) === 15000);
+  check('URL 不合法时不炸（退回全局）',
+    feedTimeout({ url: '不是个URL' }, 15000, { 'rsshub.bestblogs.dev': 45000 }) === 15000);
+}
+
+// 配置里确实放宽了 RSSHub 镜像的时
+{
+  let cfg = null;
+  try {
+    cfg = JSON.parse(fs.readFileSync(path.join(__dirname, 'rss.config.json'), 'utf8'));
+  } catch {
+    /* 留给下面的断言报错 */
+  }
+  const global = Number(cfg && cfg.timeoutMs) || 15000;
+  const byHost = (cfg && cfg.timeoutMsByHost) || {};
+  check('rss.config.json 给 rsshub.bestblogs.dev 放宽了超时（RSSHub 冷启动）',
+    Number(byHost['rsshub.bestblogs.dev']) > global,
+    `全局=${global} 按host=${byHost['rsshub.bestblogs.dev']}`);
+  check('配置里的 _doc 记了这条规矩',
+    /2026-11-26 RSSHub 镜像源放宽超时/.test(JSON.stringify(cfg && cfg._doc)));
 }
 
 /* ────────────────────── 过期条目闸门 ──────────────────────
