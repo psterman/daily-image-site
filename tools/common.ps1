@@ -145,6 +145,47 @@ function Get-SourceDateDir {
   return (Join-Path (Join-Path (Get-ImageRoot) 'src') $Date)
 }
 
+function Send-Alert {
+  <#
+    发一条告警通知（Windows toast；macOS 走 osascript，见 notify.ps1）。
+
+    ⚠️ **为什么要把告警下沉到夜间脚本**（2026-11-25 加）：
+      原来只有「定时任务台」（night-dashboard.mjs）在它自己判定出错时才发 toast。
+      但任务台是**手动起的 GUI 进程**（起任务台.cmd），机器每次重启就没了
+      （实测 2026-11-25 那个 pid 28388 已经不在，8801 端口不通），
+      而且它**没有任何自启动**（Startup 文件夹 / Run 注册表 / 计划任务里都没有）。
+      → 结果：**夜里发布失败时，一个通知都不会发**，只能等早上人去看。
+
+      现在夜间发布脚本自己发 —— 不依赖任何常驻进程。
+
+    设计原则（必须守住）：
+      · **通知是补位，不是主功能** —— 发不出去绝不能掀翻主流程
+        （所以内部吞掉所有异常，且用独立子进程跑）。
+      · **失败才发** —— 成功不发（不然每晚一条 toast，一周就烦了）。
+      · **只认退出码** —— 复用 Invoke-PsScript 的约定（PS 5.1 的 stderr
+        会变成 ErrorRecord，顶着 Stop 就能掀翻调用方）。
+
+    返回值：永远不抛异常。调用方可以完全忽略。
+  #>
+  param(
+    [Parameter(Mandatory = $true)][string]$Title,
+    [string]$Body = '',
+    [string]$Root = $PSScriptRoot
+  )
+  try {
+    if (-not $Body) { return }
+    $notify = Get-ToolPath -Root $Root -Name 'notify.ps1'
+    if (-not (Test-Path $notify)) { return }
+    $rc = Invoke-PsScript -Script $notify -ScriptArgs @('-Title', $Title, '-Body', $Body)
+    if ($rc -ne 0) {
+      # 通知发不出去也只能记一笔 —— 不能让主流程因为它失败
+      Write-Host "  （告警没发出去，exit $rc）"
+    }
+  } catch {
+    # 静默降级：通知永远不影响主流程
+  }
+}
+
 # ── tools/ 下的文件 ────────────────────────────────────────────
 function Get-ToolPath {
   <#

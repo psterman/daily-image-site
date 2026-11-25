@@ -148,6 +148,8 @@
 - `tools\test-night-flow.mjs` —— **50/0**（用 `stripComments` 剥掉注释再断言，避免脚本里的反面示例误伤；第 7 组是跨平台那一组）
 - `tools\test-portability.mjs` —— **44/0**（跨平台护栏，见下节）
 - `tools\test-night-flow-mutate.mjs` —— **38/0**（**37 处变异全被抓**；变异体写在 `tools\.tmp-night-mut\`，跑完自清）—— 变异体包括「闸门又改回 20:00」「手动入口也加上夜间闸门」「幂等标记不跟夜间共用」「.cmd 里混进中文」「去掉 Asia/Shanghai 兜底」「路径又用反斜杠拼」
+- `tools\test-night-hardening.mjs` —— **46/0**（2026-11-25 那轮夜间加固的契约：告警下沉（`Send-Alert` 在 common.ps1 / 失败才发 / 通知失败不掀翻主流程）+ 看门狗（`.done` 判定 / exit≠0 不重复告警 / `.cmd` 纯 ASCII 无 pause / 参数透传）+ 抓图总预算（**每个源都查**）+ pHash 增量缓存（**mtime+size 都要比** / 原子写盘 / 新图登记进缓存 / **改模块级标志位的函数必须有 `global` 声明**）+ RSS 换源（**V2EX 官方 / NYT中文+法广中文走 bestblogs / DW 中文已删 / 不许加回用户移除过的源**）+ 日志轮转（切历史不删文件 / 夜间流程最后调）。第 7 组读实机计划任务设置，**只在传 `SCHED_SETTINGS_FILE` 时才断言**，否则跳过）
+- `tools\test-night-hardening-mutate.mjs` —— **18/18 全被抓**（证明上面那套护栏**真的有牙齿**：改坏告警链路 / 看门狗 `.cmd` / 抓图预算 / pHash 缓存键 / **两处 `global` 声明** / RSS 地址 / 日志轮转。⚠️ 第一版有 **4 个假绿** —— 只查「函数名出现过」，变异把**调用**换掉也不红 → 已改成**查结构不查词 presence**）
 - `tools\test-product-validity.mjs` —— **43/0**（产物有效性三道闸门，见「产物有效性」一节；**真跑**三份脚本，临时工程在 `tools\.tmp-product-validity\`；全程用夹具把 `fetch` 换掉 —— **一个网络请求都发不出去**）
 - `tools\test-product-validity-mutate.mjs` —— **10/10 全被抓**（每条变异还指定了「必须保持绿」的断言 —— 红的正好是指定的那几条，不是别的断言碰巧红了）
 
@@ -171,6 +173,52 @@
 > 首次真跑暴露的两个**非致命**现象（都符合预期）：
 > - **福利吧 116 张全被台账跳过** → 日志提示「这一期 2026-11-14 已经抓过 —— 源站大概率还没发新一期」。福利吧只取最新一期，**源站不出新期 → 见笑数量会掉**（11-16 的见笑 99 张 vs 11-15 的 197 张）。这不是 bug。
 > - **知乎 401** → cookie 过期的老问题，不影响发布。
+
+### 夜间链路的加固（2026-11-25 加）
+
+体检发现四个问题，都已修掉。**根因都不是「代码写错了」，是「环境变了但没人管」**。
+
+**① 告警链路是断的 —— 夜里失败时一个通知都不会发**
+
+- 原来 toast **只有定时任务台**（`night-dashboard.mjs`）在它自己判定出错时才发，而任务台是**手动起的 GUI 进程**（`起任务台.cmd`）、**没有任何自启动**（Startup 文件夹 / Run 注册表 / 计划任务里都没有）→ 机器每次重启就没了。
+- 现在 `common.ps1` 加了 `Send-Alert`（**公共 helper**，走 `Get-ToolPath` 拼路径 + `Invoke-PsScript` 起子进程），`night-publish.ps1` 的**失败分支**自己发 toast（**成功不发** —— 每晚一条没人受得了）。
+- ⚠️ **「进程被硬杀」这条路径本来是完全静默的**（没有 catch、没有 toast、连 `=== NIGHT_DONE ===` 都没写）→ 新增 `tools\night-watchdog.ps1` + `tools\night-watchdog.cmd`，计划任务 **`DailyImageSite-NightWatchdog-0130`**（DAILY **01:30**）在发布窗口之后查一次：`.done` 不存在 → 告警。**刻意不判「日志停摆多久」**（那类判据会误报，见「读日志的坑」）。
+- ⚠️ **机器每晚定时关机**（用户习惯，不是计划任务）→ 01:30 的看门狗**有可能压根没机会跑**。这是已知缺口，不假装解决。
+
+**② 计划任务 `ExecutionTimeLimit` 从 `PT72H` 改成 `PT2H`**
+
+- 原来 `PT72H`（3 天）+ `MultipleInstances = IgnoreNew` → **一次卡死 = 之后 3 天的触发全被忽略**，既不报错也没告警。
+- 实测最慢的一晚是 34 分 47 秒 → 2 小时留得够。顺带开了 `AllowStartIfOnBatteries` + `DontStopIfGoingOnBatteries`（笔记本合盖/切换电源时不该把夜间链路掐掉）。
+- ⚠️ 改之前 `schtasks` 的这些设置**不在源码里**（是计划任务属性），所以护栏钉不到 —— `test-night-hardening.mjs` 第 7 组**只在传入 `SCHED_SETTINGS_FILE` 时才断言**，否则跳过（不让「跑测试的机器没建这个任务」把护栏搞红）。
+
+**③ 抓图阶段加了总时间预算（防关机硬杀）**
+
+- 抓图耗时随上游剧烈波动：实测 **446 / 573 / 675 / 638 / 1701 秒**（最慢那晚是 t.me `read timeout=20` 反复出现）。
+- 而机器定时关机、发布 00:10 起跑 —— 有一次发布 00:22:16 结束、00:27:37 关机，**余量只有 5.3 分钟**。
+- 现在 `tools/grab/daily_grab_all.py` 支持 `MEMES_GRAB_BUDGET_SEC`（环境变量），`night-publish.ps1` 设 **1500 秒（25 分钟）**。**超了就带着已抓到的素材继续，剩下的源跳过** → 宁可少几张图，这一期也要按时发出去。
+- 判据**只在源之间检查**（不是每张图都查）—— 单个源内部中断会留下不完整的素材。
+
+**④ pHash 索引改持久化增量缓存**
+
+- 原来每晚把整个图库（跨所有日期目录）逐张打开算 pHash：实测 7414 张要 **94~116 秒**，而且**随图库线性增长**（9 天涨 42%：5269 → 7504 张）→ 这段纯 CPU 开销每天都在涨，却对「当天发什么」毫无贡献。
+- 改成按 **(path, mtime, size)** 缓存 hash（`.phash-cache.json`，工程根）：文件没变就复用，变了才重算。**实测 116.7 秒 → 1.9 秒（61 倍）**，缓存 hash 与重算**逐字一致**。
+- ⚠️ **缓存键必须含 mtime 和 size**：只按 path 缓存的话，同名文件被覆盖（审稿台删图重发）会拿到**过期 hash** → 用错的 hash 判重 → **真重复漏拦 / 误删真图**。
+- ⚠️ 缓存读不出来（文件坏了 / JSON 坏了）→ **退回全量重算**，绝不抛异常（缓存只是加速器）。
+- ⚠️⚠️ **改模块级标志位必须写 `global`** —— **2026-11-25 端到端实测真踩过**：Python 里**赋值即声明局部变量**，少了 `global _PHASH_CACHE_DIRTY` 就会：① `main()` 末尾的 `if _PHASH_CACHE_DIRTY:` 报 **`UnboundLocalError`**（而且是**流程最后一步**崩 → 前面抓的图全白抓）② `_phash_cache_register()` 里的赋值传不到模块级 → **缓存攒一晚永远不落盘** → 新图白算。护栏 `test-night-hardening.mjs` 专门盯着这条（`pyMissingGlobal()`：先抹注释和字符串、再按缩进算作用域 —— ⚠️ **别用「按 `\ndef\s+` 切字符串」的糙办法**：模块顶层的赋值会被算成「某个函数改了它」→ 误报红；docstring 里写的反面示例也会被当成真赋值）。
+
+**⑤ 三个中文 RSS 源被网络层拦死 → 换掉**
+
+- **根因不是源坏了，是这台机器的网络层拦的**（Node 与 PowerShell 两种运行时实测一致）：`rss.dw.com` DNS 解析成 **0.0.0.0**（污染）；`cn.nytimes.com` / `rss.mifaw.com` / `www.rfi.fr` 全部 **`ERR_SSL_SSL/TLS_ALERT_HANDSHAKE_FAILURE`**。**换域名解决不了**，必须走国内通道。
+- 换法：**V2EX 热榜 → 官方 `www.v2ex.com/feed/tab/hot.xml`**（官方比 RSS屋镜像更稳）、**纽约时报中文 → `rsshub.bestblogs.dev/nytimes/world`**、**法广中文 → `rsshub.bestblogs.dev/rfi/cn`**。
+- ⚠️ **`德国之声中文` 已删除**：DNS 被污染，且 RSSHub 上没有对应中文路由（`dw/zh` / `dw/chinese` / `dw/chi` 全 404，`dw/news` 是**英文**源违反「只收中文」硬约束）→ 它的位置由**法广中文**接替（同为欧洲国际广播机构、同样有中文节目）。
+- ⚠️ **`rsshub.app` 公共实例已被风控（403）**，能用的是 `rsshub.bestblogs.dev`。
+- ⚠️ 删源要**同步删 `tools/news-taxonomy.json` 里的 `sourceCategory` 映射**（`test-news-taxonomy.mjs` 断言「源数量 == 映射数量」且「没有已下线的源」）。
+
+**⑥ 日志轮转**
+
+- `.night-publish-console.log` / `.daily-review.log` 是 `cmd >>` 写出来的 —— **只追加、永不清理**（实测 11 天涨到 505 KB / 664 KB）。
+- `tools/rotate-logs.mjs`：**切历史 + 原地清空**（**不能删文件** —— `cmd >>` 占着句柄删不掉），保留最近 7 份；夜间流程最后调（成功失败都轮），轮转失败**不影响发布结果**。
+- 台账 `.fetch-ledger.json` **不在这里管** —— 它有自己的保留策略（`fetch_ledger.py` 的 `KEEP_DAYS = 120`）。
 
 ---
 
@@ -821,7 +869,10 @@ const watchList = [...followSchedule, ...movieList, ...videoList, ...followEvent
 | `test-night-dashboard.mjs` | 172 | 定时任务台：三个 helper 的时间戳格式 + 解析层（剥 BOM / 15 节点 / 老日志兼容 / 跨零点）+ 状态与问题判定（中位数只用成功的夜 / **`.done` 优先于日志标记 / dead 点名步骤 / 格式变了退化为 unknown 并按完成记录分级 / 阶段级慢 > 中位数 × 3（只比闭合区间）/ 06:00 闸门 / 阶段级只比闭合区间** / **计划任务「正在运行」不算失败** / **267009·267011 只靠结果码也判成「不是失败」**）+ HTTP 层（本机 / 动态端口 Origin / 目录穿越金丝雀 / **写路径零副作用** / **by:manual 取 manual 日志** / **只绑 127.0.0.1** / **`/api/log` 只读尾部 64KB** / **guard 挡非本机 + 挡跨站 + 放行本机同源** / **已有发布在跑 → 409 且零 spawn**）+ 启动器约定 + 服务端 toast（**AUMID 字面量只放 common.ps1**） |
 | `test-night-dashboard-mutate.mjs` | 17 组变异 | 改坏**解析层、HTTP 层和 toast 的 AUMID 归位**都必须被抓住（剥 BOM / 时间戳正则 / 跨零点 / 负耗时 / 分组 / median / allowWrite 顺序 / by:manual / 绑 0.0.0.0 / 读整份日志 / **AUMID 字面量搬回 notify.ps1** / **common.ps1 里的 Get-ToastAumid 被改名** / **删掉结果码排除** / **guard 放行非本机** / **409 那道门失效**） |
 
-**合计 ≈991 项断言**（不含 62 组变异、8322 文件对照）。改完代码至少跑相关的那几套。
+| `test-night-hardening.mjs` | 46 | 2026-11-25 那轮夜间加固的契约：告警下沉（`Send-Alert` 在 common.ps1 / 失败才发 / 通知失败不掀翻主流程）+ 看门狗（`.done` 判定 / exit≠0 不重复告警 / `.cmd` 纯 ASCII 无 pause / 参数透传）+ 抓图总预算（**每个源都查**）+ pHash 增量缓存（**mtime+size 都要比** / 原子写盘 / 新图登记进缓存 / **改模块级标志位的函数必须有 `global` 声明**）+ RSS 换源（**V2EX 官方 / NYT中文+法广中文走 bestblogs / DW 中文已删 / 不许加回用户移除过的源**）+ 日志轮转（切历史不删文件 / 夜间流程最后调）。第 7 组（计划任务属性）**只在传 `SCHED_SETTINGS_FILE` 时才断言**，否则跳过 |
+| `test-night-hardening-mutate.mjs` | 18 组变异 | 证明上面那套护栏**真的有牙齿**：改坏告警链路 / 看门狗 `.cmd` / 抓图预算 / pHash 缓存键 / **两处 `global` 声明** / RSS 地址 / 日志轮转，**18/18 全被抓**。⚠️ 第一版有 **4 个假绿**（只查「函数名出现过」→ 变异把调用换掉也不红），已改成**查结构不查词 presence** |
+
+**合计 ≈1037 项断言**（不含 80 组变异、8322 文件对照）。改完代码至少跑相关的那几套。
 
 | 工具 | 用途 |
 |---|---|
@@ -1202,15 +1253,22 @@ https://wechat2rss.bestblogs.dev/img-proxy/?k=0dd9c3af&u=https%3A%2F%2Fmmbiz.qpi
 `rss.huxiu.com/` · `cn.nytimes.com/rss/` · `feeds-origin.appinn.com/appinns`（**必须用 feeds-origin**）·
 `feedex.net/feed/feed.iplaysoft.com/` · `rss.nodeseek.com/` · `linuxdorss.longpink.com/top.xml` ·
 `plink.anyfeeder.com/{idaily/today, zaobao/realtime/china, weixin/<账号名>}`（是 `/rss` 不是 `/feed`）·
-`wechat2rss.bestblogs.dev/feed/<hash>.xml` / `wechat2rss.xlab.app/feed/<hash>.xml`（公众号镜像）·
-`rss.mifaw.com/articles/…`（V2EX 热榜）
+`wechat2rss.bestblogs.dev/feed/<hash>.xml` / `wechat2rss.xlab.app/feed/<hash>.xml`（公众号镜像）
 
 **抓不到**：`36kr.com/feed`（火山引擎 WAF）· `appsos.com/feed` · `iplayapp.com/*` · `linux.do` 直连 403 ·
 `appinn.com/feed` 本机不可达 · `rss.shab.fun` / `xiaozhensoft.com` 本机网络层不可达
 
+⚠️⚠️ **2026-11-25 更正：下面三个源被「网络层」拦死了，不是源坏了** —— 实测（Node 与 PowerShell 两种运行时一致）：
+
+- `rss.dw.com`（德国之声中文）DNS 解析成 **0.0.0.0**（污染）→ **该源已删除**，位置由**法广中文**接替（RSSHub 无对应中文路由，`dw/news` 是英文源违反「只收中文」）。
+- `cn.nytimes.com/rss/`（纽约时报中文）· `rss.mifaw.com/articles/…`（V2EX 热榜）· `www.rfi.fr/cn/rss`（法广中文）全部 **`ERR_SSL_SSL/TLS_ALERT_HANDSHAKE_FAILURE`**（TLS 握手被阻断）。
+- **换域名解决不了**，必须走国内通道：纽约时报中文 → `rsshub.bestblogs.dev/nytimes/world`；法广中文 → `rsshub.bestblogs.dev/rfi/cn`；**V2EX 热榜 → 官方 `www.v2ex.com/feed/tab/hot.xml`**（官方比 RSS屋镜像更稳，实测多轮稳定）。
+- ⚠️ **`rsshub.app` 公共实例已被风控（403）**，能用的是 `rsshub.bestblogs.dev`。
+- ⚠️ 换源后**必须同步删 `tools/news-taxonomy.json` 里的 `sourceCategory` 映射** —— `test-news-taxonomy.mjs` 断言「源数量 == 映射数量」且「没有已下线的源」。
+
 ⚠️ `reuters.buzzing.cc` 名为「路透中文」，实为 Bluesky 上**路透英文源**的镜像：标题机器翻成中文、正文和 summary 是英文、链接跳 reut.rs 跳英文站（对本机 IP 回 401/超时）。**是否保留待用户拍板。**
 
-**注意**：知乎日报 `rsshub.bestblogs.dev/zhihu/daily` 只有 **1 个可用镜像**（9 个 RSSHub 实例实测：rsshub.app 超时 47.4s、rssforever fetch failed、ktachibana.party 429、pseudoyu/19940731/bdbk 解析不了、luckly.workers.dev 超时）；它一天 4 条、发布时间都在 07:00 前后（比别的源晚 6 小时 → 按时间补齐时常常只拿到保底的 1 条）。`feeds.feedburner.com/nytcn` 不稳（3 次里 1 次要靠重试才过，24 秒）→ 纽约时报中文改用直连 `cn.nytimes.com/rss/`。
+**注意**：知乎日报 `rsshub.bestblogs.dev/zhihu/daily` 只有 **1 个可用镜像**（9 个 RSSHub 实例实测：rsshub.app 超时 47.4s、rssforever fetch failed、ktachibana.party 429、pseudoyu/19940731/bdbk 解析不了、luckly.workers.dev 超时）；它一天 4 条、发布时间都在 07:00 前后（比别的源晚 6 小时 → 按时间补齐时常常只拿到保底的 1 条）。`feeds.feedburner.com/nytcn` 不稳（3 次里 1 次要靠重试才过，24 秒）→ 纽约时报中文改用直连 `cn.nytimes.com/rss/`（⚠️ **2026-11-25 起直连也 TLS 握手失败了 → 已改成 `rsshub.bestblogs.dev/nytimes/world`**，见上面那条更正）。
 
 **规则**：内容站**只收中文源**；英文源（经济学人 / Hacker News / MIT Tech Review）不要。
 「Folo 里能刷到」≠ 本机能抓 —— 加源前先 `node tools\fetch-rss.mjs --probe <url>` 验一遍。

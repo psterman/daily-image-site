@@ -12,11 +12,12 @@
     "maxItems 怎么算": "59 个源 × 每源 4 条 = 232。**不是死公式** —— fairCap = max(2, ceil(maxItems/源数))，且补齐是「保底 1 条 + 之后按时间倒序填」，所以条目比热门源旧的源会被挤到 1~2 条。实测 177（×3）时求是网/侠客岛/新财富等只拿到 1 条，232（×4）后几乎每个源都 4 条 → **按「安静源能不能露脸」调**。改大 maxItems 见报总长会跟着涨（177→347 条 / 232→396 条）",
     "2026-11-11 加的 30 个源": "全部实测过（2026-11-11）：HTTP 200 + 合法 RSS + 最新条目 0~2 天前。**没加**：人民日报（公众号镜像推的是「梁家辉最佳男主角」「国民平价鱼」这种娱乐/生活向，跟时政要闻对不上）、BBC中文（繁体，简体站）、财新网/第一财经周刊（标题大半是「推广|特别呈现|活动招募」的商业活动稿）、InfoQ推荐（与 infoQ中文 同一批文章，重复）、V2EX首页（全站流水含灌水帖）、知乎日报/澎湃的 feedx.net 旧镜像（停更 325~416 天，过期闸门会全丢）、IT之家/极客公园/Solidot/开源中国（用户之前移除过，不许借镜像混回来）",
     "2026-11-12 加的 8 个 AI 源": "机器之心 / 新智元 / 硅星人Pro / AI前线 / Datawhale / 晚点LatePost / 集智俱乐部 / PaperWeekly。**全走 `wechat2rss.bestblogs.dev`**（站里已在用：APPSO、掘金技术社区）—— 因为这几家的**官网 RSS 都已经死了**（机器之心 /rss、/rss.xml、/atom.xml 三个地址全返回 HTML；PaperWeekly 域名不通；硅星人官网域名被抢跳 /lander 广告页），公众号镜像反而是唯一长期可用的通道。实测（2026-11-12）：8 个源 HTTP 200 + 合法 RSS + 近 7 天都有更新。**没加**：雷峰网公众号（官网源已在，文章重复）；智谱/通义/阶跃/DeepSeek 公众号（停更 8~115 天，过期闸门会全丢）；宝玉（停更 23 天）；TechNode（2000 条但全英文标题，违反只收中文）",
-    "换过的地址": "**APPSO（2026-11-12）**：配置里的地址被截断成 38 位（…4ae111e5b509609a5ee96c9894f1868fba）→ 一直 HTTP 500，之前记成「镜像上也没了」是错的；用户给的完整地址是 42 位 …4ae111e5b509609a5ee96c9894f1868fbafd793e.xml → 改完后 200 + 10 条 + 9 条带图 + 最新 11-11。 || 纽约时报中文：用户给的是 feedburner（http://feeds.feedburner.com/nytcn），实测 3 次里有 1 次要靠重试才过（24 秒），直连 cn.nytimes.com/rss 每次 1.2 秒 —— 内容一模一样，改用直连",
-    "重名的源": "「V2EX 热榜」有两个渠道（头条 Python 抓的 + RSS屋 镜像），共用同一个显示名。构建期有跨源去重，同一条链接只留一条",
+    "换过的地址": "**APPSO（2026-11-12）**：配置里的地址被截断成 38 位（…4ae111e5b509609a5ee96c9894f1868fba）→ 一直 HTTP 500，之前记成「镜像上也没了」是错的；用户给的完整地址是 42 位 …4ae111e5b509609a5ee96c9894f1868fbafd793e.xml → 改完后 200 + 10 条 + 9 条带图 + 最新 11-11。 || 纽约时报中文：用户给的是 feedburner（http://feeds.feedburner.com/nytcn），实测 3 次里有 1 次要靠重试才过（24 秒），直连 cn.nytimes.com/rss 每次 1.2 秒 —— 内容一模一样，改用直连 || 2026-11-25：直连 cn.nytimes.com/rss 的 **TLS 握手被网络层拦死**（ERR_SSL_SSL/TLS_ALERT_HANDSHAKE_FAILURE）→ 改走 `rsshub.bestblogs.dev/nytimes/world`",
+    "重名的源": "「V2EX 热榜」有两个渠道（头条 Python 抓的 + 官方 feed `www.v2ex.com/feed/tab/hot.xml`），共用同一个显示名。构建期有跨源去重，同一条链接只留一条",
     "2026-11-18 tophub/folo 补源": "新增机核/游研社/喷嚏网/豆瓣四源/财联社三源/豆瓣图书榜；maxItems=312。微博/头条/B站 RSSHub 本轮未加。",
     "2026-11-18 格式五板块白名单": "从 format-feeds.json（cutoff≥2026-01-01）每桶精选；Twitter 来自 BestBlogs_RSS_Twitters.opml（api.xgo.ing）。feed 可带 contentType。生成：node tools/build-format-catalog.mjs",
-    "2026-11-18 BestBlogs扩源": "expand-rss-from-catalog：+0 更新824 跳过体育等0；feeds=890 maxItems=2670"
+    "2026-11-18 BestBlogs扩源": "expand-rss-from-catalog：+0 更新824 跳过体育等0；feeds=890 maxItems=2670",
+    "2026-11-25 换掉的 3 个源（网络层被拦死）": "**根因不是源坏了，是这台机器的网络层把它们拦死了**（实测 Node 与 PowerShell 两种运行时都一样）：`rss.dw.com` DNS 解析成 **0.0.0.0**（污染）；`cn.nytimes.com` / `rss.mifaw.com` / `www.rfi.fr` 全部 **ERR_SSL_SSL/TLS_ALERT_HANDSHAKE_FAILURE**（TLS 握手被阻断）。**换域名解决不了**，必须走国内通道。实测结论：**官方 feed 反而更稳** —— V2EX 官方 `www.v2ex.com/feed/tab/hot.xml` 通（40 条，多轮稳定），而原来的 RSS屋镜像 `rss.mifaw.com` 挂 → **已改用官方地址**。纽约时报中文 → `rsshub.bestblogs.dev/nytimes/world`（10 条，中文标题，链接仍指向 cn.nytimes.com）。法广中文 → `rsshub.bestblogs.dev/rfi/cn`（44 条；直连 www.rfi.fr 同样被 TLS 拦死）。**德国之声中文已删除**：直连 DNS 被污染，且 RSSHub 上没有对应中文路由（dw/zh / dw/chinese / dw/chi 全 404，dw/news 是**英文**源，违反「只收中文」硬约束）→ 它的位置由**法广中文**接替（同为欧洲国际广播机构、同样有中文节目）。**注意 `rsshub.app` 公共实例已被风控（403）**，能用的是 `rsshub.bestblogs.dev`。"
   },
   "enabled": true,
   "perFeed": 6,
@@ -354,10 +355,6 @@
       "contentType": "article"
     },
     {
-      "name": "德国之声中文",
-      "url": "https://rss.dw.com/rdf/rss-chi-all"
-    },
-    {
       "name": "地球知识局",
       "url": "https://wechat2rss.bestblogs.dev/feed/c8500fccbf17324e8e865ef13e1fe972c946ee7c.xml",
       "contentType": "article"
@@ -474,7 +471,7 @@
     },
     {
       "name": "法广中文",
-      "url": "https://www.rfi.fr/cn/rss"
+      "url": "https://rsshub.bestblogs.dev/rfi/cn"
     },
     {
       "name": "帆书樊登讲书",
@@ -1287,7 +1284,7 @@
     },
     {
       "name": "纽约时报中文",
-      "url": "https://cn.nytimes.com/rss/"
+      "url": "https://rsshub.bestblogs.dev/nytimes/world"
     },
     {
       "name": "喔家ArchiSelf",
@@ -4288,7 +4285,7 @@
     },
     {
       "name": "V2EX 热榜",
-      "url": "https://rss.mifaw.com/articles/5c8bb11a3c41f61efd36683e/5c923e953882afa09dff573a"
+      "url": "https://www.v2ex.com/feed/tab/hot.xml"
     },
     {
       "name": "V2EX·技术",

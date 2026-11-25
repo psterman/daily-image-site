@@ -234,6 +234,13 @@ PHASH_INDEX = {}        # abs_path -> imagehash.ImageHash
 PHASH_THRESHOLD = 5    # 距离 ≤ 5 视为同一张图
 PHASH_EXTS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"}
 
+# pHash 增量缓存的**内存副本**（进程存活期间一直用这一份）：
+# 扫图时读进来，新下载的图随时登记进来，跑完再落盘。
+# 之所以不在每次登记时直接写文件：那会每加一张图就写一次整个 JSON
+# （7500 条目 → 每次几 MB 写盘，纯浪费）。攒到结束写一次就够。
+_PHASH_CACHE = {}
+_PHASH_CACHE_DIRTY = False
+
 # 福利吧每张图的「逐张判据结论」缓存：文件名 -> 是否写真
 # 段级归并要按段统计写真占比，总不能再把每张图重新判一遍。
 FULIBA_JUDGE = {}
@@ -289,12 +296,133 @@ def cat_dir_for(category, target_date=None):
     return out
 
 
+def _phash_cache_path():
+    """pHash 增量缓存文件的位置。
+
+    放在**图库根目录的上一级**（OUT_BASE 的父目录），
+    跟台账 `.fetch-ledger.json` 一样放在工程根 —— 图库目录本身会被
+    「只保留最近 N 天」之类的清理逻辑扫过，缓存不该跟着图一起没。
+    """
+    return os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+        ".phash-cache.json",
+    )
+
+
+def _phash_cache_load():
+    """读 pHash 缓存 -> {abs_path: [mtime_ns, size, hash_hex]}。
+
+    读不出来（文件不存在 / JSON 坏了 / 结构不对）→ 返回空 dict，
+    **绝不抛异常**：缓存只是加速器，坏了就退化成全量重算，
+    不能因此让整轮抓图失败。
+    """
+    p = _phash_cache_path()
+    try:
+        if not os.path.isfile(p):
+            return {}
+        with open(p, "r", encoding="utf-8") as f:
+            raw = json.load(f)
+        if not isinstance(raw, dict):
+            return {}
+        out = {}
+        for k, v in raw.items():
+            # 结构校验：必须是 [int, int, str] 三元组
+            if (isinstance(v, list) and len(v) == 3
+                    and isinstance(v[0], int) and isinstance(v[1], int)
+                    and isinstance(v[2], str)):
+                out[k] = v
+        return out
+    except Exception as e:
+        log.debug(f"phash cache load failed: {e}")
+        return {}
+
+
+def _phash_cache_save(cache):
+    """把 pHash 缓存原子写回磁盘（先写临时文件再改名 → 不会被写一半的进程搞坏）。
+
+    写失败只记日志，不抛 —— 缓存写不进去只是「明天多花 95 秒」，不该让整轮失败。
+    """
+    p = _phash_cache_path()
+    try:
+        tmp = p + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(cache, f, ensure_ascii=False)
+        os.replace(tmp, p)
+    except Exception as e:
+        log.warning(f"phash cache save failed: {e}")
+
+
+def _phash_cache_register(path, h):
+    """把一张刚下载/刚算出的图登记进 pHash 缓存（path -> [mtime_ns, size, hash]）。
+
+    记的是**文件当前的 mtime 和 size** —— 下次扫描时若文件没变，
+    就能直接复用这个 hash，不用再打开图片。
+
+    ⚠️ **必须 `global`**（2026-11-25 踩过）：
+      Python 里**赋值即声明局部变量** —— 不写 `global` 的话，
+      下面这行 `_PHASH_CACHE_DIRTY = True` 会创建**函数局部变量**，
+      模块级的那个标志**永远不会被置成 True**
+      → 缓存攒了一整晚，回调时却因为「不脏」而不落盘 → 新图白算。
+    """
+    global _PHASH_CACHE_DIRTY
+    try:
+        st = os.stat(path)
+        cache = _PHASH_CACHE
+        cache[path] = [st.st_mtime_ns, st.st_size, str(h)]
+        _PHASH_CACHE_DIRTY = True
+    except OSError:
+        pass
+
+
+def _phash_cache_move(src, dst, h):
+    """文件被移动（src → dst）时同步更新缓存条目。
+
+    移动会保留 mtime，但**路径变了** → 缓存里必须换成新路径，
+    否则下次扫描时旧路径的条目会被当成「已不存在的文件」清掉，
+    新路径又要重算一遍（白费一次全量扫描的收益）。
+
+    ⚠️ **必须 `global`** —— 同 _phash_cache_register 的说明：
+      赋值即声明局部变量，不写 global 的话标志传不到模块级。
+    """
+    global _PHASH_CACHE_DIRTY
+    try:
+        st = os.stat(dst)
+        cache = _PHASH_CACHE
+        cache.pop(src, None)
+        cache[dst] = [st.st_mtime_ns, st.st_size, str(h)]
+        _PHASH_CACHE_DIRTY = True
+    except OSError:
+        pass
+
+
 def phash_scan_existing():
     """启动时扫一遍所有目录已有图，建立 pHash 索引。
     跨日期也要去重：今天新下载的图如果和昨天/前天的图 pHash 距离 ≤5，
     仍然算重复，不下载新文件。
+
+    ⚠️ **为什么要增量缓存**（2026-11-25 加）：
+      原来每晚都把整个图库（跨所有日期目录）逐张打开、逐张算 pHash。
+      实测 7414 张要 **94 秒**，而且**随图库线性增长**（9 天涨 42%：
+      5269 → 7504 张，扫描耗时 97 → 161 秒）→ 这段纯 CPU 开销每天都在涨，
+      却对「当天要发什么」毫无贡献（真正决定当天结果的是当天新下载的图）。
+
+      改成**按 (path, mtime, size) 缓存 hash**：
+        · 文件没变 → 直接复用上次的 hash，**不再打开图片、不再算 pHash**；
+        · 文件变了（被删/被改/新加）→ 重算那一张。
+      稳态下每晚只需重算「当天新增的那几百张」，耗时从 ~95 秒掉到 ~1 秒。
+
+      ⚠️ **缓存键必须含 mtime 和 size**：只按 path 缓存的话，
+      同名文件被覆盖（审稿台删图重发、福利吧改图）会算出**过期的 hash**
+      → 跨目录去重会用错误的 hash 判重 → 真重复漏拦 / 误删真图。
     """
+    cache = _phash_cache_load()
+    _PHASH_CACHE.clear()
+    _PHASH_CACHE.update(cache)
+    global _PHASH_CACHE_DIRTY
+    _PHASH_CACHE_DIRTY = False
+    dirty = False
     cnt = 0
+    reused = 0
     for d in _all_root_dirs():
         if not os.path.isdir(d):
             continue
@@ -305,13 +433,46 @@ def phash_scan_existing():
             if os.path.splitext(fn)[1].lower() not in PHASH_EXTS:
                 continue
             try:
+                st = os.stat(p)
+            except OSError as e:
+                log.debug(f"phash stat skip {p}: {e}")
+                continue
+            key = (st.st_mtime_ns, st.st_size)
+            cached = cache.get(p)
+            # ⚠️ mtime **和** size 都要一致才算命中：
+            # 只比 mtime 的话，某些工具「保持 mtime 但换了内容」时
+            # 会拿到过期 hash → 用错的 hash 判重 → 真重复漏拦 / 误删真图。
+            if cached is not None and cached[0] == key[0] and cached[1] == key[1]:
+                # 文件没动过 → 复用上次算好的 hash（不打开图片）
+                try:
+                    PHASH_INDEX[p] = imagehash.hex_to_hash(cached[2])
+                    reused += 1
+                    cnt += 1
+                    continue
+                except Exception as e:
+                    log.debug(f"phash cache unusable {p}: {e}")
+                    cache.pop(p, None)
+                    dirty = True
+            try:
                 with Image.open(p) as im:
-                    PHASH_INDEX[p] = imagehash.phash(im, hash_size=8)
+                    h = imagehash.phash(im, hash_size=8)
+                PHASH_INDEX[p] = h
+                cache[p] = [key[0], key[1], str(h)]
+                dirty = True
                 cnt += 1
             except Exception as e:
                 log.debug(f"phash skip {p}: {e}")
-    log.info(f"pHash 索引：扫描到 {cnt} 张已有图片")
-
+    # 缓存里已经不存在的文件（被审稿台删掉的）→ 清掉，否则缓存无限膨胀
+    live = set(PHASH_INDEX.keys())
+    stale = [k for k in cache if k not in live]
+    for k in stale:
+        cache.pop(k, None)
+    if stale:
+        dirty = True
+    if dirty:
+        _phash_cache_save(cache)
+    log.info(f"pHash 索引：扫描到 {cnt} 张已有图片"
+             f"（命中缓存 {reused} 张，重新计算 {cnt - reused} 张）")
 
 def phash_check_and_cleanup(path, threshold=None):
     """下载完成后做一次 pHash 检查：若与索引内任何图距离 ≤ 阈值，
@@ -350,6 +511,7 @@ def phash_check_and_cleanup(path, threshold=None):
                      f"{os.path.basename(existing_path)} 距离 {d})")
             return True
     PHASH_INDEX[path] = new_h
+    _phash_cache_register(path, new_h)
     return False
 
 
@@ -1449,6 +1611,8 @@ def _move_into_cat(src, dst_dir):
         h = PHASH_INDEX.pop(src, None)
         if h is not None:
             PHASH_INDEX[dst] = h
+            # 换了路径 → 缓存里的旧路径也要跟着换，否则缓存会指向不存在的文件
+            _phash_cache_move(src, dst, h)
     return dst
 
 
@@ -1616,6 +1780,58 @@ def split_fuliba_by_portrait(target_date):
 
 # ==================== 入口 ====================
 
+# ==================== 抓图总时间预算 ====================
+#
+# ⚠️ **为什么要有预算**（2026-11-25 加）：
+#   夜间发布从 00:10 起跑，而**这台机器每晚 01:12~03:12 自动关机**（用户习惯）。
+#   2026-11-17 那晚发布 00:22:16 结束、00:27:37 关机 —— **余量只有 5.3 分钟**。
+#   抓图耗时会随上游波动剧烈变化（实测 446 / 573 / 675 / 638 / **1701** 秒），
+#   上游一慢（t.me read timeout=20 反复出现）就可能**跑到一半被关机硬杀** ——
+#   这正是历史上 11-14/11-15 那两次「进程被硬杀、查不到原因」的形态。
+#
+#   所以给**抓图阶段**一个总预算：超了就**带着已抓到的素材继续**，
+#   剩下的源跳过 → 少几张图，但这一期照样能按时发出去。
+#   （宁可少图，不可发不出去 —— 站点空着比少几张图严重得多。）
+#
+#   预算只作用于**抓图**这一步，不影响后面的构建/上传/部署。
+#   0 = 不限（手动跑时用）。
+GRAB_BUDGET_SEC = int(os.environ.get("MEMES_GRAB_BUDGET_SEC", "0") or 0)
+_GRAB_DEADLINE = None      # time.monotonic() 绝对截止时刻
+
+
+def _grab_budget_start():
+    """开始计时：设定整轮抓图的截止时刻。
+
+    单独调一个函数（而不是在模块导入时算），是为了让**测试**可以
+    在导入之后再设置预算 —— 模块导入时 `time.monotonic()` 的基准
+    会让测试没法构造「已经超时」的场景。
+    """
+    global _GRAB_DEADLINE, GRAB_BUDGET_SEC
+    if GRAB_BUDGET_SEC > 0:
+        _GRAB_DEADLINE = time.monotonic() + GRAB_BUDGET_SEC
+        log.info(f"抓图时间预算：{GRAB_BUDGET_SEC} 秒"
+                 f"（超了就带着已有素材继续，剩下的源跳过）")
+    else:
+        _GRAB_DEADLINE = None
+        log.info("抓图时间预算：不限")
+
+
+def _grab_budget_exhausted(name):
+    """预算用完了吗？用完了就跳过这个源并记一笔。
+
+    返回 True = 该跳过。**只在源之间检查**（不是每张图都查），
+    因为单个源内部没法安全地中断 —— 半途停止会留下不完整的素材。
+    """
+    if _GRAB_DEADLINE is None:
+        return False
+    left = _GRAB_DEADLINE - time.monotonic()
+    if left > 0:
+        return False
+    log.warning(f"  ! 抓图时间预算已用尽 —— 跳过「{name}」"
+                f"（这一期的图会少一些，但能按时发出去）")
+    return True
+
+
 def main():
     target_arg = None
     if "--date" in sys.argv:
@@ -1627,6 +1843,10 @@ def main():
     log.info(f"目标日期: {target.isoformat()}  (参数: {target_arg or '<昨天>'})")
     log.info(f"UTC 区间: {start_utc}  ~  {end_utc}")
 
+    # 抓图总时间预算：从**这一刻**开始算（不含下面建索引的时间，
+    # 因为那步现在走缓存、只要 1 秒左右，见 phash_scan_existing 的说明）。
+    _grab_budget_start()
+
     # 启动时建好 pHash 索引，跨日期/跨目录去重
     phash_scan_existing()
 
@@ -1637,6 +1857,8 @@ def main():
 
     # 1) Telegram 三频道
     for ch in TG_CHANNELS:
+        if _grab_budget_exhausted("TG " + ch["label"]):
+            continue
         try:
             grab_telegram_channel(ch["user"], ch["label"], start_utc, end_utc, target)
         except Exception as e:
@@ -1644,17 +1866,19 @@ def main():
         LEDGER.save()
 
     # 2) 喷嚏图卦
-    try:
-        grab_dapenti_tugua(target)
-    except Exception as e:
-        log.exception(f"喷嚏图卦 抓取失败: {e}")
+    if not _grab_budget_exhausted("喷嚏图卦"):
+        try:
+            grab_dapenti_tugua(target)
+        except Exception as e:
+            log.exception(f"喷嚏图卦 抓取失败: {e}")
     LEDGER.save()
 
     # 3) 福利吧（边下边分流：下载完一张立刻判类归位）
-    try:
-        grab_fuliba(target)
-    except Exception as e:
-        log.exception(f"福利吧 抓取失败: {e}")
+    if not _grab_budget_exhausted("福利吧"):
+        try:
+            grab_fuliba(target)
+        except Exception as e:
+            log.exception(f"福利吧 抓取失败: {e}")
     LEDGER.save()
 
     # 3b) 福利吧兜底分流：处理临时目录里残留的图（正常跑完是空的）
@@ -1672,11 +1896,26 @@ def main():
         log.exception(f"福利吧段级归并失败: {e}")
 
     # 4) 煎蛋网女装区
-    try:
-        grab_jandan_beauty(target)
-    except Exception as e:
-        log.exception(f"煎蛋网女装区 抓取失败: {e}")
+    if not _grab_budget_exhausted("煎蛋网女装区"):
+        try:
+            grab_jandan_beauty(target)
+        except Exception as e:
+            log.exception(f"煎蛋网女装区 抓取失败: {e}")
     LEDGER.save()
+
+    # pHash 增量缓存落盘（整轮跑完写一次；期间新下载的图已登记在内存副本里）
+    #
+    # ⚠️ **必须 `global`**（2026-11-25 踩过）：
+    #   Python 里**赋值即声明局部变量** —— 只写 `if _PHASH_CACHE_DIRTY:` 再
+    #   `_PHASH_CACHE_DIRTY = False`，这两行会让 Python 把整个 main() 里的
+    #   `_PHASH_CACHE_DIRTY` 当**函数局部变量** → 读到未赋值 →
+    #   `UnboundLocalError: cannot access local variable '_PHASH_CACHE_DIRTY'`。
+    #   而这行是**流程末尾**才执行的 → 整个抓图轮次在最后一步崩掉，
+    #   前面的图都白抓了（2026-11-25 端到端实测踩到）。
+    global _PHASH_CACHE_DIRTY
+    if _PHASH_CACHE_DIRTY:
+        _phash_cache_save(_PHASH_CACHE)
+        _PHASH_CACHE_DIRTY = False
 
     _ls = LEDGER.stats()
     log.info(f"抓取台账已更新: {_ls['urls']} 个 URL / {_ls['articles']} 篇文章")

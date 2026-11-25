@@ -174,6 +174,17 @@ if (-not $NoGrab) {
   Step '1/5 抓图 + 目录分流'
   $grabArgs = @('tools/grab/daily_grab_all.py', '--date', $ContentDate)
   if ($Out) { $grabArgs += @('--out', $Out) }
+  # ⚠️ **抓图时间预算**（2026-11-25 加）：
+  #   抓图耗时随上游波动剧烈（实测 446 / 573 / 675 / 638 / 1701 秒），
+  #   而这台机器每晚 01:12~03:12 自动关机、发布 00:10 起跑
+  #   → 上游一慢就可能**跑到一半被关机硬杀**（历史上 11-14/11-15 就是这个形态）。
+  #   给它一个总预算：超了就带着已抓到的素材继续，剩下的源跳过
+  #   → 宁可少几张图，这一期也要按时发出去。
+  #
+  #   0 = 不限（默认，手动跑时保持原行为）。夜间流程由 night-publish.ps1 传 1500 秒（25 分钟）。
+  $budget = [int]$env:MEMES_GRAB_BUDGET_SEC
+  if ($budget -lt 0) { $budget = 0 }
+  $env:MEMES_GRAB_BUDGET_SEC = "$budget"
   & $py @grabArgs | Out-Host
   if ($LASTEXITCODE -ne 0) { throw "抓图失败（exit $LASTEXITCODE）" }
 } else {

@@ -55,3 +55,14 @@ tools/grab/models/
 .night-dashboard.pid
 .night-dashboard.out.log
 .night-dashboard.err.log
+
+# pHash 增量缓存（2026-11-25 加）
+# 它是**本机加速器**，每晚会重写；进仓库只会制造无意义的 diff。
+.phash-cache.json
+.phash-cache.json.tmp
+
+# 看门狗（2026-11-25 加）的控制台日志 + 轮转产生的历史
+.night-watchdog-console.log
+.night-watchdog-console.log.*
+.night-publish-console.log.*
+.daily-review.log.*

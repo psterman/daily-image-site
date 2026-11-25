@@ -134,6 +134,13 @@ try {
   # ── 1/2 准备 ───────────────────────────────────────────────
   Write-Host ''
   Write-Host '  [1/2] 准备（抓图 → 头条 → 清洗 → 构建 → 自检）' -ForegroundColor Cyan
+  # 抓图总时间预算（秒）。给「抓图」这一步封顶：上游一慢（t.me read timeout
+  # 反复出现）就可能跑到一半被关机硬杀 —— 机器每晚 01:12~03:12 自动关机，
+  # 而这一轮 00:10 起跑（2026-11-17 那晚余量只剩 5.3 分钟）。
+  # 超预算就带着已抓到的素材继续（少几张图，但这一期照样按时发出去）。
+  # 25 分钟 = 1500 秒：实测最慢的一晚是 28 分钟，25 分钟留得住；
+  # 也远低于「离关机至少还有 45 分钟」的余量。
+  $env:MEMES_GRAB_BUDGET_SEC = '1500'
   $rc = Invoke-Child (Get-ShellExe) @(
     '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', (Get-ToolPath -Root $Root -Name 'daily-review.ps1'),
     '-SkipReview', '-NoBrowser'
@@ -152,6 +159,22 @@ try {
   $exitCode = 1
   Write-Host ''
   Write-Host ('夜间流程失败：' + $_.Exception.Message) -ForegroundColor Red
+
+  # ── 失败告警（2026-11-25 加）─────────────────────────────────
+  #
+  # 为什么在这里发：原来**只有定时任务台**（night-dashboard.mjs）在它自己
+  # 判定出错时才发 toast，而任务台是**手动起的 GUI 进程**、没有任何自启动
+  # （机器每次重启就没了）→ 夜里发布失败时**一个通知都不会发**。
+  # 现在由夜间脚本自己发 —— 不依赖任何常驻进程。
+  #
+  # 失败才发（成功不发）；通知发不出去也不影响主流程（Send-Alert 内部吞异常）。
+  try {
+    Send-Alert -Root $Root -Title '夜间发布失败' -Body (
+      "期号 {0}`n原因：{1}`n日志：{2}" -f $Date, $_.Exception.Message, $LogFile
+    )
+  } catch {
+    # 静默降级 —— 通知永远不能掀翻主流程
+  }
 }
 
 # 标记 + 结束标记
@@ -173,4 +196,25 @@ if ($exitCode -eq 0) {
 } else {
   Write-Host ("  夜间发布失败（$Date）。日志：$LogFile") -ForegroundColor Red
 }
+
+# ── 日志轮转 ────────────────────────────────────────────────
+#
+# `.night-publish-console.log` / `.daily-review.log` 是 `cmd >>` 写出来的 ——
+# **只追加、永不清理**（实测 11 天涨到 505 KB / 664 KB，一年能到十几 MB，
+# 而且每次排查都要 tail 它 → 越大越慢）。
+#
+# 轮转放在**最后**（成功和失败都轮）：切历史 + 原地清空，保留最近 7 份。
+# 轮转失败绝不影响发布结果（它只是清磁盘）。
+try {
+  $rotate = Get-ToolPath -Root $Root -Name 'rotate-logs.mjs'
+  if (Test-Path $rotate) {
+    $node = Get-Command node -ErrorAction SilentlyContinue
+    if ($node) {
+      & $node.Source $rotate | Out-Null
+    }
+  }
+} catch {
+  # 轮转失败就失败 —— 不影响发布
+}
+
 exit $exitCode
