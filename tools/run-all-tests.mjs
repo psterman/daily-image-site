@@ -2,7 +2,7 @@
 /**
  * 全量护栏跑批器。
  *
- *   node tools/run-all-tests.mjs              # 跑 38 个常规套件
+ *   node tools/run-all-tests.mjs              # 跑 39 个常规套件
  *   node tools/run-all-tests.mjs --mutate     # 连变异套件一起跑（慢，但能证明护栏有牙齿）
  *   node tools/run-all-tests.mjs --only=lqip  # 只跑名字里含 lqip 的套件
  *

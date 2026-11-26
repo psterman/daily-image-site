@@ -274,6 +274,16 @@ button { font-family: inherit; }
   transform: translateZ(0);
 }
 
+/* 格子里的图包在 <a> 里（微信长按图片 → 链接菜单 →「发送给朋友」发出去是带缩略图的卡片）。
+   只加 display:block —— **不能动格子的宽高比占位**（padding-top 百分比）：
+   多包一层 <a> 不该改变图片的渲染尺寸，图片仍是 .cell 的绝对定位子元素
+   （参照系还是 .cell，不是新加的那层）。
+   cursor:inherit 是为了保住格子原本的 zoom-in 光标（<a> 默认会变成 pointer）。 */
+.cell-link {
+  display: block;
+  cursor: inherit;
+}
+
 /* 模糊占位（blur-up）。
    LQIP 是一张 24px 宽的小图，以 base64 data URI 内联在 manifest 里 ——
    浏览器**零额外请求**就能立刻画出来，大图到位后再盖上去，
@@ -517,6 +527,22 @@ button { font-family: inherit; }
    按钮渲染成「💬 0评论这张图」，数字和文案贴死（真实 Chrome 实测 0px）。 */
 .vbtn > span + span { margin-left: 6px; }
 .vbtn-like.is-on .vbtn-ico { -webkit-filter: saturate(1.4); filter: saturate(1.4); }
+
+/* 「看原帖」没有上游地址时整个元素不显示 ——
+   .vbtn 自带 display:inline-flex，**会把 [hidden] 的 display:none 顶掉**
+   （作者样式优先于 UA 样式），所以必须自己再写一条（同 .like-badge[hidden] 的写法）。 */
+.vbtn[hidden] { display: none; }
+
+/* 加了「复制链接 / 原图 / 看原帖」之后，390px 的手机上一行放不下 → 允许换行。
+   文字不许断行（否则「复制链接」被挤成两行，按钮高度就跳了）。
+   下面两条是**新规则**，不动上面 .viewer-actions / .vbtn 的既有声明。 */
+.viewer-actions {
+  -webkit-flex-wrap: wrap;
+  flex-wrap: wrap;
+}
+.viewer-actions .vbtn {
+  white-space: nowrap;
+}
 
 /* ── 缩略图格子的赞数角标（只显示，不可点） ── */
 .like-badge {

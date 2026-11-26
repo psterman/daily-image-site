@@ -117,7 +117,49 @@
     }
   }
 
-  /** 查看器底部的赞数 / 评论数 / 评论链接 */
+  /* ─────────────── 单图页链接（分享用） ─────────────── */
+
+  /**
+   * 单图页的**相对**路径：/pic/<日期>/<栏key>/<序号3位>/
+   *
+   * 为什么写相对路径、不写死域名：这套产物有两个副本（正式站 / 脱敏副本），
+   * 写死域名的话脱敏副本给出的链接会指向正式站 —— 分享出去的卡片直接串台。
+   * 相对路径在哪个域名下都指向「当前这个站」。
+   * 只有「复制链接」的时候才拼成绝对地址（贴到微信里必须是绝对的，相对路径别人点不开）。
+   *
+   * 为什么是 /pic/：另一个功能（公开成果页）占了 /p/ 前缀，
+   * 两条功能都用 /p/ 的话部署时会互相覆盖（Pages 同一路径只能有一个 Function）。 */
+  function pagePath(tabKey, index) {
+    return '/pic/' + encodeURIComponent(DATA.date) + '/' +
+      encodeURIComponent(tabKey) + '/' +
+      String(index + 1).padStart(3, '0') + '/';
+  }
+
+  /** 当前站点的绝对地址前缀（很老的内核没有 location.origin，兜一层）。 */
+  function siteOrigin() {
+    return location.origin || (location.protocol + '//' + location.host);
+  }
+
+  /** 单图页的绝对地址（复制链接 / 贴微信用）。 */
+  function pageUrl(tabKey, index) {
+    return siteOrigin() + pagePath(tabKey, index);
+  }
+
+  /**
+   * 站内相对路径 → 绝对地址。
+   *
+   * manifest 里的 thumb/full 是 /img/... 这种相对路径（两个域名副本通用），
+   * 但「原图」链接要发到微信 / 新标签页打开 → 必须是绝对地址。
+   * 已经是 http(s) 的原样返回（协议校验走 safeHref —— 全站只那一处）。 */
+  function absoluteUrl(p) {
+    if (!p || typeof p !== 'string') return '';
+    var abs = safeHref(p);
+    if (abs) return abs;
+    if (p.charAt(0) !== '/') return '';
+    return siteOrigin() + p;
+  }
+
+  /** 查看器底部的赞数 / 评论数 / 评论链接 + 分享三件套（复制链接 / 原图 / 看原帖） */
   function syncViewerActions() {
     var likeBtn = document.getElementById('viewerLike');
     var cmtLink = document.getElementById('viewerComment');
@@ -142,6 +184,24 @@
         '&id=' + encodeURIComponent(id) +
         '&thumb=' + encodeURIComponent(entry.item.thumb),
     );
+
+    /* 分享三件套 —— 全部跟着**当前查看的那张图**走（vTab / vIndex）。
+       「看原帖」只有上游给了地址才有（目前只有见笑有），
+       没有就**整个元素不显示**，不能留一个点了没反应的空按钮。 */
+    var origLink = document.getElementById('viewerOriginal');
+    if (origLink) origLink.setAttribute('href', absoluteUrl(entry.item.full));
+
+    var originLink = document.getElementById('viewerOrigin');
+    if (originLink) {
+      var upstream = safeHref(entry.item.src);
+      if (upstream) {
+        originLink.setAttribute('href', upstream);
+        originLink.hidden = false;
+      } else {
+        originLink.removeAttribute('href');
+        originLink.hidden = true;
+      }
+    }
   }
 
   /** 点赞：幂等切换，on = 目标状态 */
@@ -169,6 +229,69 @@
       })
       .catch(function () { /* 静默失败：角标还是上一个值 */ })
       .then(function () { if (btn) btn.disabled = false; });
+  }
+
+  /* ─────────────── 复制单图页链接 ─────────────── */
+
+  /**
+   * 「复制链接」：把当前这张图的单图页地址复制到剪贴板。
+   *
+   * 两条路都得有：
+   *   ① navigator.clipboard.writeText —— 现代浏览器
+   *   ② 隐藏 textarea + document.execCommand('copy') ——
+   *      **老安卓微信（X5 内核）没有 clipboard API**，只有这一条路能用
+   * 两条都不成也要给个说法（提示手动复制地址栏），不能静默。
+   *
+   * 复制的是**绝对**地址：贴到微信里必须是绝对的，相对路径别人点不开。 */
+  function copyPageLink() {
+    var s = state[vTab];
+    var entry = s && s.cells ? s.cells[vIndex] : null;
+    if (!entry || !entry.item) return;
+    var url = pageUrl(vTab, vIndex);
+    var clip = navigator.clipboard;
+    if (clip && typeof clip.writeText === 'function') {
+      try {
+        clip.writeText(url).then(function () {
+          showHint(2200, '链接已复制');
+        }).catch(function () {
+          fallbackCopy(url);
+        });
+        return;
+      } catch (e) {
+        /* 不给 clipboard 的环境（非安全上下文 / 权限被拒）→ 走降级 */
+      }
+    }
+    fallbackCopy(url);
+  }
+
+  /** 降级复制：隐藏 textarea + execCommand('copy')（老安卓微信 X5 只有这一条路）。 */
+  function fallbackCopy(text) {
+    var ok = false;
+    var ta = null;
+    try {
+      ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', 'readonly');   /* readonly：手机上不弹键盘 */
+      /* 不能 display:none —— 那样选不中；缩到 1px 透明就行 */
+      ta.style.position = 'fixed';
+      ta.style.top = '0';
+      ta.style.left = '0';
+      ta.style.width = '1px';
+      ta.style.height = '1px';
+      ta.style.padding = '0';
+      ta.style.border = '0';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      ta.setSelectionRange(0, text.length);
+      ok = document.execCommand('copy');
+    } catch (e) {
+      ok = false;
+    } finally {
+      if (ta && ta.parentNode) ta.parentNode.removeChild(ta);
+    }
+    showHint(2600, ok ? '链接已复制' : '复制失败，请手动复制地址栏');
   }
 
   if (!DATA) {
@@ -279,13 +402,22 @@
         cell.setAttribute('data-tab', tab.key);
         cell.style.paddingTop = (item.th / item.tw * 100).toFixed(4) + '%';
 
+        /* 图包在 <a> 里：微信里长按一张被 <a> 包住的图片，给的是**链接菜单**
+           （复制链接 / 发送给朋友），「发送给朋友」发出去就是**带缩略图的卡片**；
+           不包 <a> 的话发出去是纯图片，链接就没了。
+           href 用**相对路径**（正式站 / 脱敏副本两个域名下都对）。 */
+        var link = document.createElement('a');
+        link.className = 'cell-link';
+        link.setAttribute('href', pagePath(tab.key, i));
+
         var img = document.createElement('img');
         img.alt = tab.label + ' ' + (i + 1);
         img.setAttribute('data-src', item.thumb);
         img.width = item.tw;
         img.height = item.th;
         img.decoding = 'async';
-        cell.appendChild(img);
+        link.appendChild(img);
+        cell.appendChild(link);
 
         /* 模糊占位：LQIP 是 24px 的小图，以 base64 data URI 内联在 manifest 里。
            零额外请求 —— 首屏立刻有内容感，不用等缩略图下载完。
@@ -295,7 +427,13 @@
           cell.style.setProperty('--lqip', 'url("' + item.lqip + '")');
         }
 
-        cell.addEventListener('click', function () {
+        cell.addEventListener('click', function (e) {
+          /* 包了 <a> 之后点击会触发链接跳转 —— 这里拦住，
+             点图仍然是打开查看器。
+             带修饰键的点击（Ctrl/Cmd/Shift）不拦：那是用户想「在新标签页打开」，
+             右键菜单里的「在新标签页打开」也是同一个道理。 */
+          if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+          e.preventDefault();
           openViewer(tab.key, i);
         });
 
@@ -1908,11 +2046,20 @@
   });
 
   var hintTimer = null;
-  function showHint(delay) {
+  var HINT_DEFAULT = '左右滑动切换 · 双击放大 · 长按可保存';
+  /**
+   * 查看器底部那行提示。
+   * @param {number} delay 多久之后自动收回去
+   * @param {string} [text] 要显示的文字；不给就用默认那句。
+   *   「链接已复制」这类临时提示靠这个参数，收回时自动换回默认文案，
+   *   免得下一张图还挂着「链接已复制」。 */
+  function showHint(delay, text) {
+    viewerHint.textContent = text === undefined ? HINT_DEFAULT : text;
     viewerHint.className = 'viewer-hint';
     if (hintTimer) clearTimeout(hintTimer);
     hintTimer = setTimeout(function () {
       viewerHint.className = 'viewer-hint is-hidden';
+      viewerHint.textContent = HINT_DEFAULT;
     }, delay);
   }
 
@@ -1958,5 +2105,14 @@
   document.getElementById('viewerLike').addEventListener('click', function () {
     toggleLike();
   });
+
+  /* 「复制链接」：复制当前这张图的单图页地址（老安卓微信走降级路径） */
+  var viewerShare = document.getElementById('viewerShare');
+  if (viewerShare) {
+    viewerShare.addEventListener('click', function () {
+      copyPageLink();
+    });
+  }
+
   loadSocial(DATA.date);
 })();

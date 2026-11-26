@@ -27,6 +27,8 @@ import { isMediaTab, isTextTab } from './tab-kinds.mjs';
 import { composeOgImage, ogImageUrl } from './build-og.mjs';
 import { buildFeedXml } from './build-feed.mjs';
 import { makeLqipDataUris } from './build-lqip.mjs';
+import { buildCards, cardRelPath } from './build-cards.mjs';
+import { upstreamUrlFor } from './upstream-url.mjs';
 import {
   ROOT,
   R2_LOCAL,
@@ -1326,6 +1328,9 @@ async function main() {
     const tabSrcDir = path.join(srcRoot, tab.dir);
     const destDir = path.join(r2Dir, tab.key);
     let files = [];
+    // 卡片图任务（当期）：每张媒体图配一张 JPEG 卡片，微信分享卡片用。
+    // 产物走 published/<日期>/card/<栏key>/，**不走 R2**（R2 那条管道只认 .webp 命名）。
+    const cardJobs = [];
     try {
       files = (await fs.readdir(tabSrcDir, { withFileTypes: true }))
         .filter((d) => d.isFile() && /\.(jpe?g|png|gif|webp|bmp)$/i.test(d.name))
@@ -1338,6 +1343,16 @@ async function main() {
         console.log(`  ~ ${tab.dir}/ 源图缺失，从已转码产物重建 ${rebuilt.count} 张`);
         manifest.tabs.push(rebuilt);
         rebuiltMode = true;
+        // 源图没了但产物还在 —— 卡片图照样能出（源就是已转码的全尺寸 webp）。
+        // 不补这一步的话，这次构建会把 published/<日期>/ 整个重建（卡片目录被清掉），
+        // 而卡片再也不会回来 —— 补建/往期就会静默丢掉分享缩略图。
+        for (const it of rebuilt.items || []) {
+          const webpName = path.basename(it.full);
+          cardJobs.push({
+            src: path.join(destDir, webpName),
+            out: path.join(publishedDir, cardRelPath(tab.key, webpName)),
+          });
+        }
         continue;
       }
       console.log(`  ! ${tab.dir}/ 不存在，跳过`);
@@ -1452,6 +1467,10 @@ async function main() {
       totalFull += fullSize;
       totalThumb += thumbSize;
 
+      // 上游原帖链接：从**源文件名**反解（规则在 tools/upstream-url.mjs，是唯一真源）。
+      // 构建期才拿得到原始文件名 —— 运行期反解就得在 manifest 里另存一份文件名。
+      const upstream = upstreamUrlFor(tab.key, name);
+
       const item = {
         id: `${tab.key}_${id}`,
         w: full.W,
@@ -1461,8 +1480,17 @@ async function main() {
         // URL 里文件名自带不可猜的随机段，路径无法被枚举
         thumb: `${imageBase}/${date}/${relThumb}`,
         full: `${imageBase}/${date}/${relFull}`,
+        // 上游原帖链接：反解不出来就**整个键不出现**（不写 null、不写空串）——
+        // 前端只要判断 item.src 存不存在就行。
+        ...(upstream ? { src: upstream } : {}),
       };
       items.push(item);
+      /* 卡片图（当期）：这张图配一张 JPEG 卡片，文件名跟全图产物同名（只换扩展名），
+         前端把 manifest 里的 .webp 换成同名 .jpg 就能定位到。 */
+      cardJobs.push({
+        src: destFull,
+        out: path.join(publishedDir, cardRelPath(tab.key, path.basename(relFull))),
+      });
       /* 模糊占位（LQIP）的素材：**缩略图**文件 ——
          网格里显示的就是它，小图从它缩出来最省事。
          注意是母本里的本地路径，不是 manifest 里的 URL。 */
@@ -1476,6 +1504,18 @@ async function main() {
       );
     }
     process.stdout.write('\n');
+
+    /* 卡片图（当期）：这一栏每张图配一张 JPEG 卡片（等比长边 900、质量 70）。
+       只给**当期**生成 —— 往期不动（往期没有 card/ 目录，单图页要能降级）。
+       --keep-manifest 也要生成：卡片图是新增的前端资源，不是内容改动。
+       单张转码失败只跳过那一张，不让整次构建失败。 */
+    if (cardJobs.length) {
+      const cards = await buildCards({ ffmpeg, jobs: cardJobs });
+      console.log(
+        `  · 卡片图：${cards.ok}/${cards.total} 张` +
+        `（${(cards.bytes / 1024 / 1024).toFixed(1)}MB）`,
+      );
+    }
 
     // 旧产物清理：按「本轮实际产出的文件名白名单」删，
     // 不是按「序号 > 新数量」删。

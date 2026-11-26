@@ -99,14 +99,27 @@
     <img id="viewerImg" alt="">
   </div>
   <div class="viewer-hint" id="viewerHint">左右滑动切换 · 双击放大 · 长按可保存</div>
-  <!-- 点赞 + 评论这张图。放在 stage 下面，不挡图。
-       缩略图格子上只显示赞数角标，真正能点的是这里。 -->
+  <!-- 点赞 + 评论这张图 + 分享三件套。放在 stage 下面，不挡图。
+       缩略图格子上只显示赞数角标，真正能点的是这里。
+       「看原帖」没有上游地址时整个元素不显示（见 app.js 的 syncViewerActions）。 -->
   <div class="viewer-actions" id="viewerActions">
     <button class="vbtn vbtn-like" id="viewerLike" type="button">
       <span class="vbtn-ico" id="viewerLikeIco">🤍</span><span id="viewerLikeCount">0</span>
     </button>
     <a class="vbtn vbtn-cmt" id="viewerComment" href="/board/">
       <span class="vbtn-ico">💬</span><span id="viewerCommentCount">0</span><span class="vbtn-txt">评论这张图</span>
+    </a>
+    <!-- 复制链接：复制这张图的单图页地址（绝对地址，贴到微信里能点） -->
+    <button class="vbtn vbtn-share" id="viewerShare" type="button">
+      <span class="vbtn-ico">🔗</span><span class="vbtn-txt">复制链接</span>
+    </button>
+    <!-- 原图：全尺寸那张（绝对地址，新标签页打开） -->
+    <a class="vbtn vbtn-orig" id="viewerOriginal" href="#" target="_blank" rel="noopener">
+      <span class="vbtn-ico">⤢</span><span class="vbtn-txt">原图</span>
+    </a>
+    <!-- 看原帖：上游原帖（只有见笑有 src；没有时这个元素整个不显示） -->
+    <a class="vbtn vbtn-origin" id="viewerOrigin" href="#" target="_blank" rel="noopener" hidden>
+      <span class="vbtn-ico">↗</span><span class="vbtn-txt">看原帖</span>
     </a>
   </div>
 </div>
