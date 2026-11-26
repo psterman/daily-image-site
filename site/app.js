@@ -1465,19 +1465,109 @@
   var vIndex = 0;
   var touchX = 0, touchY = 0, moved = false;
 
+  /* ── 缩放（2026-11-26 加）───────────────────────────────
+     为什么加：用户反馈「见笑的图片无法放大」。
+     见笑的梗图最长边只有 800px（**上游图源给的上限**，改构建参数也提不高），
+     在手机上按屏宽铺开之后字就看不清；
+     而站点的 <meta viewport> 写着 user-scalable=no + maximum-scale=1.0，
+     **浏览器自带的双指缩放被全局禁掉了** → 以前真的一点放大办法都没有。
+
+     ⚠️ 缩放不能突破源图的像素：放大到 800px 源图的 2 倍以上就是插值糊。
+        这里给的是「看清楚」的余地，不是「凭空变清晰」。
+
+     上限 4×：再往上没有信息量，只是把像素摊开。 */
+  var ZOOM_MIN = 1, ZOOM_MAX = 4, ZOOM_DOUBLE = 2.5;
+  var zoom = 1, panX = 0, panY = 0;
+  var zoomBadge = document.getElementById('viewerZoom');
+
+  /** 缩放/平移的最终状态 —— 统一在这里落到 DOM 上。 */
+  function applyZoom() {
+    if (!viewerImg) return;
+    /* ⚠️ data-zoom 是给护栏看的「数字真值」。
+       只看 transform 的话，zoom=0.5 和 zoom=1 长得一模一样
+       （applyZoom 在 zoom<=1.001 时把 transform 清空）→ 断言就抓不到「缩到 1× 以下」。
+       这里把比例直接写出来，护栏才能断言「夹在 1×~4× 之间」。 */
+    viewerStage.setAttribute('data-zoom', zoom.toFixed(3));
+    if (zoom <= 1.001) {
+      viewerImg.style.transform = '';
+      viewerStage.classList.remove('is-zoomed');
+    } else {
+      viewerImg.style.transform =
+        'translate3d(' + Math.round(panX) + 'px,' + Math.round(panY) + 'px,0) scale(' + zoom.toFixed(3) + ')';
+      viewerStage.classList.add('is-zoomed');
+    }
+    if (zoomBadge) {
+      if (zoom <= 1.001) {
+        zoomBadge.hidden = true;
+      } else {
+        zoomBadge.hidden = false;
+        zoomBadge.textContent = zoom.toFixed(1) + '×';
+      }
+    }
+  }
+
+  /**
+   * 设定缩放比例。
+   * @param {number} z 目标比例（夹在 1× ~ 4× 之间）
+   * @param {number} [ax] 锚点屏幕坐标 x；不给就是以 stage 中心为锚点
+   * @param {number} [ay] 锚点屏幕坐标 y
+   *
+   * 锚点缩放的算法：图以 stage 中心为中心、transform-origin 也是 center，
+   * 所以「锚点底下那个像素」在图上的相对位置是 (锚点 - 中心 - pan) / zoom；
+   * 换比例后要让它还停在锚点上 → pan' = 锚点偏移 - 相对位置 × 新比例。
+   * 不这么算的话，捏合的时候图会往两根手指中间「滑」，越放大越跑偏。 */
+  function setZoom(z, ax, ay) {
+    var old = zoom;
+    var nz = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z));
+    if (nz <= 1.001) nz = 1;
+    if (typeof ax === 'number' && typeof ay === 'number') {
+      var box = viewerStage.getBoundingClientRect();
+      var dx = ax - (box.left + box.width / 2);
+      var dy = ay - (box.top + box.height / 2);
+      var ux = (dx - panX) / old;
+      var uy = (dy - panY) / old;
+      panX = dx - ux * nz;
+      panY = dy - uy * nz;
+    }
+    zoom = nz;
+    if (zoom === 1) { panX = 0; panY = 0; }
+    clampPan();
+    applyZoom();
+  }
+
+  /** 平移边界：放大后不能把图拖出屏幕，也不能拖到图外面露出空白。 */
+  function clampPan() {
+    if (zoom <= 1.001) { panX = 0; panY = 0; return; }
+    var maxX = Math.max(0, (viewerImg.offsetWidth * zoom - viewerStage.clientWidth) / 2);
+    var maxY = Math.max(0, (viewerImg.offsetHeight * zoom - viewerStage.clientHeight) / 2);
+    if (panX > maxX) panX = maxX; else if (panX < -maxX) panX = -maxX;
+    if (panY > maxY) panY = maxY; else if (panY < -maxY) panY = -maxY;
+  }
+
+  /** 回到 1× —— 切图、关闭时都要复位，否则下一张也是放大的。 */
+  function resetZoom() {
+    zoom = 1;
+    panX = 0;
+    panY = 0;
+    applyZoom();
+  }
+
   function openViewer(key, index) {
     vTab = key;
     vIndex = index;
     viewer.hidden = false;
     document.body.style.overflow = 'hidden';
+    resetZoom();
     renderViewer();
     viewerHint.className = 'viewer-hint';
   }
 
   function closeViewer() {
+    clearTimeout(closeTimer);
     viewer.hidden = true;
     document.body.style.overflow = '';
     viewerImg.removeAttribute('src');
+    resetZoom();
     abortPreloads();
   }
 
@@ -1485,6 +1575,8 @@
     var s = state[vTab];
     var entry = s.cells[vIndex];
     if (!entry) return;
+    /* 切图 = 回到 1×。带着上一张的缩放切过去，图会停在莫名其妙的位置。 */
+    resetZoom();
     viewerImg.src = entry.item.full;
     viewerCount.textContent = vIndex + 1 + ' / ' + s.tab.count;
     showHint(3200);
@@ -1545,33 +1637,173 @@
     else if (e.key === 'ArrowLeft') step(-1);
   });
 
+  /* ── 手势：滑动切图 / 双击放大 / 双指捏合 / 拖动平移 ──────
+     ⚠️ 下面三个监听器**不能**是 passive:true ——
+        捏合缩放必须 preventDefault，否则浏览器会自己把双指当页面缩放/滚动
+        （而站点的 viewport 里 user-scalable=no，浏览器缩放又被禁了，
+          结果就是页面被拖走、我们的缩放不生效）。
+        所以这里改成非 passive：需要拦的分支调 preventDefault，
+        不需要拦的分支（1× 状态的单指滑动切图）照样放行。 */
+  var pinchDist = 0, pinchZoom = 1, pinching = false;
+  var panFromX = 0, panFromY = 0, panBaseX = 0, panBaseY = 0;
+  var lastTapAt = 0, lastTapX = 0, lastTapY = 0;
+  var closeTimer = 0;
+
+  /** 两指之间的距离（捏合比例用）。 */
+  function touchDist(e) {
+    if (!e.touches || e.touches.length < 2) return 0;
+    var a = e.touches[0];
+    var b = e.touches[1];
+    var dx = a.clientX - b.clientX;
+    var dy = a.clientY - b.clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  /** 两指的中点（捏合时的锚点）。 */
+  function touchMid(e) {
+    var a = e.touches[0];
+    var b = e.touches[1];
+    return { x: (a.clientX + b.clientX) / 2, y: (a.clientY + b.clientY) / 2 };
+  }
+
+  /**
+   * 是不是「双击」的第二次？
+   * 第一次调用只是登记这次点击，第二次在时间窗内且位置够近才算双击。
+   * 判定阈值 40px / 280ms —— 手指头点不准，位置差得太多就不算双击。 */
+  function isDoubleTap(x, y) {
+    var now = Date.now();
+    if (now - lastTapAt < 280 && Math.abs(x - lastTapX) < 40 && Math.abs(y - lastTapY) < 40) {
+      lastTapAt = 0;
+      return true;
+    }
+    lastTapAt = now;
+    lastTapX = x;
+    lastTapY = y;
+    return false;
+  }
+
+  /**
+   * 点一下（单击、或双击的其中一下）。
+   *
+   * ⚠️ 单击和双击**必须共用这一条路** —— 之前把它们分成两套（放大态提前 return、
+   *    1× 态走另一套），结果放大态的那一下既没登记成「双击」、
+   *    也没取消上一轮遗留的「延时关闭」定时器，
+   *    那个定时器随后把查看器关了（2026-11-26 护栏实测抓到的）。
+   *
+   * 双击的第一下不能立刻生效（否则双击放大永远等不到第二下），
+   * 所以单击一律**延后 240ms** 再执行；第二下会把这个延时取消。
+   */
+  function handleTap(x, y) {
+    if (isDoubleTap(x, y)) {
+      clearTimeout(closeTimer);
+      if (zoom > 1.001) setZoom(1);
+      else setZoom(ZOOM_DOUBLE);
+      return;
+    }
+    clearTimeout(closeTimer);
+    closeTimer = setTimeout(function () {
+      /* 单击：放大状态下 = 还原到 1×；1× 状态下 = 关闭查看器。 */
+      if (zoom > 1.001) setZoom(1);
+      else closeViewer();
+    }, 240);
+  }
+
   viewerStage.addEventListener('touchstart', function (e) {
+    if (e.touches.length >= 2) {
+      /* 双指 = 捏合缩放。基准记下来，比例按「当前距离 / 起始距离」算。 */
+      pinching = true;
+      pinchDist = touchDist(e);
+      pinchZoom = zoom;
+      moved = true;
+      return;
+    }
     var t = e.touches[0];
     touchX = t.clientX;
     touchY = t.clientY;
+    panFromX = t.clientX;
+    panFromY = t.clientY;
+    panBaseX = panX;
+    panBaseY = panY;
     moved = false;
-  }, { passive: true });
+  }, { passive: false });
 
   viewerStage.addEventListener('touchmove', function (e) {
+    if (pinching && e.touches.length >= 2) {
+      e.preventDefault();
+      var d = touchDist(e);
+      if (pinchDist > 0 && d > 0) {
+        var mid = touchMid(e);
+        setZoom(pinchZoom * (d / pinchDist), mid.x, mid.y);
+      }
+      return;
+    }
+    if (zoom > 1.001 && e.touches.length === 1) {
+      /* 放大状态下：单指拖动 = 平移，不切图。 */
+      e.preventDefault();
+      var t = e.touches[0];
+      panX = panBaseX + (t.clientX - panFromX);
+      panY = panBaseY + (t.clientY - panFromY);
+      clampPan();
+      applyZoom();
+      moved = true;
+      return;
+    }
     moved = true;
-  }, { passive: true });
+  }, { passive: false });
 
   viewerStage.addEventListener('touchend', function (e) {
+    if (pinching) {
+      /* 双指抬起一根：不算点击、也不算切图。
+         把基准挪到剩下那根手指上，否则它继续动会突然跳一大截。 */
+      if (e.touches.length < 2) {
+        pinching = false;
+        if (e.touches.length === 1) {
+          var rest = e.touches[0];
+          touchX = rest.clientX;
+          touchY = rest.clientY;
+          panFromX = rest.clientX;
+          panFromY = rest.clientY;
+          panBaseX = panX;
+          panBaseY = panY;
+        }
+        moved = true;
+      }
+      return;
+    }
     var t = e.changedTouches[0];
     var dx = t.clientX - touchX;
     var dy = t.clientY - touchY;
+    if (zoom > 1.001) {
+      /* 放大状态下：单指拖动已经在 touchmove 里平移过了，这里只处理「点一下」。
+         ⚠️ 横向滑动**不能**切图 —— 否则拖着看图会一路翻页。 */
+      if (!moved) handleTap(t.clientX, t.clientY);
+      return;
+    }
     if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy)) {
       step(dx < 0 ? 1 : -1);
       showHint(1600);
     } else if (!moved) {
-      closeViewer();
+      handleTap(t.clientX, t.clientY);
     }
   });
 
-  // 桌面端点图关闭
-  viewerStage.addEventListener('click', function () {
+  // 桌面端：滚轮缩放（查看器是全屏固定层，页面本身不会滚，所以滚轮直接拿来缩放）
+  viewerStage.addEventListener('wheel', function (e) {
+    e.preventDefault();
+    var k = e.deltaY < 0 ? 1.2 : 1 / 1.2;
+    setZoom(zoom * k, e.clientX, e.clientY);
+  }, { passive: false });
+
+  /* 桌面端点图关闭 / 放大 / 双击放大 —— 跟触屏**共用** handleTap。
+   * ⚠️ 这里**故意不用 dblclick 事件**：
+   *   ① 触屏上双击会同时派发 dblclick，那条路 touchend 已经处理过了，
+   *      再处理一遍会把刚放大的图又还原掉（放大→还原，来回抵消）；
+   *   ② 桌面端 dblclick 是在 click,click 之后才派的，
+   *      而 click 已经把「双击的第一下」记上了 —— 用 click 自己判更准。
+   * 所以双击统一由 handleTap 里的 isDoubleTap 判定。 */
+  viewerStage.addEventListener('click', function (e) {
     if ('ontouchstart' in window) return; // 移动端交给 touchend
-    closeViewer();
+    handleTap(e.clientX, e.clientY);
   });
 
   var hintTimer = null;

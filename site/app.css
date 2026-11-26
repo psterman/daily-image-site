@@ -403,6 +403,11 @@ button { font-family: inherit; }
   align-items: center;
   -webkit-justify-content: center;
   justify-content: center;
+  /* 缩放手势我们自己处理 —— touch-action:none 让浏览器别插手，
+     双指才不会被它拿去滚动/缩放页面（那样我们的捏合就不生效了）。
+     stage 外面（提示条、操作栏）不受影响，照常可点。 */
+  touch-action: none;
+  -ms-touch-action: none;
 }
 
 .viewer-stage img {
@@ -414,7 +419,26 @@ button { font-family: inherit; }
   -webkit-user-select: none;
   user-select: none;
   -webkit-user-drag: none;
+  /* 缩放锚点 = 图中心（跟 JS 里的平移算法对得上：
+     平移量是「相对中心的偏移」，所以原点也必须是中心）。 */
+  transform-origin: center center;
+  -webkit-transform-origin: center center;
 }
+
+/* 放大状态下：光标变成抓手，提示能拖动 */
+.viewer-stage.is-zoomed img { cursor: grab; }
+.viewer-stage.is-zoomed.is-dragging img { cursor: grabbing; }
+
+/* 当前放大倍数（1× 时隐藏） */
+.viewer-zoom {
+  font-size: 12px;
+  line-height: 1;
+  color: rgba(255,255,255,.72);
+  font-variant-numeric: tabular-nums;
+  margin-right: 8px;
+  white-space: nowrap;
+}
+.viewer-zoom[hidden] { display: none; }
 
 .viewer-hint {
   text-align: center;
