@@ -27,7 +27,7 @@ import { isMediaTab, isTextTab } from './tab-kinds.mjs';
 import { composeOgImage, ogImageUrl } from './build-og.mjs';
 import { buildFeedXml } from './build-feed.mjs';
 import { makeLqipDataUris } from './build-lqip.mjs';
-import { buildCards, cardRelPath } from './build-cards.mjs';
+import { buildCards, cardRelPath, buildSquareCards, cardSquareRelPath } from './build-cards.mjs';
 import { upstreamUrlFor } from './upstream-url.mjs';
 import {
   ROOT,
@@ -1330,7 +1330,12 @@ async function main() {
     let files = [];
     // 卡片图任务（当期）：每张媒体图配一张 JPEG 卡片，微信分享卡片用。
     // 产物走 published/<日期>/card/<栏key>/，**不走 R2**（R2 那条管道只认 .webp 命名）。
+    //
+    // 方形卡片图（card-sq/）：同一张源图再出一张 640×640 正方形 ——
+    // 微信对 og:image 强制 1:1 居中裁剪，长边版被裁得只剩 29%~100% 面积，
+    // 方图版面积 100% 可见。两套同名同目录结构，只是目录不同。
     const cardJobs = [];
+    const cardSquareJobs = [];
     try {
       files = (await fs.readdir(tabSrcDir, { withFileTypes: true }))
         .filter((d) => d.isFile() && /\.(jpe?g|png|gif|webp|bmp)$/i.test(d.name))
@@ -1351,6 +1356,10 @@ async function main() {
           cardJobs.push({
             src: path.join(destDir, webpName),
             out: path.join(publishedDir, cardRelPath(tab.key, webpName)),
+          });
+          cardSquareJobs.push({
+            src: path.join(destDir, webpName),
+            out: path.join(publishedDir, cardSquareRelPath(tab.key, webpName)),
           });
         }
         continue;
@@ -1491,6 +1500,10 @@ async function main() {
         src: destFull,
         out: path.join(publishedDir, cardRelPath(tab.key, path.basename(relFull))),
       });
+      cardSquareJobs.push({
+        src: destFull,
+        out: path.join(publishedDir, cardSquareRelPath(tab.key, path.basename(relFull))),
+      });
       /* 模糊占位（LQIP）的素材：**缩略图**文件 ——
          网格里显示的就是它，小图从它缩出来最省事。
          注意是母本里的本地路径，不是 manifest 里的 URL。 */
@@ -1514,6 +1527,17 @@ async function main() {
       console.log(
         `  · 卡片图：${cards.ok}/${cards.total} 张` +
         `（${(cards.bytes / 1024 / 1024).toFixed(1)}MB）`,
+      );
+    }
+
+    /* 方形卡片图（当期）：同一批源图再出 640×640 正方形（模糊底 + 主体居中）。
+       微信对 og:image 强制 1:1 居中裁剪 —— 长边版被裁后中位只剩 68% 面积，
+       方图版 100% 可见。失败策略跟长边版一致：单张失败跳过，不拖垮整次构建。 */
+    if (cardSquareJobs.length) {
+      const squares = await buildSquareCards({ ffmpeg, jobs: cardSquareJobs });
+      console.log(
+        `  · 方形卡片图：${squares.ok}/${squares.total} 张` +
+        `（${(squares.bytes / 1024 / 1024).toFixed(1)}MB）`,
       );
     }
 
