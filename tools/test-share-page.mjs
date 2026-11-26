@@ -66,37 +66,11 @@ check('静态：build.mjs 的媒体 item 带 src（整个键不出现的那种�
 check('静态：build.mjs 用 upstreamUrlFor 反解上游原帖',
   /import \{ upstreamUrlFor \} from '\.\/upstream-url\.mjs';/.test(buildSrc) &&
   /upstreamUrlFor\(tab\.key, name\)/.test(buildSrc), '');
-/* 方形卡片图：微信对 og:image 强制 1:1 居中裁剪，长边版裁完中位只剩 68% 面积，
-   所以额外出一套 640×640 正方形（模糊底 + 主体居中）给 og:image 用。
-   三处（生成端 / 构建端 / 分享页端）必须同时在，缺一处方图就出不来。
-
-   ⚠️ `cardSquareJobs.push` 必须**两条产出路径上都有**：
-     ① 正常路径（src = destFull）
-     ② 源图缺失的「重建路径」（src = destFull 目录里的 webp）——
-        少挂一条 → 那条路径构建出来的期次没有方图 → og:image 悄悄退回长边版，
-        而**线上不会报错**（只是缩略图又被裁了）→ 所以这里数个数，不只看「有没有」。 */
-const squarePushCount = (buildSrc.match(/cardSquareJobs\.push\(\{/g) || []).length;
-check('静态：build.mjs 会生成方形卡片图（两条产出路径都挂了 cardSquareJobs）',
-  /import \{[^}]*buildSquareCards[^}]*\} from '\.\/build-cards\.mjs';/.test(buildSrc) &&
-  /buildSquareCards\(\{ ffmpeg, jobs: cardSquareJobs \}\)/.test(buildSrc) &&
-  squarePushCount === 2 &&
-  /cardSquareJobs\.push\(\{\s*\n\s*src: destFull,/.test(buildSrc) &&
-  /cardSquareJobs\.push\(\{\s*\n\s*src: path\.join\(destDir, webpName\),/.test(buildSrc),
-  { squarePushCount });
 
 const cardsSrc = readSrc(path.join('tools', 'build-cards.mjs'));
 check('静态：tools/build-cards.mjs 存在，卡片图规格是长边 900 / 质量 70',
   /export const CARD_MAX_EDGE = 900;/.test(cardsSrc) &&
   /export const CARD_QUALITY = 70;/.test(cardsSrc), '');
-check('静态：tools/build-cards.mjs 存在，方形卡片图规格是 640×640 / 目录 card-sq',
-  /export const CARD_SQUARE_SIZE = 640;/.test(cardsSrc) &&
-  /export const CARD_SQUARE_DIR_NAME = 'card-sq';/.test(cardsSrc), '');
-/* ⚠️ 方图必须是「模糊底 + 主体缩到画布内再叠加」——
-   直接把长边版裁成方，主体就被切掉了（实测最差的一张只剩 29% 面积）。 */
-check('静态：方图是「模糊底 + 主体缩进画布居中叠加」，不是直接裁剪',
-  /gblur=sigma=/.test(cardsSrc) &&
-  /overlay=\(W-w\)\/2:\(H-h\)\/2/.test(cardsSrc) &&
-  /force_original_aspect_ratio=decrease/.test(cardsSrc), '');
 
 const fnSrc = readSrc(path.join('functions', 'pic', '[[path]].js'));
 check('静态：functions/pic/[[path]].js 存在并导出 onRequest 与 renderSharePage',
@@ -104,10 +78,6 @@ check('静态：functions/pic/[[path]].js 存在并导出 onRequest 与 renderSh
   /export function renderSharePage\(/.test(fnSrc), '');
 check('静态：分享页声明的卡片图长边也是 900（跟生成端一致）',
   /const CARD_LONG_EDGE = 900;/.test(fnSrc), '');
-check('静态：分享页声明的方形卡片图边长也是 640（跟生成端一致）',
-  /const CARD_SQUARE_SIZE = 640;/.test(fnSrc), '');
-check('静态：分享页的方形卡片图目录也是 card-sq（跟生成端一致）',
-  /const CARD_SQUARE_DIR = 'card-sq';/.test(fnSrc), '');
 /* ⚠️ **「看原帖」入口已下线**（2026-11-26 用户拍板）：上游原帖是 t.me 外链，
    微信内置浏览器会拦成微信自己的「已停止访问该网页」页 → 留着就是给用户埋雷。
    这里盯的是「**一个都不许有**」：分享页不许再渲染那个按钮，
@@ -237,61 +207,6 @@ check('纯函数：og:title 格式 = <栏中文名> <序号> · <日期>（序�
 check('纯函数：og:url 指向单图页（序号补 3 位）',
   ogUrl === SITE_URL + '/pic/2026-11-26/jianxiao/001/', ogUrl);
 
-/* 两套卡片图并存：方图给 og:image（微信 1:1 裁剪，方的等于不裁），
-   长边版给 twitter:image（X / Telegram 按原比例显示）。 */
-const SQ_URL = SITE_URL + '/2026-11-26/card-sq/jianxiao/abc_001.jpg';
-const LONG_URL = SITE_URL + '/2026-11-26/card/jianxiao/abc_001.jpg';
-const htmlSquare = shareMod.renderSharePage({
-  ...BASE,
-  cardImage: {
-    og: { url: SQ_URL, width: 640, height: 640 },
-    twitter: { url: LONG_URL, width: 900, height: 263 },
-  },
-});
-check('纯函数：og:image 优先方形版（640×640），twitter:image 留给长边版',
-  metaContent(htmlSquare, 'property', 'og:image') === SQ_URL &&
-  metaContent(htmlSquare, 'property', 'og:image:width') === '640' &&
-  metaContent(htmlSquare, 'property', 'og:image:height') === '640' &&
-  metaContent(htmlSquare, 'name', 'twitter:image') === LONG_URL,
-  {
-    og: metaContent(htmlSquare, 'property', 'og:image'),
-    w: metaContent(htmlSquare, 'property', 'og:image:width'),
-    h: metaContent(htmlSquare, 'property', 'og:image:height'),
-    twitter: metaContent(htmlSquare, 'name', 'twitter:image'),
-  });
-check('纯函数：cardImage 是扁的旧形状时，og:image 和 twitter:image 都用它',
-  metaContent(html, 'property', 'og:image') === BASE.cardImage.url &&
-  metaContent(html, 'name', 'twitter:image') === BASE.cardImage.url,
-  {
-    og: metaContent(html, 'property', 'og:image'),
-    twitter: metaContent(html, 'name', 'twitter:image'),
-  });
-
-/* 选图逻辑（pickCardImages）—— 运行时到底挑了哪张当 og:image，护栏直接测这个纯函数。 */
-const PICK_ITEM = { w: 800, h: 1200 };
-const pickArgs = {
-  squarePath: '/2026-11-26/card-sq/jianxiao/abc_001.jpg',
-  longPath: '/2026-11-26/card/jianxiao/abc_001.jpg',
-  item: PICK_ITEM,
-  siteUrl: SITE_URL,
-};
-const pickedSquare = shareMod.pickCardImages({ ...pickArgs, squareExists: true, longExists: false });
-check('纯函数：pickCardImages 有方图时 og 用方图（640×640）、twitter 用长边版',
-  !!pickedSquare &&
-  pickedSquare.og.url === SITE_URL + '/2026-11-26/card-sq/jianxiao/abc_001.jpg' &&
-  pickedSquare.og.width === 640 && pickedSquare.og.height === 640 &&
-  pickedSquare.twitter.url === SITE_URL + '/2026-11-26/card/jianxiao/abc_001.jpg',
-  pickedSquare);
-const pickedLong = shareMod.pickCardImages({ ...pickArgs, squareExists: false, longExists: true });
-check('纯函数：pickCardImages 没有方图时退回长边版（og 和 twitter 同一张）',
-  !!pickedLong &&
-  pickedLong.og.url === SITE_URL + '/2026-11-26/card/jianxiao/abc_001.jpg' &&
-  pickedLong.twitter.url === pickedLong.og.url,
-  pickedLong);
-check('纯函数：pickCardImages 两张都没有时返回 null（走 og.jpg 兜底）',
-  shareMod.pickCardImages({ ...pickArgs, squareExists: false, longExists: false }) === null,
-  shareMod.pickCardImages({ ...pickArgs, squareExists: false, longExists: false }));
-
 /* ⚠️ 「看原帖」入口已下线（2026-11-26 用户拍板）：t.me 外链在微信内置浏览器里
    会被拦成「已停止访问该网页」→ **传了 src 也不许渲染**，更不许渲染成死链。 */
 check('纯函数：即使传了 src，HTML 里也没有「看原帖」（入口已下线）',
@@ -309,9 +224,6 @@ const htmlFallback = shareMod.renderSharePage({ ...BASE, cardImage: null });
 const ogFallback = metaContent(htmlFallback, 'property', 'og:image');
 check('纯函数：cardImage 为 null 时 og:image 降级成 <日期>/og.jpg',
   ogFallback.endsWith('/' + DATE + '/og.jpg'), ogFallback);
-check('纯函数：cardImage 为 null 时 twitter:image 也降级成 <日期>/og.jpg',
-  metaContent(htmlFallback, 'name', 'twitter:image').endsWith('/' + DATE + '/og.jpg'),
-  metaContent(htmlFallback, 'name', 'twitter:image'));
 
 check('纯函数：HTML 里有唯一的 share-page 标记',
   (html.match(/<meta name="share-page" content="1">/g) || []).length === 1, '');
@@ -350,11 +262,6 @@ const server = http.createServer((req, res) => {
   if (url === '/pic/no-src') {
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
     res.end(htmlNoSrc);
-    return;
-  }
-  if (url === '/pic/square') {
-    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-    res.end(htmlSquare);
     return;
   }
   if (url.startsWith('/img/')) {
@@ -418,17 +325,6 @@ try {
   check('真浏览器：页面里有 share-page 标记', seen.marker, seen);
   check('真浏览器：og:title / og:image 在 DOM 里（微信爬虫读的就是这两个）',
     seen.ogTitle === '见笑 1 · 2026-11-26' && /^https:\/\//.test(seen.ogImage), seen);
-
-  /* 方形版那一路：og:image 必须指向方图且声明 640×640，twitter:image 留给长边版。 */
-  await page.goto(base + '/pic/square', { waitUntil: 'domcontentloaded' });
-  const sq = await page.evaluate(() => ({
-    og: (document.querySelector('meta[property="og:image"]') || {}).content || '',
-    w: (document.querySelector('meta[property="og:image:width"]') || {}).content || '',
-    h: (document.querySelector('meta[property="og:image:height"]') || {}).content || '',
-    twitter: (document.querySelector('meta[name="twitter:image"]') || {}).content || '',
-  }));
-  check('真浏览器：og:image 是方形版 URL 且声明 640×640，twitter:image 是长边版',
-    sq.og === SQ_URL && sq.w === '640' && sq.h === '640' && sq.twitter === LONG_URL, sq);
 
   await page.goto(base + '/pic/no-src', { waitUntil: 'domcontentloaded' });
   const without = await page.evaluate(() => {
@@ -530,40 +426,6 @@ if (!fs.existsSync(PUB)) {
           Number.isFinite(itemRatio) && itemRatio > 0 &&
           Math.abs(cardRatio - itemRatio) / itemRatio < 0.01,
           { card: cardRatio, item: itemRatio, itemWH: [sample.w, sample.h], cardWH: [info.width, info.height] });
-      }
-
-      /* 方形卡片图（card-sq/）：微信 1:1 居中裁剪用的那套 —— 必须是 640×640 正方形。
-         少了这一套，og:image 就会退回长边版，微信裁完只剩 29%~100% 面积。 */
-      const squareRoot = path.join(dir, 'card-sq');
-      if (!fs.existsSync(squareRoot)) {
-        console.log('  （这一期还没有 card-sq/，跳过方形卡片图断言 —— 跑一次 node tools/build.mjs 就能查）');
-      } else {
-        for (const tab of manifest.tabs || []) {
-          const sqDir = path.join(squareRoot, tab.key);
-          if (!fs.existsSync(sqDir)) continue;
-          const sqFiles = fs.readdirSync(sqDir).filter((f) => /\.jpe?g$/i.test(f));
-          const sqItems = tab.items || [];
-
-          check('产物：card-sq/' + tab.key + ' 的方形卡片图数量 = 该栏当期的图片数',
-            sqFiles.length === sqItems.length, { files: sqFiles.length, items: sqItems.length });
-
-          if (!sqItems.length || !sqFiles.length) continue;
-          const sqSample = sqItems[0];
-          const sqName = path.basename(sqSample.full || '').replace(/\.[A-Za-z0-9]+$/, '.jpg');
-          const sqFile = path.join(sqDir, sqName);
-          if (!fs.existsSync(sqFile)) {
-            check('产物：card-sq/' + tab.key + ' 里能找到 ' + sqName + '（跟全图同名）', false, { sqFile });
-            continue;
-          }
-          const sqBuf = fs.readFileSync(sqFile);
-          const sqInfo = jpegInfo(sqBuf);
-          check('产物：card-sq/' + tab.key + ' 的方形卡片图真的是 JPEG（不是 webp 改名）',
-            !!sqInfo && sqBuf.slice(0, 4).toString('latin1') !== 'RIFF',
-            { head: sqBuf.slice(0, 4).toString('hex') });
-          if (!sqInfo) continue;
-          check('产物：card-sq/' + tab.key + ' 的方形卡片图是 640×640 正方形',
-            sqInfo.width === 640 && sqInfo.height === 640, sqInfo);
-        }
       }
 
       /* manifest 里的 src：只有当这一期的 manifest **本身带 src** 时才断言 ——

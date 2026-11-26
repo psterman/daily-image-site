@@ -22,19 +22,12 @@
  *      和结尾的 ; → JSON.parse
  *   3. manifest.tabs 里按 tab.key 找 tab → items[序号-1]
  *
- * 卡片图降级链（两套并存）：
- *   og:image    1. /<日期>/card-sq/<栏key>/<nonce>_<序号3位>.jpg  方形版 640×640（微信用）
- *                2. /<日期>/card/<栏key>/<nonce>_<序号3位>.jpg    长边版（往期没有方形版时）
- *   twitter:image 长边版 —— X / Telegram 按原比例显示，方图带模糊边反而难看
- *   两者都拿不到时：
- *                3. 该期日期页自己声明的 og:image = <日期>/og.jpg（1200x630，三栏拼图）
+ * 卡片图（og:image）降级链：
+ *   1. /<日期>/card/<栏key>/<nonce>_<序号3位>.jpg  当期有（tools/build-cards.mjs 生成）
+ *   2. 该期日期页自己声明的 og:image                = <日期>/og.jpg（1200x630，三栏拼图）
  *                                                  2026-11-18 之前的老期没有 og.jpg，
  *                                                  日期页声明的是 /assets/logo.jpg（640x640）
- *                4. <日期>/og.jpg                          renderSharePage 里的最后兜底
- *
- * 为什么 og:image 要方图：微信对 og:image **强制按 1:1 居中裁剪**，
- *   而长边版是「等比缩到长边 900、不裁剪」—— 实测当期 201 张裁完中位只剩 68% 面积，
- *   最差的 900×263 超宽图只剩 29%（对方在聊天里看到的就是一条横带）。
+ *   3. <日期>/og.jpg                                renderSharePage 里的最后兜底
  *
  * 缓存头：
  *   - 错误响应必须 no-store —— Pages 给没设 Cache-Control 的 Function 响应默认套
@@ -48,16 +41,6 @@ const DEFAULT_SITE_URL = 'https://example.com';
 
 /* 卡片图规格：等比缩到长边 900、不裁剪不填充（与 tools/build-cards.mjs 一致） */
 const CARD_LONG_EDGE = 900;
-
-/* 方形卡片图规格：640×640 正方形（与 tools/build-cards.mjs 的 CARD_SQUARE_SIZE 一致）。
-   微信对 og:image **强制按 1:1 居中裁剪** —— 长边版裁完中位只剩 68% 面积，
-   方图版 100% 可见（裁它等于不裁）。 */
-const CARD_SQUARE_SIZE = 640;
-
-/* 卡片图在 published/<日期>/ 下的两个目录名（与 tools/build-cards.mjs 一致）：
-   card/ = 长边版（twitter:image 等渠道用），card-sq/ = 方形版（微信 og:image 用）。 */
-const CARD_DIR = 'card';
-const CARD_SQUARE_DIR = 'card-sq';
 
 /* 往期 og.jpg（整期三栏拼图）的规格 */
 const OG_FALLBACK_WIDTH = 1200;
@@ -157,10 +140,7 @@ export async function onRequest(context) {
  *   tabLabel  栏中文名，如 见笑
  *   seq       序号（数字或字符串都行），显示时去掉前导零，URL 里补成 3 位
  *   item      manifest 里的那一条：{ id, w, h, tw, th, thumb, full, lqip }
- *   cardImage 卡片图：
- *              · { url, width, height }            —— 扁的（只有一张，og 和 twitter 都用它）
- *              · { og: {…}, twitter: {…} }         —— 新的（方图给 og、长边版给 twitter）
- *              传 null 表示降级用 <日期>/og.jpg
+ *   cardImage 卡片图 { url, width, height }；传 null 表示降级用 <日期>/og.jpg
  *
  * 返回：完整 HTML 字符串
  */
@@ -178,15 +158,11 @@ export function renderSharePage(opts) {
   const pageUrl = `${siteUrl}/pic/${date}/${tabKey}/${seq.padded}/`;
 
   // 卡片图：没传就降级用该期的 og.jpg
-  //   card       = og:image 用的那张（优先方形版）
-  //   twitterCard = twitter:image 用的那张（长边版 —— X/Telegram 这类渠道不裁 1:1，
-  //                方图带模糊边反而难看）
   const card = normalizeCard(o.cardImage) || {
     url: `${siteUrl}/${date}/og.jpg`,
     width: OG_FALLBACK_WIDTH,
     height: OG_FALLBACK_HEIGHT,
   };
-  const twitterCard = normalizeTwitterCard(o.cardImage) || card;
 
   const title = `${tabLabel} ${seq.display} · ${date}`;
   const desc = `${siteName} · ${date} ${tabLabel}第 ${seq.display} 张 · 点开看原图`;
@@ -223,7 +199,7 @@ export function renderSharePage(opts) {
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="${esc(title)}">
 <meta name="twitter:description" content="${esc(desc)}">
-<meta name="twitter:image" content="${esc(twitterCard.url)}">
+<meta name="twitter:image" content="${esc(card.url)}">
 <style>
   /* 关键样式内联：微信 X5 解析外部 CSS 前先上色，避免白闪。
      不引站内的 app.css —— 那套是给整页（多栏网格）用的，单图页用不上。 */
@@ -321,99 +297,41 @@ async function loadPeriod(env, request, date) {
 }
 
 /**
- * 定卡片图（og:image / twitter:image）。
+ * 定卡片图（og:image）。
  *
- * 1. **方形版** /<日期>/card-sq/<栏key>/<nonce>_<序号3位>.jpg —— og:image 用它
- *    （微信强制 1:1 居中裁剪，方的等于不裁）
- * 2. **长边版** /<日期>/card/<栏key>/<nonce>_<序号3位>.jpg —— twitter:image 用它
- *    （X / Telegram 按原比例显示，方图带模糊边反而难看）
- * 3. 降级：该期日期页自己声明的 og:image（<日期>/og.jpg，再老就是 /assets/logo.jpg）
- *
- * ⚠️ 探测有开销（一次网络往返）—— 所以先探方图，探到了就不再探长边版：
- *    两套图是**同一次构建**出来的，方图在就说明长边版也在，路径推得出来。
+ * 1. 当期的卡片图 /<日期>/card/<栏key>/<nonce>_<序号3位>.jpg —— 探一下存不存在
+ * 2. 降级：该期日期页自己声明的 og:image（<日期>/og.jpg，再老就是 /assets/logo.jpg）
  */
 async function resolveCardImage(env, request, { date, tabKey, item, siteUrl, period }) {
-  const squarePath = cardPathFor(date, tabKey, item.full, CARD_SQUARE_DIR);
-  const longPath = cardPathFor(date, tabKey, item.full, CARD_DIR);
-
-  const squareExists = squarePath ? await probeAsset(env, request, squarePath) : false;
-  const longExists = longPath && !squareExists ? await probeAsset(env, request, longPath) : false;
-
-  const picked = pickCardImages({ squarePath, longPath, squareExists, longExists, item, siteUrl });
-  if (picked) return picked;
+  const cardPath = cardPathFor(date, tabKey, item.full);
+  if (cardPath) {
+    const exists = await probeAsset(env, request, cardPath);
+    if (exists) {
+      const size = scaledSize(item.w, item.h, CARD_LONG_EDGE);
+      return { url: `${siteUrl}${cardPath}`, width: size.width, height: size.height };
+    }
+  }
 
   if (!period.ogImage) return null;
 
-  const fallback = {
+  return {
     url: absUrl(siteUrl, period.ogImage),
     width: period.ogWidth,
     height: period.ogHeight,
   };
-  return { og: fallback, twitter: fallback };
-}
-
-/**
- * 选卡片图 —— **纯函数**：不碰 env、不碰网络，护栏直接 import 它测。
- *
- * 规则（就三条，别自创）：
- *   · 有方图 → og:image = 方图（640×640），twitter:image = 长边版
- *   · 没方图但有长边版 → 两边都用长边版
- *   · 两张都没有 → 返回 null（调用方降级到该期 og.jpg）
- *
- * ⚠️ 有方图时**不再确认长边版存不存在**（longExists 传 false 也照样给 twitter）——
- *   两套图是同一次构建出来的，方图在就说明长边版在；而每多一次 ASSETS 探测
- *   就是多一次网络往返（这个函数每个请求都跑）。
- *
- * @param {object} o
- * @param {string} [o.squarePath] 方形版路径（不存在就是 null）
- * @param {string} [o.longPath]   长边版路径
- * @param {boolean} [o.squareExists] 方形版探测结果
- * @param {boolean} [o.longExists]   长边版探测结果
- * @param {object} o.item  manifest 里那一条（取 w/h 算长边版尺寸）
- * @param {string} o.siteUrl 站点绝对地址
- * @returns {{og:{url:string,width:number,height:number},twitter:{url:string,width:number,height:number}}|null}
- */
-export function pickCardImages({ squarePath, longPath, squareExists, longExists, item, siteUrl }) {
-  const it = item || {};
-  const size = scaledSize(it.w, it.h, CARD_LONG_EDGE);
-
-  if (squarePath && squareExists) {
-    const og = {
-      url: `${siteUrl}${squarePath}`,
-      width: CARD_SQUARE_SIZE,
-      height: CARD_SQUARE_SIZE,
-    };
-    const twitter = longPath
-      ? { url: `${siteUrl}${longPath}`, width: size.width, height: size.height }
-      : og;
-    return { og, twitter };
-  }
-
-  if (longPath && longExists) {
-    const card = { url: `${siteUrl}${longPath}`, width: size.width, height: size.height };
-    return { og: card, twitter: card };
-  }
-
-  return null;
 }
 
 /**
  * 从 item.full 推导卡片图路径。
  *
  * item.full 形如 /img/<日期>/<栏key>/<nonce>_<序号3位>.webp，
- * 卡片图形如 /<日期>/<card|card-sq>/<栏key>/<nonce>_<序号3位>.jpg
- * —— 同 nonce、同序号，只是目录名和扩展名换了。
- *
- * @param {string} date  期号
- * @param {string} tabKey 栏 key
- * @param {string} full  manifest 里的全图地址
- * @param {string} dir   卡片图目录（card = 长边版 / card-sq = 方形版）
- * @returns {string|null}
+ * 卡片图形如 /<日期>/card/<栏key>/<nonce>_<序号3位>.jpg
+ * —— 同 nonce、同序号，只是目录换成 card/、后缀换成 .jpg。
  */
-function cardPathFor(date, tabKey, full, dir = CARD_DIR) {
+function cardPathFor(date, tabKey, full) {
   const m = String(full || '').match(/\/([0-9A-Za-z]+)_(\d{3})\.webp$/);
   if (!m) return null;
-  return `/${date}/${dir}/${tabKey}/${m[1]}_${m[2]}.jpg`;
+  return `/${date}/card/${tabKey}/${m[1]}_${m[2]}.jpg`;
 }
 
 /**
@@ -511,42 +429,16 @@ function normalizeSeq(seq) {
   return { display: trimmed || raw, padded: trimmed ? trimmed.padStart(3, '0') : raw };
 }
 
-/**
- * 卡片图对象归一：缺 url 就当没有（走降级），宽高缺失时用 og.jpg 的规格兜底。
- *
- * ⚠️ **两种形状都收**：
- *   · 扁的 { url, width, height }     —— 旧的（只有一张卡片图）
- *   · { og: {...}, twitter: {...} }   —— 新的（方图给微信 og:image、长边版给 twitter:image）
- *   护栏里有一批断言用的是扁的形状 —— 形状改了它们不能跟着红。
- */
+/** 卡片图对象归一：缺 url 就当没有（走降级），宽高缺失时用 og.jpg 的规格兜底 */
 function normalizeCard(card) {
-  if (!card) return null;
-  const one = card.url ? card : card.og;
-  if (!one || !one.url) return null;
-  const width = Number(one.width);
-  const height = Number(one.height);
+  if (!card || !card.url) return null;
+  const width = Number(card.width);
+  const height = Number(card.height);
   return {
-    url: String(one.url),
+    url: String(card.url),
     width: Number.isFinite(width) && width > 0 ? Math.round(width) : OG_FALLBACK_WIDTH,
     height: Number.isFinite(height) && height > 0 ? Math.round(height) : OG_FALLBACK_HEIGHT,
   };
-}
-
-/**
- * twitter:image 用的那张卡片图（长边版）。
- *
- * 微信的缩略图是 1:1 居中裁剪出来的，方图在那边才好看；
- * 但 X / Telegram 这类渠道按原比例显示，给方图就等于给人家看一圈模糊边。
- * 所以两张并存：og:image = 方图，twitter:image = 长边版。
- *
- * 扁的形状（只有一张）→ 就是它自己；新形状 → card.twitter；都没有 → 退回 og 那张。
- */
-function normalizeTwitterCard(card) {
-  if (!card) return null;
-  if (card.url) return normalizeCard(card);
-  const one = card.twitter || card.og;
-  if (!one || !one.url) return null;
-  return normalizeCard(one);
 }
 
 /** HTML 转义：manifest 里的栏名/描述是外部数据，进标签前必须转义 */

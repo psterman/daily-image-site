@@ -18,7 +18,6 @@
  * ⚠️ **等价变异体**：「卡片图长边 900」在两处都有实现
  *    （tools/build-cards.mjs 的 CARD_MAX_EDGE 与 functions/pic/[[path]].js 的 CARD_LONG_EDGE），
  *    只改一处会出现「另一处兜住了行为 → 护栏不红」的假象，所以 M5 两处一起改。
- *    同理，方形卡片图的**边长**（M10）和**目录名**（M12）也各有两处实现，一起改。
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -144,95 +143,6 @@ const MUTANTS = [
       '静态：site/app.js 里有分享两件套的 id（viewerShare / viewerOriginal）',
       '静态：site/app.js 把网格里的图包在 a.cell-link 里，href 指向单图页',
       '静态：site/template.html 里有那两个 id，且没有 viewerOrigin',
-    ],
-  },
-  /* ↓ 方形卡片图（微信 1:1 裁剪用的那套）—— 2026-11-26 加 */
-  {
-    id: 'M10', file: ['cards', 'fn'], name: '方形卡片图边长从 640 改成 900（生成端和分享页端一起改）',
-    from: {
-      cards: 'export const CARD_SQUARE_SIZE = 640;',
-      fn: 'const CARD_SQUARE_SIZE = 640;',
-    },
-    to: {
-      cards: 'export const CARD_SQUARE_SIZE = 900;',
-      fn: 'const CARD_SQUARE_SIZE = 900;',
-    },
-    expectFail: [
-      '静态：tools/build-cards.mjs 存在，方形卡片图规格是 640×640 / 目录 card-sq',
-      '静态：分享页声明的方形卡片图边长也是 640（跟生成端一致）',
-    ],
-    expectGreen: [
-      '静态：tools/build-cards.mjs 存在，卡片图规格是长边 900 / 质量 70',
-      '静态：分享页声明的卡片图长边也是 900（跟生成端一致）',
-    ],
-  },
-  {
-    id: 'M11', file: 'fn', name: 'og:image 和 twitter:image 搞反了（微信又拿到长边版）',
-    from: '    return { og, twitter };',
-    to: '    return { og: twitter, twitter: og };',
-    expectFail: ['纯函数：pickCardImages 有方图时 og 用方图（640×640）、twitter 用长边版'],
-    expectGreen: [
-      '纯函数：pickCardImages 没有方图时退回长边版（og 和 twitter 同一张）',
-      '纯函数：pickCardImages 两张都没有时返回 null（走 og.jpg 兜底）',
-    ],
-  },
-  {
-    id: 'M12', file: ['cards', 'fn'], name: '方形卡片图目录从 card-sq 改成 card（两套混到一个目录）',
-    from: {
-      cards: "export const CARD_SQUARE_DIR_NAME = 'card-sq';",
-      fn: "const CARD_SQUARE_DIR = 'card-sq';",
-    },
-    to: {
-      cards: "export const CARD_SQUARE_DIR_NAME = 'card';",
-      fn: "const CARD_SQUARE_DIR = 'card';",
-    },
-    expectFail: [
-      '静态：tools/build-cards.mjs 存在，方形卡片图规格是 640×640 / 目录 card-sq',
-      '静态：分享页的方形卡片图目录也是 card-sq（跟生成端一致）',
-    ],
-    expectGreen: [
-      '静态：tools/build-cards.mjs 存在，卡片图规格是长边 900 / 质量 70',
-      '产物：card/jianxiao 的卡片图数量 = 该栏当期的图片数',
-    ],
-  },
-  {
-    id: 'M13', file: 'cards', name: '方图不再有模糊底（直接把长边版裁成方，主体被切掉）',
-    from: 'crop=${size}:${size},gblur=sigma=${blur}[${p}bg2]',
-    to: 'crop=${size}:${size}[${p}bg2]',
-    expectFail: ['静态：方图是「模糊底 + 主体缩进画布居中叠加」，不是直接裁剪'],
-    expectGreen: [
-      '静态：tools/build-cards.mjs 存在，方形卡片图规格是 640×640 / 目录 card-sq',
-      '产物：card-sq/jianxiao 的方形卡片图是 640×640 正方形',
-    ],
-  },
-  {
-    id: 'M14', file: 'build', name: 'build.mjs 不再产出方形卡片图（og:image 退回长边版）',
-    from: '      cardSquareJobs.push({\n        src: destFull,\n        out: path.join(publishedDir, cardSquareRelPath(tab.key, path.basename(relFull))),\n      });',
-    to: '      // 变异：不再产出方形卡片图',
-    expectFail: ['静态：build.mjs 会生成方形卡片图（两条产出路径都挂了 cardSquareJobs）'],
-    expectGreen: [
-      '静态：build.mjs 用 upstreamUrlFor 反解上游原帖',
-      '产物：card/jianxiao 的卡片图长边 = 900（等比放大到 900）',
-    ],
-  },
-  {
-    id: 'M15', file: 'fn', name: 'twitter:image 也指向方图了（X / Telegram 那边带一圈模糊边）',
-    from: '<meta name="twitter:image" content="${esc(twitterCard.url)}">',
-    to: '<meta name="twitter:image" content="${esc(card.url)}">',
-    expectFail: ['纯函数：og:image 优先方形版（640×640），twitter:image 留给长边版'],
-    expectGreen: [
-      '纯函数：og 标签齐全（title / description / image / url / type / twitter:card）',
-      '纯函数：og:image 是绝对 URL（微信爬虫抓不到相对路径）',
-    ],
-  },
-  {
-    id: 'M16', file: 'fn', name: '选图逻辑里没有方图分支了（微信又只能拿到长边版）',
-    from: '  if (squarePath && squareExists) {',
-    to: '  if (false && squarePath && squareExists) {',
-    expectFail: ['纯函数：pickCardImages 有方图时 og 用方图（640×640）、twitter 用长边版'],
-    expectGreen: [
-      '纯函数：pickCardImages 没有方图时退回长边版（og 和 twitter 同一张）',
-      '纯函数：pickCardImages 两张都没有时返回 null（走 og.jpg 兜底）',
     ],
   },
 ];
