@@ -1748,6 +1748,19 @@
       moved = true;
       return;
     }
+    /* 1× 状态下的单指拖动：这里**只处理横向**（横向 = 切图）。
+     *
+     * ⚠️ **横向必须 preventDefault** —— 否则浏览器会把这个横拖
+     *    当成它自己的「横向越界」→ 规范里叫 horizontal swipe navigation →
+     *    **历史回退** → 用户一滑就退出网页（手机端最常见的误退出原因）。
+     *    纵向不拦：viewer 是全屏固定层，纵向本来就不滚，拦了只会挡掉系统行为。
+     *    注：`.viewer-stage` 上还有 `touch-action:none` 兜底，但那是 CSS 层面的，
+     *    老内核/微信 X5 可能不认 —— 显式 preventDefault 才是真正的那道门。 */
+    if (e.touches.length === 1) {
+      var dx = e.touches[0].clientX - panFromX;
+      var dy = e.touches[0].clientY - panFromY;
+      if (Math.abs(dx) > Math.abs(dy)) e.preventDefault();
+    }
     moved = true;
   }, { passive: false });
 

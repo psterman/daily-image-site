@@ -25,6 +25,20 @@ html, body {
   padding: 0;
   background: var(--bg);
   color: var(--text);
+
+  /* ⚠️ **横向越界不许再往上传** —— 这是「右滑一下就退出网页」的根因。
+   *
+   * 机制：视口的横向越界（overscroll）在 Chrome / Android 上会触发
+   * **历史回退**（规范里叫「horizontal swipe navigation」）。
+   * 只要页面上有横向滚动容器（tab 栏、分类 chip），滑到头继续滑 →
+   * **滚动链**一路传到根 → 根再横向越界 → 浏览器判成「用户想后退」→ 页面退出。
+   *
+   * 这里给根兜底：`overscroll-behavior-x: none` 关掉视口的横向越界导航。
+   * ⚠️ 只写 **x**：y 轴留着（不然下拉刷新也被关了，那是另一个行为）。
+   * ⚠️ 老 iOS Safari（<16.4）和微信 X5 会**静默忽略**这个属性
+   *    → 所以真正起作用的是下面两个「显式滚动容器」上的 contain。
+   */
+  overscroll-behavior-x: none;
 }
 
 body {
@@ -170,6 +184,12 @@ button { font-family: inherit; }
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
+
+  /* 滑到头继续滑时**别把越界往上传**（上传 = 根横向越界 = 浏览器回退 = 退出网页）。
+     contain 保留一点边缘弹性反馈，但不再触发原生导航。
+     ⚠️ 这条属性**只在显式滚动容器上生效** —— 根元素上的同款在老 iOS/微信 X5 会被忽略，
+     所以这里是真正管用的那一处。 */
+  overscroll-behavior-x: contain;
 }
 .tabs::-webkit-scrollbar { display: none; }
 
@@ -625,6 +645,10 @@ button { font-family: inherit; }
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
   padding: 10px 0 12px;
+
+  /* 同 tab 栏：越界不外传，外传 = 浏览器回退 = 退出网页。
+     这条最要紧 —— 见报的分类多，滑到头的人最多。 */
+  overscroll-behavior-x: contain;
 }
 .chips::-webkit-scrollbar { display: none; }
 
