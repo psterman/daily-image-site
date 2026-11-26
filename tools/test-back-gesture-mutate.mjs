@@ -15,6 +15,8 @@
  * ⚠️ 锚点为什么这么长：`.tabs` 和 `.chips` 两处的声明**字面完全一样**
  *    （`overscroll-behavior-x: contain;`），所以锚点必须带上**各自那段注释**，
  *    否则命中 2 次 → 直接判脚本坏了。
+ *    同理 `if (viewer.hidden) return;` 在 app.js 里出现两次（键盘处理器 + popstate 处理器），
+ *    B6 的锚点必须带下面那行 `trapId = 0;` 才唯一。
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -80,6 +82,45 @@ const MUTANTS = [
     expectGreen: [
       '真浏览器：横向拖动仍然切图（老行为不坏）',
       '真浏览器：查看器里纵向拖动不被拦',
+    ],
+  },
+  {
+    id: 'B5', file: 'app', name: '返回陷阱不压历史了（看大图时按返回会退出整页）',
+    from: "    try {\n      history.pushState({ vt: trapId }, '');\n    } catch (e) {\n      trapId = 0;   // 压不进去就算了 —— 不能因此把关闭逻辑弄坏\n    }",
+    to: '    /* 变异：不压历史 */\n    trapId = 0;',
+    expectFail: [
+      '静态：返回陷阱有 pushState（压历史）+ popstate 监听（接住返回）',
+      '真浏览器：打开大图时压了一条历史（返回手势会被大图吃掉）',
+      '真浏览器：查看器开着时按返回 → 大图关上、页面没退出去',
+    ],
+    expectGreen: [
+      '真浏览器：关掉大图后陷阱被收回（下一次返回是正常退出页面）',
+      '真浏览器：关掉大图后按返回，页面能真的退出去（陷阱不困人）',
+    ],
+  },
+  {
+    id: 'B6', file: 'app', name: 'popstate 里条件写反了（大图关不掉，返回手势照样退页面）',
+    from: "    if (viewer.hidden) return;   // 没有大图可关 → 放行，页面正常后退\n    trapId = 0;",
+    to: "    if (!viewer.hidden) return;   // 变异：条件写反了\n    trapId = 0;",
+    expectFail: ['真浏览器：查看器开着时按返回 → 大图关上、页面没退出去'],
+    expectGreen: [
+      '静态：返回陷阱有 pushState（压历史）+ popstate 监听（接住返回）',
+      '真浏览器：打开大图时压了一条历史（返回手势会被大图吃掉）',
+      '真浏览器：关掉大图后陷阱被收回（下一次返回是正常退出页面）',
+      '真浏览器：关掉大图后按返回，页面能真的退出去（陷阱不困人）',
+    ],
+  },
+  {
+    id: 'B7', file: 'app', name: '关掉大图时不收回陷阱（返回键得多按一次才出得来）',
+    from: '    if (!opts.fromPopstate) popTrap();',
+    to: '    /* 变异：不收回陷阱 */',
+    expectFail: [
+      '真浏览器：关掉大图后陷阱被收回（下一次返回是正常退出页面）',
+      '真浏览器：关掉大图后按返回，页面能真的退出去（陷阱不困人）',
+    ],
+    expectGreen: [
+      '真浏览器：打开大图时压了一条历史（返回手势会被大图吃掉）',
+      '真浏览器：查看器开着时按返回 → 大图关上、页面没退出去',
     ],
   },
 ];

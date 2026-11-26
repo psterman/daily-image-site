@@ -24,6 +24,7 @@
  *   · 真浏览器：**滚动链本体** —— 把 chips 拖到头再往外拖，**文档不能被带着滚**
  *   · 真浏览器：查看器里横向拖动**被页面接管**（defaultPrevented），
  *     纵向拖动**不被拦**（别把系统行为挡掉），横向拖动**仍然切图**（老行为不坏）
+ *   · 真浏览器：**返回陷阱** —— 看大图时按返回，关的是大图，不是整页
  */
 import http from 'node:http';
 import fs from 'node:fs';
@@ -168,6 +169,13 @@ check('静态：查看器 1× 横向拖动分支有 preventDefault（页面接�
   /Math\.abs\(dx\)\s*>\s*Math\.abs\(dy\)[^\n]*\n?[^\n]*preventDefault/.test(js) ||
   /preventDefault\(\);\s*\n[^\n]*\/\*[^*]*\*\/\s*\n?[^\n]*moved = true/.test(js) ||
   /Math\.abs\(dx\)\s*>\s*Math\.abs\(dy\)[\s\S]{0,120}?preventDefault\(\)/.test(js));
+check('静态：返回陷阱有 pushState（压历史）+ popstate 监听（接住返回）',
+  /^[ \t]*history\.pushState\(/m.test(js) &&
+  /^[ \t]*window\.addEventListener\('popstate'/m.test(js),
+  {
+    pushState: /^[ \t]*history\.pushState\(/m.test(js),
+    popstate: /^[ \t]*window\.addEventListener\('popstate'/m.test(js),
+  });
 
 /* ─────────────────────────────────────────────────────────
  * ② 真浏览器：computed style + 滚动链 + 手势
@@ -304,6 +312,101 @@ await page.waitForTimeout(400);
 const afterV = await page.evaluate(() => window.__mv.slice());
 check('真浏览器：查看器里纵向拖动不被拦（系统行为照旧）',
   afterV.length === 0 || afterV[afterV.length - 1] === false, afterV.slice(-3));
+
+/* ─────────────────────────────────────────────────────────
+ * ⑤ 返回陷阱：看大图时按返回 → 关的是大图，不是整页
+ *
+ * ⚠️ 这几组用**独立的页面**跑：万一陷阱没生效，history.back()
+ *    会真的把页面退走（回到上一张），放在共用页面上会把前面
+ *    几组断言一起带偏 —— 那叫「状态串场」，护栏就不可信了。
+ * ───────────────────────────────────────────────────────── */
+const trapPage = await ctx.newPage();
+await trapPage.route('**/likes/api*', (route) =>
+  route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"count":0}' }),
+);
+await trapPage.goto(base, { waitUntil: 'domcontentloaded' });
+await trapPage.waitForTimeout(400);
+
+const trapLenBefore = await trapPage.evaluate(() => history.length);
+await trapPage.click('#grid-jianxiao .cell');
+await trapPage.waitForFunction(() => {
+  const i = document.getElementById('viewerImg');
+  return !!i && i.complete && i.naturalWidth > 0;
+}, { timeout: 15000 });
+await trapPage.waitForTimeout(300);
+const trapOpen = await trapPage.evaluate(() => ({
+  len: history.length,
+  state: history.state,
+}));
+check('真浏览器：打开大图时压了一条历史（返回手势会被大图吃掉）',
+  trapOpen.len === trapLenBefore + 1 && !!(trapOpen.state && trapOpen.state.vt),
+  { before: trapLenBefore, after: trapOpen });
+
+/* 关掉大图 → 我们把自己压的那条退掉 → 返回键恢复正常（不多按一次）。
+ *
+ * ⚠️ 判据不能看 `history.length` —— 按规范，**后退不会让 length 变短**
+ *    （前进位还留在列表里，只是当前项退回去了）；length 变短是「又压了一条」才有的效果。
+ *    精确判据 = **当前项不再是陷阱项**（history.state 里没有我们写的 vt 标记）。
+ */
+await trapPage.click('#viewerClose');
+await trapPage.waitForTimeout(400);
+const trapClosed = await trapPage.evaluate(() => ({ len: history.length, state: history.state }));
+check('真浏览器：关掉大图后陷阱被收回（下一次返回是正常退出页面）',
+  !(trapClosed.state && trapClosed.state.vt), { before: trapOpen, after: trapClosed });
+
+/* 再打开一次 → 按返回 → 大图关上，页面不退出 */
+await trapPage.click('#grid-jianxiao .cell');
+await trapPage.waitForFunction(() => {
+  const v = document.getElementById('viewer');
+  return v && !v.hidden;
+}, { timeout: 15000 });
+await trapPage.waitForTimeout(300);
+/* 这个标记只有「页面没被重新加载」才会还在 */
+await trapPage.evaluate(() => { window.__noReload = 'ok'; });
+await trapPage.evaluate(() => history.back());
+await trapPage.waitForTimeout(500);
+
+/* 陷阱没生效时，history.back() 会把页面真的退走 → evaluate 会抛。
+ * 那不是「护栏崩了」，那是**这一条断言该红** —— 抓住它，别让整套脚本崩掉。 */
+let afterBack = null;
+try {
+  afterBack = await trapPage.evaluate(() => ({
+    hidden: document.getElementById('viewer')?.hidden,
+    noReload: window.__noReload === 'ok',
+    href: location.href,
+    cells: document.querySelectorAll('#grid-jianxiao .cell').length,
+  }));
+} catch (e) {
+  afterBack = { hidden: null, noReload: false, href: '', cells: 0, error: String(e && e.message || e) };
+}
+check('真浏览器：查看器开着时按返回 → 大图关上、页面没退出去',
+  !!afterBack && afterBack.hidden === true && afterBack.noReload === true &&
+  String(afterBack.href).startsWith(base) && afterBack.cells > 0,
+  afterBack);
+
+/* 最后一条：陷阱**不能把用户困在站内**（返回键怎么按都出不去 = 骚扰）。
+   关掉大图后按返回 → 页面要真的退走。 */
+const leavePage = await ctx.newPage();
+await leavePage.goto(base, { waitUntil: 'domcontentloaded' });
+await leavePage.waitForTimeout(400);
+await leavePage.click('#grid-jianxiao .cell');
+await leavePage.waitForFunction(() => {
+  const v = document.getElementById('viewer');
+  return v && !v.hidden;
+}, { timeout: 15000 });
+await leavePage.waitForTimeout(300);
+await leavePage.click('#viewerClose');
+await leavePage.waitForTimeout(400);
+await leavePage.evaluate(() => history.back());
+await leavePage.waitForTimeout(600);
+let afterLeave = null;
+try {
+  afterLeave = await leavePage.evaluate(() => ({ href: location.href }));
+} catch (e) {
+  afterLeave = { href: '<上下文已销毁>', error: String(e && e.message || e) };
+}
+check('真浏览器：关掉大图后按返回，页面能真的退出去（陷阱不困人）',
+  !(afterLeave && String(afterLeave.href).startsWith(base)), afterLeave);
 
 await browser.close();
 server.close();

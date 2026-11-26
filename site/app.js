@@ -1552,6 +1552,80 @@
     applyZoom();
   }
 
+  /* ── 返回陷阱：看大图时按返回，别把整页退出去 ──────────────
+     CSS 那一侧（overscroll-behavior）能拦掉「页面自己造成的横向越界」，
+     但**系统级边缘返回**（iOS Safari 的右滑、微信里右滑退出到聊天列表）
+     那是宿主行为，页面拦不住。
+
+     能做的代码级缓解是**返回陷阱**：打开大图时往历史里压一条，
+     用户按返回 / 右滑时退掉的是**这一条** → popstate 里把大图关掉，
+     而不是让整页退出去。
+
+     ⚠️ **只压一条**，而且**只在查看器开着的时候压**：
+        压多了会把用户困在站内（返回键怎么按都出不去），那是骚扰。
+        一条 = 「看图时那一次返回被大图吃掉」；
+        关掉大图时我们把这条退掉 → 下一次返回照旧正常退出页面。 */
+  var trapId = 0;            // 当前压着的那条陷阱的编号（0 = 没压）
+  var trapSeq = 0;           // 编号自增
+  var trapBacking = false;   // 「我们自己退掉那条」还没落地
+  var trapBackToken = 0;     // 用来作废过期的兜底定时器
+  var trapWaiters = [];      // 等「退干净了」再压新一条的排队
+
+  function flushTrapWaiters() {
+    var ws = trapWaiters;
+    trapWaiters = [];
+    for (var i = 0; i < ws.length; i++) {
+      try { ws[i](); } catch (e) { /* 压不进去就算了，不能连累别的 */ }
+    }
+  }
+
+  /** 压一条历史。URL 用空串 = 保持当前地址不变（只是多一条历史）。 */
+  function pushTrap() {
+    trapId = ++trapSeq;
+    try {
+      history.pushState({ vt: trapId }, '');
+    } catch (e) {
+      trapId = 0;   // 压不进去就算了 —— 不能因此把关闭逻辑弄坏
+    }
+  }
+
+  /** 把自己压的那条退掉 —— 让用户下一次返回是「正常退出页面」，而不是白白多按一次 */
+  function popTrap() {
+    if (!trapId) return;
+    trapId = 0;
+    trapBacking = true;
+    var myToken = ++trapBackToken;
+    try {
+      history.back();
+    } catch (e) {
+      trapBacking = false;
+      return;
+    }
+    /* 兜底：万一回声没来（history.back() 什么也没做），
+       1.5 秒后自己把标志清掉 —— 别把陷阱永久卡死。 */
+    setTimeout(function () {
+      if (trapBackToken !== myToken) return;   // 已经有更新的动作了
+      if (!trapBacking) return;                // 回声已经到了
+      trapBacking = false;
+      flushTrapWaiters();
+    }, 1500);
+  }
+
+  window.addEventListener('popstate', function () {
+    if (trapBacking) {
+      /* 回声：是我们自己在 closeViewer 里退掉那条触发的 —— 什么都不用做 */
+      trapBacking = false;
+      trapBackToken++;      // 作废兜底定时器
+      flushTrapWaiters();
+      return;
+    }
+    /* 不是回声 = 用户自己按了返回 / 做了边缘返回手势。
+       大图开着 → 关大图，**页面不退出**。 */
+    if (viewer.hidden) return;   // 没有大图可关 → 放行，页面正常后退
+    trapId = 0;                  /* 那条历史已经被浏览器退掉了 */
+    closeViewer({ fromPopstate: true });
+  });
+
   function openViewer(key, index) {
     vTab = key;
     vIndex = index;
@@ -1560,15 +1634,29 @@
     resetZoom();
     renderViewer();
     viewerHint.className = 'viewer-hint';
+    /* 压一条历史，让返回手势先被大图吃掉（见上面的「返回陷阱」） */
+    if (trapBacking) {
+      /* 上一条陷阱正在退 —— 等退干净了再压新的。
+         不等的话会多压一条 → 用户返回要多按一次才出得来。 */
+      trapWaiters.push(pushTrap);
+    } else {
+      pushTrap();
+    }
   }
 
-  function closeViewer() {
+  function closeViewer(opts) {
+    opts = opts || {};
     clearTimeout(closeTimer);
     viewer.hidden = true;
     document.body.style.overflow = '';
     viewerImg.removeAttribute('src');
     resetZoom();
     abortPreloads();
+    /* 大图都关了，排队等着压的那条也作废（别压出一条没人管的陷阱） */
+    trapWaiters.length = 0;
+    /* 从 popstate 进来时，那条历史**已经被浏览器退掉了** —— 不能再退一次，
+       再退一次就把页面本身退出去了。 */
+    if (!opts.fromPopstate) popTrap();
   }
 
   function renderViewer() {
