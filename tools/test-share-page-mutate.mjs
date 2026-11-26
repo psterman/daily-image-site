@@ -99,16 +99,17 @@ const MUTANTS = [
     ],
   },
   {
-    id: 'M6', file: 'fn', name: 'renderSharePage 在没有 src 时也渲染「看原帖」（空链接）',
-    from: '  const srcLink = srcUrl\n    ? `\\n    <a class="btn" href="${esc(srcUrl)}" target="_blank" rel="noopener noreferrer">看原帖</a>`\n    : \'\';',
-    to: '  const srcLink = `\\n    <a class="btn" href="${esc(srcUrl)}" target="_blank" rel="noopener noreferrer">看原帖</a>`;',
+    id: 'M6', file: 'fn', name: '分享页又把「看原帖」渲染回来了（入口已下线，不许复活）',
+    from: '    <a class="btn" href="${esc(fullUrl)}">原图</a>\n    <a class="btn" href="${esc(`${siteUrl}/${date}/`)}">回到这一期</a>',
+    to: '    <a class="btn" href="${esc(fullUrl)}">原图</a>\n    <a class="btn" href="https://t.me/jandan_pic/184601" target="_blank" rel="noopener noreferrer">看原帖</a>\n    <a class="btn" href="${esc(`${siteUrl}/${date}/`)}">回到这一期</a>',
     expectFail: [
-      '纯函数：没传 src 时 HTML 里没有「看原帖」',
-      '真浏览器：没有 src 时「看原帖」整个不出现',
+      '静态：分享页不渲染「看原帖」、不读上游地址（入口已下线）',
+      '纯函数：即使传了 src，HTML 里也没有「看原帖」（入口已下线）',
+      '真浏览器：「看原帖」**整个不存在**（入口已下线，微信会拦 t.me 外链）',
     ],
     expectGreen: [
-      '纯函数：传了 src 时 HTML 里有「看原帖」',
-      '真浏览器：「看原帖」有 src 时可见且 href 正确',
+      '纯函数：og:url 指向单图页（序号补 3 位）',
+      '真浏览器：「原图」链接指向 item.full 的绝对地址',
     ],
   },
   {
@@ -132,13 +133,16 @@ const MUTANTS = [
     ],
   },
   {
-    id: 'M9', file: 'app', name: '前端 #viewerOrigin 不做条件显示（没有 src 也留个空按钮）',
-    from: '      if (upstream) {\n        originLink.setAttribute(\'href\', upstream);\n        originLink.hidden = false;\n      } else {\n        originLink.removeAttribute(\'href\');\n        originLink.hidden = true;\n      }',
-    to: '      originLink.setAttribute(\'href\', upstream || \'#\');\n      originLink.hidden = false;',
-    expectFail: ['静态：site/app.js 里 #viewerOrigin 按 item.src 条件显示'],
+    id: 'M9', file: 'app', name: '前端把 #viewerOrigin 加回来（入口已下线，不许复活）',
+    from: '    var origLink = document.getElementById(\'viewerOriginal\');',
+    to: '    var origLink = document.getElementById(\'viewerOriginal\');\n    var originLink = document.getElementById(\'viewerOrigin\');',
+    expectFail: [
+      '静态：site/app.js 里没有 viewerOrigin、也没有消费上游地址（入口已下线）',
+    ],
     expectGreen: [
-      '静态：site/app.js 里有分享三件套的 id（viewerShare / viewerOriginal / viewerOrigin）',
-      '静态：site/template.html 里有那三个 id',
+      '静态：site/app.js 里有分享两件套的 id（viewerShare / viewerOriginal）',
+      '静态：site/app.js 把网格里的图包在 a.cell-link 里，href 指向单图页',
+      '静态：site/template.html 里有那两个 id，且没有 viewerOrigin',
     ],
   },
 ];
@@ -209,7 +213,10 @@ try {
     for (let i = 0; i < keys.length; i++) {
       const from = pieceOf(m.from, keys[i]);
       const to = pieceOf(m.to, keys[i]);
-      const next = srcs[i].replace(from, to);
+      /* ⚠️ **必须用函数形式的 replace** —— 字符串形式会把 to 里的 `$` 当成
+         特殊模式（`$` + 反引号 = 匹配点之前的全部内容）。本文件的 to 里
+         就有 `${esc(fullUrl)}` 这种带 `$` 的模板串。 */
+      const next = srcs[i].replace(from, () => to);
       if (next === srcs[i]) { mutated = false; break; }
       fs.writeFileSync(TARGETS[keys[i]], next, 'utf8');
     }

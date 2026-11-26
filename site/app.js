@@ -185,23 +185,12 @@
         '&thumb=' + encodeURIComponent(entry.item.thumb),
     );
 
-    /* 分享三件套 —— 全部跟着**当前查看的那张图**走（vTab / vIndex）。
-       「看原帖」只有上游给了地址才有（目前只有见笑有），
-       没有就**整个元素不显示**，不能留一个点了没反应的空按钮。 */
+    /* 分享两件套 —— 全部跟着**当前查看的那张图**走（vTab / vIndex）。
+       ⚠️ 这里**没有**「看原帖」：上游原帖是 t.me 外链，微信内置浏览器会拦
+       （点开是微信自己的「已停止访问该网页」页）—— 入口已下线，
+       现在的主流程是「复制这张图的链接 → 对方点进站看原图」。 */
     var origLink = document.getElementById('viewerOriginal');
     if (origLink) origLink.setAttribute('href', absoluteUrl(entry.item.full));
-
-    var originLink = document.getElementById('viewerOrigin');
-    if (originLink) {
-      var upstream = safeHref(entry.item.src);
-      if (upstream) {
-        originLink.setAttribute('href', upstream);
-        originLink.hidden = false;
-      } else {
-        originLink.removeAttribute('href');
-        originLink.hidden = true;
-      }
-    }
   }
 
   /** 点赞：幂等切换，on = 目标状态 */

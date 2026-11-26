@@ -78,30 +78,38 @@ check('静态：functions/pic/[[path]].js 存在并导出 onRequest 与 renderSh
   /export function renderSharePage\(/.test(fnSrc), '');
 check('静态：分享页声明的卡片图长边也是 900（跟生成端一致）',
   /const CARD_LONG_EDGE = 900;/.test(fnSrc), '');
+/* ⚠️ **「看原帖」入口已下线**（2026-11-26 用户拍板）：上游原帖是 t.me 外链，
+   微信内置浏览器会拦成微信自己的「已停止访问该网页」页 → 留着就是给用户埋雷。
+   这里盯的是「**一个都不许有**」：分享页不许再渲染那个按钮，
+   也不许再读那条上游地址（否则哪天又被加回来）。
+   ⚠️ 正则必须排除 viewerOriginal —— 它是 viewerOrigin 的**子串**，
+   直接写 /viewerOrigin/ 会把「原图」按钮也一起判红。 */
+check('静态：分享页不渲染「看原帖」、不读上游地址（入口已下线）',
+  !/>看原帖</.test(fnSrc) && !/srcLink/.test(fnSrc) && !/item\.src/.test(fnSrc), '');
 
 const appSrc = readSrc(path.join('site', 'app.js'));
 check('静态：site/app.js 里能看出单图页路径的拼法 /pic/<日期>/<栏key>/<序号3位>/',
   /function pagePath\(/.test(appSrc) &&
   /'\/pic\/'/.test(appSrc) &&
   /padStart\(3, '0'\)/.test(appSrc), '');
-check('静态：site/app.js 里有分享三件套的 id（viewerShare / viewerOriginal / viewerOrigin）',
+check('静态：site/app.js 里有分享两件套的 id（viewerShare / viewerOriginal）',
   /getElementById\('viewerShare'\)/.test(appSrc) &&
-  /getElementById\('viewerOriginal'\)/.test(appSrc) &&
-  /getElementById\('viewerOrigin'\)/.test(appSrc), '');
-/* 「看原帖」必须**有 src 才显示** —— 没有上游地址时留一个点了没反应的按钮更糟。
-   这里盯的是「两个分支都在」：src 有 → hidden=false；src 没有 → hidden=true。
-   只写一半（永远显示 / 永远隐藏）都要红。 */
-check('静态：site/app.js 里 #viewerOrigin 按 item.src 条件显示（有 src 才显示，没有就隐藏）',
-  /var upstream = safeHref\(entry\.item\.src\);[\s\S]{0,300}?originLink\.hidden = false;[\s\S]{0,300}?originLink\.hidden = true;/.test(appSrc), '');
+  /getElementById\('viewerOriginal'\)/.test(appSrc), '');
+/* ⚠️ 「看原帖」入口已下线：app.js 里既不能有 #viewerOrigin，
+   也不能再有上游地址的消费（manifest 的 src 字段仍然保留 —— 上游反解机制备用 ——
+   但**没有任何入口消费它**）。
+   ⚠️ 正则必须排除 viewerOriginal —— 它是 viewerOrigin 的**子串**。 */
+check('静态：site/app.js 里没有 viewerOrigin、也没有消费上游地址（入口已下线）',
+  !/viewerOrigin(?!al)/.test(appSrc) && !/entry\.item\.src/.test(appSrc), '');
 check('静态：site/app.js 把网格里的图包在 a.cell-link 里，href 指向单图页',
   /className = 'cell-link'/.test(appSrc) &&
   /setAttribute\('href', pagePath\(tab\.key, i\)\)/.test(appSrc), '');
 
 const tplSrc = readSrc(path.join('site', 'template.html'));
-check('静态：site/template.html 里有那三个 id',
+check('静态：site/template.html 里有那两个 id，且没有 viewerOrigin',
   /id="viewerShare"/.test(tplSrc) &&
   /id="viewerOriginal"/.test(tplSrc) &&
-  /id="viewerOrigin"/.test(tplSrc), '');
+  !/id="viewerOrigin"/.test(tplSrc), '');
 
 /* ══════════════════════════════════════════════════════════════
    B. 纯函数断言 —— 真 import 源码，不许抄逻辑
@@ -199,15 +207,16 @@ check('纯函数：og:title 格式 = <栏中文名> <序号> · <日期>（序�
 check('纯函数：og:url 指向单图页（序号补 3 位）',
   ogUrl === SITE_URL + '/pic/2026-11-26/jianxiao/001/', ogUrl);
 
-/* 有 src → 有「看原帖」 */
-check('纯函数：传了 src 时 HTML 里有「看原帖」',
-  html.includes('看原帖') && html.includes('href="https://t.me/jandan_pic/184601"'), '');
+/* ⚠️ 「看原帖」入口已下线（2026-11-26 用户拍板）：t.me 外链在微信内置浏览器里
+   会被拦成「已停止访问该网页」→ **传了 src 也不许渲染**，更不许渲染成死链。 */
+check('纯函数：即使传了 src，HTML 里也没有「看原帖」（入口已下线）',
+  !html.includes('看原帖') && !html.includes('https://t.me/'), '');
 
-/* 没 src → **没有**「看原帖」（这条最容易被漏：多渲染一个死链比不渲染更糟） */
+/* 没 src → 同样没有（这条留着当回归：别以为「有 src 才渲染」还能蒙混过关） */
 const noSrcItem = { ...BASE.item };
 delete noSrcItem.src;
 const htmlNoSrc = shareMod.renderSharePage({ ...BASE, item: noSrcItem });
-check('纯函数：没传 src 时 HTML 里没有「看原帖」',
+check('纯函数：没传 src 时 HTML 里同样没有「看原帖」',
   !htmlNoSrc.includes('看原帖'), '');
 
 /* 降级：当期没有卡片图 → 用该期的 og.jpg */
@@ -298,6 +307,7 @@ try {
       natural: img ? img.naturalWidth : 0,
       originHref: origin ? origin.getAttribute('href') : '',
       originVisible: origin ? origin.getClientRects().length > 0 : false,
+      originText: origin ? origin.textContent.trim() : '',
       originalHref: original ? original.getAttribute('href') : '',
       backHref: back ? back.getAttribute('href') : '',
       marker: !!document.querySelector('meta[name="share-page"][content="1"]'),
@@ -308,8 +318,8 @@ try {
 
   check('真浏览器：页面里的全尺寸图能加载（naturalWidth > 0）', seen.natural > 0, seen);
   check('真浏览器：「原图」链接指向 item.full 的绝对地址', seen.originalHref === SITE_URL + FULL, seen);
-  check('真浏览器：「看原帖」有 src 时可见且 href 正确',
-    seen.originVisible && seen.originHref === 'https://t.me/jandan_pic/184601', seen);
+  check('真浏览器：「看原帖」**整个不存在**（入口已下线，微信会拦 t.me 外链）',
+    !seen.originVisible && !seen.originHref && seen.originText === '', seen);
   check('真浏览器：「回到这一期」指向 https://example.com/' + DATE + '/',
     seen.backHref === SITE_URL + '/' + DATE + '/', seen);
   check('真浏览器：页面里有 share-page 标记', seen.marker, seen);
@@ -325,7 +335,7 @@ try {
       bodyHas: document.body.innerText.includes('看原帖'),
     };
   });
-  check('真浏览器：没有 src 时「看原帖」整个不出现', !without.hasOrigin && !without.bodyHas, without);
+  check('真浏览器：没有 src 的单图页同样没有「看原帖」', !without.hasOrigin && !without.bodyHas, without);
 
   check('真浏览器：这一路没有 JS 报错', errors.length === 0, errors);
   await ctx.close();

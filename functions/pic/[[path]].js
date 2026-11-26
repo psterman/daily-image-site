@@ -139,8 +139,7 @@ export async function onRequest(context) {
  *   tabKey    栏 key，如 jianxiao
  *   tabLabel  栏中文名，如 见笑
  *   seq       序号（数字或字符串都行），显示时去掉前导零，URL 里补成 3 位
- *   item      manifest 里的那一条：{ id, w, h, tw, th, thumb, full, lqip, src? }
- *             src 是上游原帖 URL，**可选**，没有就不写这个键
+ *   item      manifest 里的那一条：{ id, w, h, tw, th, thumb, full, lqip }
  *   cardImage 卡片图 { url, width, height }；传 null 表示降级用 <日期>/og.jpg
  *
  * 返回：完整 HTML 字符串
@@ -156,7 +155,6 @@ export function renderSharePage(opts) {
   const item = o.item || {};
 
   const fullUrl = absUrl(siteUrl, item.full);
-  const srcUrl = item.src ? String(item.src).trim() : '';
   const pageUrl = `${siteUrl}/pic/${date}/${tabKey}/${seq.padded}/`;
 
   // 卡片图：没传就降级用该期的 og.jpg
@@ -169,10 +167,10 @@ export function renderSharePage(opts) {
   const title = `${tabLabel} ${seq.display} · ${date}`;
   const desc = `${siteName} · ${date} ${tabLabel}第 ${seq.display} 张 · 点开看原图`;
 
-  // 「看原帖」只有 manifest 里带 src（上游原帖 URL）时才出现
-  const srcLink = srcUrl
-    ? `\n    <a class="btn" href="${esc(srcUrl)}" target="_blank" rel="noopener noreferrer">看原帖</a>`
-    : '';
+  /* ⚠️ 这里**不渲染**「看原帖」：上游原帖是 t.me 外链，微信内置浏览器会拦成
+     微信自己的「已停止访问该网页」页 —— 用户点了只会一脸懵。
+     主流程是「复制本页链接 → 对方点进来在这个站看原图」。
+     manifest 里那条上游地址字段仍然保留（上游反解机制备用），但**没有任何入口消费它**。 */
 
   return `<!DOCTYPE html>
 <html lang="zh-CN">
@@ -230,7 +228,7 @@ export function renderSharePage(opts) {
     <img src="${esc(fullUrl)}" alt="${esc(title)}" decoding="async">
   </a>
   <div class="acts">
-    <a class="btn" href="${esc(fullUrl)}">原图</a>${srcLink}
+    <a class="btn" href="${esc(fullUrl)}">原图</a>
     <a class="btn" href="${esc(`${siteUrl}/${date}/`)}">回到这一期</a>
   </div>
   <p class="tip">长按图片可保存</p>
