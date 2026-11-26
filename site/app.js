@@ -159,7 +159,7 @@
     return siteOrigin() + p;
   }
 
-  /** 查看器底部的赞数 / 评论数 / 评论链接 + 分享三件套（复制链接 / 原图 / 看原帖） */
+  /** 查看器底部的赞数 / 评论数 / 评论链接 + 分享两件套（复制链接 / 原图） */
   function syncViewerActions() {
     var likeBtn = document.getElementById('viewerLike');
     var cmtLink = document.getElementById('viewerComment');
