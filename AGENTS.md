@@ -1322,6 +1322,9 @@ https://wechat2rss.bestblogs.dev/img-proxy/?k=0dd9c3af&u=https%3A%2F%2Fmmbiz.qpi
 - **两仓一致性脚本自己也会骗人** —— 2026-11-26 实测两处：`from:'index'` 的文件它把副本暂存区跟**自己**比
   → 那个文件**从来没真比过**（永远「一致」）；脱敏规则没覆盖**转义双反斜杠**形式（`C:\\Users\\pstem\\Downloads`）
   → 两仓明明一样却报不一致。⚠️ **检查脚本本身也要被检查** —— 「比较的对象选错了」和「护栏没牙齿」是同一类假绿。
+- **「做成 apk」并不能让微信分享变好 —— 系统分享面板发不出卡片** —— 2026-11-28 评估核实：apk 里**不接微信 SDK** → 只能调系统分享面板（`ACTION_SEND`）→ 微信收到的是**纯图片 + 一段文字链接**，**不是**带缩略图的图文卡片（卡片是「分享链接」才有的，系统面板给的是「分享文件 + 文本」）。要在 App 里出卡片，得接微信开放平台「移动应用」SDK（`WXMediaMessageLink`）→ 需要**企业资质**的开放平台账号（个人开发者申请不到移动应用接入）+ 应用审核 + 域名白名单。
+  → **apk 的增量在「打开方式 / 离线 / 原生感」，不在核心玩法**；而网页那条路（长按图 → 发送给朋友 → 带缩略图的卡片）已经是微信里能拿到的最好形态。**别为了「分享更好」去做 apk**。评估全文见 `docs/apk-assessment.md`
+- **套壳成 WebView 后，Android 返回键必须先 `goBack()` 再 `finish()`** —— 本站的「返回陷阱」（CHECKPOINT 第十三章）打开大图时 `history.pushState` 压了一条历史 → 套壳里 `webView.canGoBack()` **为 true** → 若 App 无条件 `finish()`，用户按返回会**直接退出 App**，大图关不掉。正解：把返回键先交给网页（`canGoBack()` → `goBack()`），让网页自己的 `popstate` 处理器关大图并把陷阱收回，网页消费不掉时才 `finish()`。
 
 ---
 
@@ -1339,6 +1342,7 @@ https://wechat2rss.bestblogs.dev/img-proxy/?k=0dd9c3af&u=https%3A%2F%2Fmmbiz.qpi
 - **macOS 那台（Mac mini）**：自动息屏。**息屏不影响后台任务**（macOS 息屏只关显示器）；
   真正打断它的是**系统睡眠** → 要 `sudo pmset -c sleep 0`；还有 **LaunchAgent 属于用户会话 → 注销后就不跑**（锁屏无妨）。
   详细迁移步骤与验收清单见 `docs/macos-migration.md`。**那边的真机验证还没做**
+- **本机没有 JDK / Android SDK / Gradle / adb**（只有 Node：`~/.tools/nodejs/node.exe`；`JAVA_HOME` / `ANDROID_HOME` 都是空）→ 要做 apk 得先装工具链（JDK 17 ≈300MB + Android SDK ≈4~6GB，**装 D 盘**：D 剩 96GB / E 剩 102GB / C 只剩 35.8GB，Android Studio 本体也别装 C）。评估见 `docs/apk-assessment.md`
 
 ---
 
